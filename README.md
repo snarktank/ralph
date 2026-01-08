@@ -26,7 +26,12 @@ Copy the ralph files into your project:
 # From your project root
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
+
+# Copy the prompt template for your AI tool of choice:
+cp /path/to/ralph/prompt-amp.md scripts/ralph/prompt.md    # For Amp
+# OR
+cp /path/to/ralph/prompt-claude.md scripts/ralph/prompt.md # For Claude Code
+
 chmod +x scripts/ralph/ralph.sh
 ```
 
@@ -100,7 +105,8 @@ Ralph will:
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
-| `prompt.md` | Instructions given to each AI instance |
+| `prompt-amp.md` | Prompt template for Amp (copy to `prompt.md` in your project) |
+| `prompt-claude.md` | Prompt template for Claude Code (copy to `prompt.md` in your project) |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -185,9 +191,9 @@ cat progress.txt
 git log --oneline -10
 ```
 
-## Customizing prompt.md
+## Customizing the Prompt
 
-Edit `prompt.md` to customize Ralph's behavior for your project:
+After copying `prompt-amp.md` or `prompt-claude.md` to your project as `prompt.md`, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
