@@ -70,18 +70,17 @@ mkdir -p "$AMP_SKILLS_DIR"
 echo "Installing skills globally to $AMP_SKILLS_DIR..."
 
 for skill in "prd" "ralph"; do
-    SKILL_URL="$GITHUB_REPO/skills/$skill"
-    DEST="$AMP_SKILLS_DIR/$skill"
-    FULL_URL="$SKILL_URL/SKILL.md"
+    mkdir -p "$AMP_SKILLS_DIR/$skill"
 
-    echo -n "  - Downloading $skill skill ($FULL_URL)..."
-    if curl -fsSL "$FULL_URL" -o "$DEST/SKILL.md"; then
+    echo -n "  - Downloading $skill skill..."
+    TEMP_FILE=$(mktemp)
+    if curl -fsSL "$GITHUB_REPO/skills/$skill/SKILL.md" -o "$TEMP_FILE" 2>/dev/null && mv "$TEMP_FILE" "$AMP_SKILLS_DIR/$skill/SKILL.md"; then
         echo " ✔"
     else
         echo " ✖ FAILED (skipping)"
+        rm -f "$TEMP_FILE"
     fi
 done
-echo "✔ Skills installed."
 echo ""
 
 # Success message
