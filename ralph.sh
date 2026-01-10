@@ -10,6 +10,7 @@ PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
+ENGINE="${RALPH_ENGINE:-codex}"
 
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
@@ -58,9 +59,47 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "═══════════════════════════════════════════════════════"
   echo "  Ralph Iteration $i of $MAX_ITERATIONS"
   echo "═══════════════════════════════════════════════════════"
-  
-  # Run amp with the ralph prompt
-  OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
+
+  if [ "$ENGINE" = "codex" ]; then
+    LAST_MESSAGE_FILE="$SCRIPT_DIR/.last-message"
+    rm -f "$LAST_MESSAGE_FILE"
+
+    CODEX_ARGS=()
+    if [ "${RALPH_CODEX_FULL_AUTO:-}" = "1" ]; then
+      CODEX_ARGS+=(--full-auto)
+      if [ -n "${RALPH_CODEX_SANDBOX:-}" ]; then
+        CODEX_ARGS+=(--sandbox "$RALPH_CODEX_SANDBOX")
+      fi
+    else
+      CODEX_ARGS+=(--sandbox "${RALPH_CODEX_SANDBOX:-read-only}")
+    fi
+
+    if [ -n "${RALPH_CODEX_MODEL:-}" ]; then
+      CODEX_ARGS+=(--model "$RALPH_CODEX_MODEL")
+    fi
+
+    if [ -n "${RALPH_CODEX_PROFILE:-}" ]; then
+      CODEX_ARGS+=(--profile "$RALPH_CODEX_PROFILE")
+    fi
+
+    if [ -n "${RALPH_CODEX_ADD_DIR:-}" ]; then
+      CODEX_ARGS+=(--add-dir "$RALPH_CODEX_ADD_DIR")
+    fi
+
+    if [ -n "${RALPH_CODEX_ARGS:-}" ]; then
+      # shellcheck disable=SC2206
+      CODEX_ARGS+=(${RALPH_CODEX_ARGS})
+    fi
+
+    cat "$SCRIPT_DIR/prompt.md" | codex exec "${CODEX_ARGS[@]}" --output-last-message "$LAST_MESSAGE_FILE" - || true
+    OUTPUT=$(cat "$LAST_MESSAGE_FILE" 2>/dev/null || echo "")
+  elif [ "$ENGINE" = "amp" ]; then
+    AMP_ARGS=${RALPH_AMP_ARGS:---dangerously-allow-all}
+    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp $AMP_ARGS 2>&1 | tee /dev/stderr) || true
+  else
+    echo "Unknown RALPH_ENGINE: $ENGINE (expected 'codex' or 'amp')"
+    exit 1
+  fi
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
