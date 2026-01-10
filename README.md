@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs [Amp](https://ampcode.com) repeatedly until all PRD items are complete. Each iteration is a fresh Amp instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs [Codex CLI](https://developers.openai.com/codex/) repeatedly until all PRD items are complete. Each iteration is a fresh Codex instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`. (Amp is still supported as an optional engine.)
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -10,9 +10,11 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Prerequisites
 
-- [Amp CLI](https://ampcode.com) installed and authenticated
+- [Codex CLI](https://developers.openai.com/codex/) installed and authenticated
+  - `codex login` for local use, or set `CODEX_API_KEY` in CI
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
+- (Optional) [Amp CLI](https://ampcode.com) if you want to use the legacy engine
 
 ## Setup
 
@@ -28,16 +30,18 @@ cp /path/to/ralph/prompt.md scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally
+### Option 2: Install skills globally (Codex)
 
-Copy the skills to your Amp config for use across all projects:
+Copy the skills to your Codex config for use across all projects:
 
 ```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
+cp -r .codex/skills/ralph-codex ~/.codex/skills/
+# Optional: make the PRD and PRD->JSON converter skills available to Codex
+cp -r skills/prd ~/.codex/skills/
+cp -r skills/ralph ~/.codex/skills/
 ```
 
-### Configure Amp auto-handoff (recommended)
+### Configure Amp auto-handoff (Amp only, recommended)
 
 Add to `~/.config/amp/settings.json`:
 
@@ -49,11 +53,23 @@ Add to `~/.config/amp/settings.json`:
 
 This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
 
+## Codex Skills
+
+Codex automatically discovers skills from:
+- `.codex/skills` in your repo
+- `~/.codex/skills` globally
+
+Optional: install curated skills with the `$skill-installer` skill (restart Codex after installing):
+
+```
+Load the $skill-installer skill and install [skill-name] from openai/skills
+```
+
 ## Workflow
 
 ### 1. Create a PRD
 
-Use the PRD skill to generate a detailed requirements document:
+Use the PRD skill to generate a detailed requirements document (install `skills/prd` into `~/.codex/skills` or copy into `.codex/skills` first):
 
 ```
 Load the prd skill and create a PRD for [your feature description]
@@ -63,7 +79,7 @@ Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-n
 
 ### 2. Convert PRD to Ralph format
 
-Use the Ralph skill to convert the markdown PRD to JSON:
+Use the Ralph skill to convert the markdown PRD to JSON (install `skills/ralph` into `~/.codex/skills` or copy into `.codex/skills` first):
 
 ```
 Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
@@ -79,6 +95,24 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 Default is 10 iterations.
 
+Codex runs in read-only mode by default. For edits, enable full auto:
+
+```bash
+RALPH_CODEX_FULL_AUTO=1 ./scripts/ralph/ralph.sh [max_iterations]
+```
+
+You can override the sandbox policy if you need broader access:
+
+```bash
+RALPH_CODEX_SANDBOX=workspace-write ./scripts/ralph/ralph.sh [max_iterations]
+```
+
+To use Amp instead of Codex:
+
+```bash
+RALPH_ENGINE=amp ./scripts/ralph/ralph.sh [max_iterations]
+```
+
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
 2. Pick the highest priority story where `passes: false`
@@ -93,13 +127,14 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Amp instances |
-| `prompt.md` | Instructions given to each Amp instance |
+| `ralph.sh` | The bash loop that spawns fresh Codex instances |
+| `prompt.md` | Instructions given to each Codex instance |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
+| `.codex/skills/ralph-codex/` | Repo-local Codex skill for Ralph conventions |
+| `skills/prd/` | Skill for generating PRDs (copy to `~/.codex/skills` if using Codex) |
+| `skills/ralph/` | Skill for converting PRDs to JSON (copy to `~/.codex/skills` if using Codex) |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
@@ -120,7 +155,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new Amp instance** with clean context. The only memory between iterations is:
+Each iteration spawns a **new Codex instance** with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -142,7 +177,7 @@ Too big (split these):
 
 ### AGENTS.md Updates Are Critical
 
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Amp automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Codex automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
 
 Examples of what to add to AGENTS.md:
 - Patterns discovered ("this codebase uses X for Y")
@@ -193,4 +228,8 @@ Ralph automatically archives previous runs when you start a new feature (differe
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)
+- [Codex CLI docs](https://developers.openai.com/codex/)
+- [Codex CLI reference](https://developers.openai.com/codex/cli/reference/)
+- [Codex skills](https://developers.openai.com/codex/skills/)
+- [Codex AGENTS.md guide](https://developers.openai.com/codex/guides/agents-md/)
+- [Amp documentation (legacy)](https://ampcode.com/manual)
