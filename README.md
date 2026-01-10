@@ -37,6 +37,15 @@ cp -r skills/prd ~/.config/amp/skills/
 cp -r skills/ralph ~/.config/amp/skills/
 ```
 
+### Option 3: Install with sk
+
+Install via [sk](https://github.com/803/skills-supply), the universal package manager for AI agent skills (supports Claude Code, Amp, Codex, OpenCode, etc.).
+
+```bash
+sk pkg add gh snarktank/ralph --path skills
+sk sync
+```
+
 ### Configure Amp auto-handoff (recommended)
 
 Add to `~/.config/amp/settings.json`:
