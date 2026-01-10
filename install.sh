@@ -74,7 +74,7 @@ for skill in "prd" "ralph"; do
     DEST="$AMP_SKILLS_DIR/$skill"
 
     echo -n "  - Downloading $skill skill..."
-    if curl -fsSL "$SKILL_URL/SKILL.md" -o "$DEST/SKILL.md" 2>/dev/null; then
+    if curl -fsSL "$SKILL_URL/SKILL.md" -o "$DEST/SKILL.md"; then
         echo " ✔"
     else
         echo " ✖ FAILED (skipping)"
