@@ -24,8 +24,13 @@ struct PhotoDetailView: View {
 
             TabView(selection: $selectedIndex) {
                 ForEach(Array(assets.enumerated()), id: \.element.localIdentifier) { index, asset in
-                    ZoomableImageView(asset: asset)
-                        .tag(index)
+                    if asset.mediaType == .video {
+                        VideoPlayerView(asset: asset)
+                            .tag(index)
+                    } else {
+                        ZoomableImageView(asset: asset)
+                            .tag(index)
+                    }
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .automatic))

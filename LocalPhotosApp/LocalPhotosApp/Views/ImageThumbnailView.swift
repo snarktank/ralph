@@ -16,6 +16,10 @@ struct ImageThumbnailView: View {
 
     private static let imageManager = PHCachingImageManager()
 
+    private var isVideo: Bool {
+        asset.mediaType == .video
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -28,6 +32,14 @@ struct ImageThumbnailView: View {
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.3))
+                }
+
+                // Play icon overlay for videos
+                if isVideo {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.white, .black.opacity(0.5))
+                        .shadow(radius: 2)
                 }
             }
         }
