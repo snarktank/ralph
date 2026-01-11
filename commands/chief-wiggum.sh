@@ -1,18 +1,23 @@
 #!/bin/bash
-# Chief Wiggum - Outer orchestrator that spawns Claude Code with /ralph-loop for each story
-# Two-tier architecture: Chief Wiggum (outer loop) + ralph-loop (inner loop per story)
-# Usage: ./chief-wiggum.sh [max_stories]
+# Chief Wiggum - Autonomous PRD executor for Claude Code
+# Two-tier architecture: Chief Wiggum (outer loop) + /ralph-loop:ralph-loop (inner loop per story)
+# Usage: ./commands/chief-wiggum.sh [max_stories] or via /chief-wiggum command
 
 set -e
 
-# Script configuration
+# Script configuration - resolve to plugin root (parent of commands/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/chief-wiggum.config.json"
-PRD_FILE="$SCRIPT_DIR/prd.json"
-PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
-ARCHIVE_DIR="$SCRIPT_DIR/archive"
-LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
-TEMPLATE_FILE="$SCRIPT_DIR/story-prompt.template.md"
+PLUGIN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Files in current working directory (user's project)
+PRD_FILE="$(pwd)/prd.json"
+PROGRESS_FILE="$(pwd)/progress.txt"
+ARCHIVE_DIR="$(pwd)/archive"
+LAST_BRANCH_FILE="$(pwd)/.chief-wiggum-last-branch"
+
+# Files in plugin directory
+CONFIG_FILE="$PLUGIN_DIR/chief-wiggum.config.json"
+TEMPLATE_FILE="$PLUGIN_DIR/story-prompt.template.md"
 
 # Load configuration
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -47,8 +52,8 @@ if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
     # Archive the previous run
     DATE=$(date +%Y-%m-%d)
-    # Strip "ralph/" prefix from branch name for folder
-    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
+    # Strip "chief-wiggum/" prefix from branch name for folder
+    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^chief-wiggum/||')
     ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
 
     echo "Archiving previous run: $LAST_BRANCH"
