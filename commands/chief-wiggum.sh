@@ -202,7 +202,7 @@ while [ $STORY_COUNT -lt $MAX_STORIES ]; do
   echo "Max iterations: $MAX_ITERATIONS_PER_STORY"
   echo ""
 
-  # Run Claude CLI with ralph-loop skill
+  # Run Claude CLI with /ralph-loop:ralph-loop skill
   OUTPUT=$(claude --dangerously-skip-permissions --print "/ralph-loop:ralph-loop \"$ESCAPED_PROMPT\" --max-iterations $MAX_ITERATIONS_PER_STORY --completion-promise $COMPLETION_PROMISE" 2>&1 | tee /dev/stderr) || true
 
   # Check for completion signal
