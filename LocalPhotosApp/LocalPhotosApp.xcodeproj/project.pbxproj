@@ -22,6 +22,8 @@
 		1A000000000000000000000D /* AlbumDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001E /* AlbumDetailView.swift */; };
 		1A000000000000000000000E /* PeopleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001F /* PeopleService.swift */; };
 		1A000000000000000000000F /* PersonDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000023 /* PersonDetailView.swift */; };
+		1A0000000000000000000024 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000025 /* LocationService.swift */; };
+		1A0000000000000000000026 /* PlacesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000027 /* PlacesView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +44,8 @@
 		1A000000000000000000001E /* AlbumDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumDetailView.swift; sourceTree = "<group>"; };
 		1A000000000000000000001F /* PeopleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeopleService.swift; sourceTree = "<group>"; };
 		1A0000000000000000000023 /* PersonDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonDetailView.swift; sourceTree = "<group>"; };
+		1A0000000000000000000025 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
+		1A0000000000000000000027 /* PlacesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,6 +99,7 @@
 				1A000000000000000000001C /* VideoPlayerView.swift */,
 				1A000000000000000000001E /* AlbumDetailView.swift */,
 				1A0000000000000000000023 /* PersonDetailView.swift */,
+				1A0000000000000000000027 /* PlacesView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -106,6 +111,7 @@
 				1A0000000000000000000019 /* PhotoLibraryService.swift */,
 				1A000000000000000000001D /* AlbumService.swift */,
 				1A000000000000000000001F /* PeopleService.swift */,
+				1A0000000000000000000025 /* LocationService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -193,6 +199,8 @@
 				1A000000000000000000000D /* AlbumDetailView.swift in Sources */,
 				1A000000000000000000000E /* PeopleService.swift in Sources */,
 				1A000000000000000000000F /* PersonDetailView.swift in Sources */,
+				1A0000000000000000000024 /* LocationService.swift in Sources */,
+				1A0000000000000000000026 /* PlacesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

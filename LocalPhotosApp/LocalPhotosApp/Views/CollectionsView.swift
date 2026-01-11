@@ -7,18 +7,21 @@
 
 import SwiftUI
 import Photos
+import MapKit
 
 struct CollectionsView: View {
     @StateObject private var albumService = AlbumService()
     @StateObject private var peopleService = PeopleService()
+    @StateObject private var locationService = LocationService()
     @State private var showNewAlbumAlert = false
     @State private var newAlbumName = ""
     @State private var isCreatingAlbum = false
+    @State private var showPlacesView = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if albumService.isLoading && peopleService.isLoading {
+                if albumService.isLoading && peopleService.isLoading && locationService.isLoading {
                     ProgressView("Loading...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -26,6 +29,12 @@ struct CollectionsView: View {
                         VStack(alignment: .leading, spacing: 24) {
                             // People Section
                             PeopleSectionView(peopleService: peopleService)
+
+                            // Places Section
+                            PlacesSectionView(
+                                locationService: locationService,
+                                onTap: { showPlacesView = true }
+                            )
 
                             // Albums Section
                             AlbumsSectionView(albumService: albumService)
@@ -63,6 +72,12 @@ struct CollectionsView: View {
                 if peopleService.people.isEmpty {
                     peopleService.fetchPeople()
                 }
+                if locationService.photoLocations.isEmpty {
+                    locationService.fetchPhotosWithLocations()
+                }
+            }
+            .fullScreenCover(isPresented: $showPlacesView) {
+                PlacesView()
             }
         }
     }
@@ -193,6 +208,110 @@ struct PersonCircleView: View {
                 DispatchQueue.main.async {
                     self.thumbnailImage = result
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Places Section
+
+struct PlacesSectionView: View {
+    @ObservedObject var locationService: LocationService
+    let onTap: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section Header
+            Text("Places")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+
+            if locationService.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding()
+            } else {
+                // Map thumbnail preview - always show, tap to open full map
+                Button(action: onTap) {
+                    PlacesMapPreview(locationService: locationService)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+            }
+        }
+    }
+}
+
+struct PlacesMapPreview: View {
+    @ObservedObject var locationService: LocationService
+    @State private var cameraPosition: MapCameraPosition = .automatic
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            if locationService.hasLocations {
+                // Mini map with pins
+                Map(position: $cameraPosition, interactionModes: []) {
+                    ForEach(locationService.photoLocations) { location in
+                        Marker("", coordinate: location.coordinate)
+                            .tint(.red)
+                    }
+                }
+                .mapStyle(.standard)
+                .frame(height: 180)
+                .cornerRadius(12)
+                .allowsHitTesting(false)
+            } else {
+                // Placeholder map when no locations
+                ZStack {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 180)
+                        .cornerRadius(12)
+
+                    VStack(spacing: 8) {
+                        Image(systemName: "map")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("No locations found")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            // Location count badge
+            if locationService.hasLocations {
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.circle.fill")
+                        .foregroundColor(.red)
+                    Text("\(locationService.photoLocations.count) \(locationService.photoLocations.count == 1 ? "location" : "locations")")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                .padding(8)
+            }
+
+            // "View All" indicator
+            HStack {
+                Spacer()
+                HStack(spacing: 4) {
+                    Text("View Map")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                }
+                .foregroundColor(.blue)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                .padding(8)
             }
         }
     }
