@@ -19,9 +19,10 @@ cd flowchart && npm run build
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh Amp instances
-- `prompt.md` - Instructions given to each Amp instance
-- `prd.json.example` - Example PRD format
+- `ralph.sh` - Wrapper entrypoint (delegates to `scripts/ralph/ralph.sh`)
+- `scripts/ralph/ralph.sh` - The canonical bash loop (Amp + optional Cursor worker)
+- `scripts/ralph/prompt.md` - Instructions given to each Amp instance
+- `scripts/ralph/prd.json.example` - Example PRD format
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
 ## Flowchart

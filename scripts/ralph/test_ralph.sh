@@ -30,18 +30,30 @@ setup_test_env() {
   local project_dir="$TEST_DIR/project"
   local runner_dir=""
 
-  if [[ "$CURRENT_LAYOUT" == "root" ]]; then
+  if [[ "$CURRENT_LAYOUT" == "wrapper-root" ]]; then
+    # Root wrapper entrypoints live at repo root, but canonical implementation lives in scripts/ralph/.
     runner_dir="$project_dir"
-    cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
-    cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
-    cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$runner_dir/prompt.cursor.md"
-    cp "$CURRENT_SOURCE_DIR/prompt.convert-to-prd-json.md" "$runner_dir/prompt.convert-to-prd-json.md"
-    cp "$CURRENT_SOURCE_DIR/prd.json.example" "$runner_dir/prd.json.example"
-    cp "$CURRENT_SOURCE_DIR/convert-to-prd-json.sh" "$runner_dir/convert-to-prd-json.sh"
+
+    # Copy root wrappers
+    cp "$REPO_ROOT/ralph.sh" "$runner_dir/ralph.sh"
+    cp "$REPO_ROOT/convert-to-prd-json.sh" "$runner_dir/convert-to-prd-json.sh"
     chmod +x "$runner_dir/ralph.sh"
     chmod +x "$runner_dir/convert-to-prd-json.sh"
+
+    # Copy canonical scripts/ralph/ implementation into the project
+    mkdir -p "$project_dir/scripts/ralph"
+    cp "$CURRENT_SOURCE_DIR/ralph.sh" "$project_dir/scripts/ralph/ralph.sh"
+    cp "$CURRENT_SOURCE_DIR/prompt.md" "$project_dir/scripts/ralph/prompt.md"
+    cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$project_dir/scripts/ralph/prompt.cursor.md"
+    cp "$CURRENT_SOURCE_DIR/prompt.convert-to-prd-json.md" "$project_dir/scripts/ralph/prompt.convert-to-prd-json.md"
+    cp "$CURRENT_SOURCE_DIR/prd.json.example" "$project_dir/scripts/ralph/prd.json.example"
+    cp "$CURRENT_SOURCE_DIR/convert-to-prd-json.sh" "$project_dir/scripts/ralph/convert-to-prd-json.sh"
+    chmod +x "$project_dir/scripts/ralph/ralph.sh"
+    chmod +x "$project_dir/scripts/ralph/convert-to-prd-json.sh"
+
+    # Run via root wrapper, but create PRD/progress files where canonical runner expects them.
     RALPH_SCRIPT="$runner_dir/ralph.sh"
-    RALPH_WORK_DIR="$runner_dir"
+    RALPH_WORK_DIR="$project_dir/scripts/ralph"
   elif [[ "$CURRENT_LAYOUT" == "scripts" ]]; then
     runner_dir="$project_dir/scripts/ralph"
     mkdir -p "$runner_dir"
@@ -419,14 +431,14 @@ run_variant() {
 main() {
   local overall_failed=0
 
-  # Canonical runner (ralph/ralph.sh)
-  if ! run_variant "canonical-root" "root" "$REPO_ROOT"; then
+  # Root wrappers (ralph/ralph.sh delegates into scripts/ralph/)
+  if ! run_variant "wrapper-root" "wrapper-root" "$REPO_ROOT/scripts/ralph"; then
     overall_failed=1
   fi
 
   echo ""
 
-  # Template runner (ralph/scripts/ralph/ralph.sh)
+  # Canonical runner (scripts/ralph/ralph.sh)
   if ! run_variant "template-scripts" "scripts" "$REPO_ROOT/scripts/ralph"; then
     overall_failed=1
   fi
