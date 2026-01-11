@@ -77,6 +77,23 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+## iOS Build Validation (Required for iOS Projects)
+
+For iOS/Swift projects, you MUST use `xcodebuild` for validation, NOT `swiftc -parse`:
+
+```bash
+# Build for iOS Simulator (catches all compilation errors)
+xcodebuild -scheme <SchemeName> -destination 'generic/platform=iOS Simulator' -configuration Debug build
+
+# If no simulators available, build with SDK flag
+xcodebuild -scheme <SchemeName> -sdk iphonesimulator -configuration Debug build
+```
+
+**Why xcodebuild over swiftc -parse:**
+- `swiftc -parse` only checks syntax, missing type errors, binding issues, and API mismatches
+- `xcodebuild` performs full compilation and catches all errors
+- Stories are NOT complete until xcodebuild succeeds with zero errors
+
 ## Browser Testing (Required for Frontend Stories)
 
 For any story that changes UI, you MUST verify it works in the browser:
