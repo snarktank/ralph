@@ -10,6 +10,9 @@ import Photos
 
 struct CollectionsView: View {
     @StateObject private var albumService = AlbumService()
+    @State private var showNewAlbumAlert = false
+    @State private var newAlbumName = ""
+    @State private var isCreatingAlbum = false
 
     var body: some View {
         NavigationStack {
@@ -40,11 +43,47 @@ struct CollectionsView: View {
                 }
             }
             .navigationTitle("Collections")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        newAlbumName = ""
+                        showNewAlbumAlert = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .disabled(isCreatingAlbum)
+                }
+            }
+            .alert("New Album", isPresented: $showNewAlbumAlert) {
+                TextField("Album name", text: $newAlbumName)
+                Button("Cancel", role: .cancel) { }
+                Button("Create") {
+                    createAlbum()
+                }
+                .disabled(newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } message: {
+                Text("Enter a name for this album.")
+            }
             .onAppear {
                 if albumService.albums.isEmpty {
                     albumService.fetchAlbums()
                 }
             }
+        }
+    }
+
+    private func createAlbum() {
+        let trimmedName = newAlbumName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        isCreatingAlbum = true
+        Task {
+            do {
+                try await albumService.createAlbum(named: trimmedName)
+            } catch {
+                print("Failed to create album: \(error)")
+            }
+            isCreatingAlbum = false
         }
     }
 }

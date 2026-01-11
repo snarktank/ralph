@@ -97,4 +97,12 @@ class AlbumService: ObservableObject {
 
         return assets
     }
+
+    func createAlbum(named title: String) async throws {
+        try await PHPhotoLibrary.shared().performChanges {
+            PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: title)
+        }
+        // Refresh albums list after creation
+        fetchAlbums()
+    }
 }
