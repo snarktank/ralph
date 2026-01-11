@@ -22,6 +22,8 @@ cd flowchart && npm run build
 - `ralph.sh` - The bash loop that spawns fresh Claude Code instances
 - `prompt.md` - Instructions given to each Claude instance
 - `prd.json.example` - Example PRD format
+- `commands/prd.md` - Slash command for generating PRDs (`/prd`)
+- `commands/ralph.md` - Slash command for converting PRDs to JSON (`/ralph`)
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
 ## Flowchart

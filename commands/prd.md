@@ -1,6 +1,5 @@
 ---
-name: prd
-description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
+description: Generate a Product Requirements Document (PRD) for a new feature
 ---
 
 # PRD Generator
@@ -82,12 +81,12 @@ Each story should be small enough to implement in one focused session.
 - [ ] Specific verifiable criterion
 - [ ] Another criterion
 - [ ] Typecheck/lint passes
-- [ ] **[UI stories only]** Verify in browser using WebFetch or browser MCP
+- [ ] **[UI stories only]** Verify in browser
 ```
 
-**Important:** 
+**Important:**
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
-- **For any story with UI changes:** Always include "Verify in browser using WebFetch or browser MCP" as acceptance criteria. This ensures visual verification of frontend work.
+- **For any story with UI changes:** Always include browser verification as acceptance criteria.
 
 ### 4. Functional Requirements
 Numbered list of specific functionalities:
@@ -172,7 +171,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - [ ] Each task card shows colored priority badge (red=high, yellow=medium, gray=low)
 - [ ] Priority visible without hovering or clicking
 - [ ] Typecheck passes
-- [ ] Verify in browser using WebFetch or browser MCP
+- [ ] Verify in browser
 
 ### US-003: Add priority selector to task edit
 **Description:** As a user, I want to change a task's priority when editing it.
@@ -182,7 +181,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - [ ] Shows current priority as selected
 - [ ] Saves immediately on selection change
 - [ ] Typecheck passes
-- [ ] Verify in browser using WebFetch or browser MCP
+- [ ] Verify in browser
 
 ### US-004: Filter tasks by priority
 **Description:** As a user, I want to filter the task list to see only high-priority items when I'm focused.
@@ -192,7 +191,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - [ ] Filter persists in URL params
 - [ ] Empty state message when no tasks match filter
 - [ ] Typecheck passes
-- [ ] Verify in browser using WebFetch or browser MCP
+- [ ] Verify in browser
 
 ## Functional Requirements
 

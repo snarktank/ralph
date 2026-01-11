@@ -28,35 +28,36 @@ cp /path/to/ralph/prompt.md scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally
+### Option 2: Install slash commands globally
 
-Copy the skills to your Claude Code config for use across all projects:
+Copy the commands to your Claude Code config for use across all projects:
 
 ```bash
-cp -r skills/prd ~/.claude/commands/
-cp -r skills/ralph ~/.claude/commands/
+mkdir -p ~/.claude/commands
+cp /path/to/ralph/commands/prd.md ~/.claude/commands/
+cp /path/to/ralph/commands/ralph.md ~/.claude/commands/
 ```
 
-This makes the skills available as slash commands in Claude Code.
+This makes `/prd` and `/ralph` available as slash commands in Claude Code.
 
 ## Workflow
 
 ### 1. Create a PRD
 
-Use the PRD skill to generate a detailed requirements document:
+Use the `/prd` command to generate a detailed requirements document:
 
 ```
-Load the prd skill and create a PRD for [your feature description]
+/prd Create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+Answer the clarifying questions. The command saves output to `tasks/prd-[feature-name].md`.
 
 ### 2. Convert PRD to Ralph format
 
-Use the Ralph skill to convert the markdown PRD to JSON:
+Use the `/ralph` command to convert the markdown PRD to JSON:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+/ralph Convert tasks/prd-[feature-name].md to prd.json
 ```
 
 This creates `prd.json` with user stories structured for autonomous execution.
@@ -88,8 +89,8 @@ Ralph will:
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
+| `commands/prd.md` | Slash command for generating PRDs |
+| `commands/ralph.md` | Slash command for converting PRDs to JSON |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
