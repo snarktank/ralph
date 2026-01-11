@@ -4,12 +4,53 @@
 
 set -e
 
+# Help function
+show_help() {
+  cat << 'EOF'
+Ralph - Autonomous AI agent loop for completing PRD user stories
+
+USAGE:
+  ralph.sh [OPTIONS] [max_iterations]
+
+OPTIONS:
+  --tool <name>    AI tool to use: amp, claude, or opencode (default: amp)
+  --help, -h       Show this help message
+
+ARGUMENTS:
+  max_iterations   Maximum iterations to run (default: 10)
+
+FLOW:
+  ┌─────────────────┐    ralph skill     ┌─────────────────────┐    ralph.sh     ┌─────────────┐
+  │ plans/foo.md    │ ────────────────►  │  prd.json           │ ──────────────► │ Agent Loop  │
+  │ (source PRD)    │     converts       │  source: plans/foo  │    reads both   │             │
+  └─────────────────┘                    └─────────────────────┘                 └─────────────┘
+                                                   │                                    │
+                                                   └────────────────────────────────────┘
+                                                        agent reads source for context
+
+EXAMPLES:
+  ralph.sh                        # Run with amp, 10 iterations
+  ralph.sh 5                      # Run with amp, 5 iterations
+  ralph.sh --tool claude 20       # Run with Claude Code, 20 iterations
+  ralph.sh --tool opencode        # Run with OpenCode, 10 iterations
+
+REQUIREMENTS:
+  - prd.json must exist in the current directory
+  - Use the 'ralph' skill to convert a PRD markdown file to prd.json
+
+EOF
+  exit 0
+}
+
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --help|-h)
+      show_help
+      ;;
     --tool)
       TOOL="$2"
       shift 2
