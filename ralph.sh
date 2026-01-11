@@ -427,6 +427,14 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     exit 2
   fi
 
+  # Check if prd.json still exists - if deleted, Ralph completed successfully
+  if [ ! -f "$PRD_FILE" ]; then
+    echo ""
+    echo "Ralph already completed! (prd.json cleaned up)"
+    echo "All tasks were completed in a previous iteration."
+    exit 0
+  fi
+
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"

@@ -46,3 +46,4 @@ npm run dev
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations
+- **Early exit optimization**: The loop checks if `prd.json` exists at the start of each iteration. When the agent completes all stories, it removes `prd.json` as part of cleanup, so subsequent iterations exit immediately without invoking the AI tool (saves tokens)
