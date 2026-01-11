@@ -5,12 +5,12 @@
 Chief Wiggum is an autonomous PRD executor plugin for Claude Code. It uses the `/ralph-loop` skill to execute user stories from a PRD with iterative completion support. Two-tier architecture:
 
 1. **Chief Wiggum (Outer Loop)**: Orchestrates story execution, tracks progress, manages state
-2. **Inner Loop**: Each story executes via `/ralph-loop` with iteration support
+2. **Ralph Loop (Inner Loop)**: Each story executes via `/ralph-loop` with iteration support
 
 ## Installation
 
 ```bash
-# First, install the required ralph-loop plugin (Claude Code default plugin)
+# First, install the required ralph-loop plugin
 claude plugins install ralph-loop
 
 # Then install chief-wiggum
@@ -23,30 +23,41 @@ git clone https://github.com/kobozo/chief-wiggum ~/.claude/plugins/chief-wiggum
 ## Architecture
 
 ```
-/chief-wiggum (or chief-wiggum.sh)
-    |
-    +-- Reads prd.json from current directory
-    +-- Picks highest priority story where passes: false
-    +-- Generates prompt from story-prompt.template.md
-    +-- Spawns: claude --dangerously-skip-permissions --print "/ralph-loop \"<prompt>\" --max-iterations 25 --completion-promise STORY_COMPLETE"
-    |
-    +-- Detects STORY_COMPLETE or BLOCKED promises
-    +-- Updates prd.json (marks passes: true)
-    +-- Archives previous runs when branch changes
-    +-- Repeats until all stories complete
+/chief-wiggum
+    │
+    ├── Executes chief-wiggum.sh
+    │
+    └── For each story in prd.json:
+        ├── Renders prompt from story-prompt.template.md
+        ├── Spawns: claude --print "/ralph-loop <prompt>"
+        ├── Detects STORY_COMPLETE or BLOCKED
+        ├── Updates prd.json (passes: true)
+        ├── Archives previous runs when branch changes
+        └── Continues to next story
 ```
 
 ## Plugin Structure
 
-| File | Purpose |
-|------|---------|
-| `plugin.json` | Plugin manifest |
-| `chief-wiggum.sh` | Main orchestrator script |
-| `chief-wiggum.config.json` | Configuration (iterations, promises, quality checks) |
-| `story-prompt.template.md` | Template for story execution prompts |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/chief-wiggum/` | Skill for converting PRDs to prd.json |
-| `hooks/stop-hook.sh` | Optional stop hook |
+```
+chief-wiggum/
+├── .claude-plugin/
+│   └── plugin.json              # Plugin manifest
+├── commands/
+│   └── chief-wiggum.md          # /chief-wiggum command → executes chief-wiggum.sh
+├── agents/
+│   └── story-executor.md        # Optional agent for story execution
+├── skills/
+│   ├── prd/
+│   │   └── SKILL.md             # PRD generation skill
+│   └── chief-wiggum/
+│       └── SKILL.md             # PRD-to-JSON converter skill
+├── hooks/
+│   ├── hooks.json               # Hook configuration
+│   └── stop-hook.sh             # Stop event handler
+├── chief-wiggum.sh              # Main orchestrator script
+├── chief-wiggum.config.json     # Configuration
+└── story-prompt.template.md     # Prompt template for stories
+```
 
 ## User Project Files
 
@@ -61,15 +72,21 @@ These files live in your project directory (not the plugin):
 ## Usage
 
 ```bash
-# Via plugin command
+# Execute all stories
 /chief-wiggum
 
-# Or directly
-./chief-wiggum.sh
-
 # Limit to N stories
-./chief-wiggum.sh 5
+/chief-wiggum 5
 ```
+
+## Commands & Skills
+
+| Command/Skill | Description |
+|---------------|-------------|
+| `/chief-wiggum` | Execute stories from prd.json via ralph-loop |
+| `/chief-wiggum 5` | Execute max 5 stories |
+| `/prd` | Generate a PRD document |
+| `/chief-wiggum:chief-wiggum` | Convert PRD markdown to prd.json |
 
 ## Configuration
 
@@ -90,13 +107,14 @@ Edit `chief-wiggum.config.json`:
 
 ## Story Lifecycle
 
-1. Chief Wiggum reads `prd.json`
-2. Picks highest priority story where `passes: false`
-3. Renders `story-prompt.template.md` with story data
-4. Executes Claude with `/ralph-loop`
-5. On `STORY_COMPLETE`: marks story as passed, continues
-6. On `BLOCKED`: stops and logs blocker
-7. On timeout: logs and continues to next story
+1. `/chief-wiggum` executes `chief-wiggum.sh`
+2. Script reads `prd.json` from current directory
+3. Picks highest priority story where `passes: false`
+4. Renders `story-prompt.template.md` with story data
+5. Spawns Claude with `/ralph-loop`
+6. On `STORY_COMPLETE`: marks story as passed, continues
+7. On `BLOCKED`: stops and logs blocker
+8. On timeout: logs and continues to next story
 
 ## Promise System
 
@@ -125,7 +143,7 @@ Each Claude Code invocation is fresh. Memory persists via:
 ### PRD Skill (`/prd`)
 Generates detailed Product Requirements Documents from feature descriptions.
 
-### Chief Wiggum Skill (`/chief-wiggum`)
+### Chief Wiggum Skill (`/chief-wiggum:chief-wiggum`)
 Converts PRD markdown files to `prd.json` format for Chief Wiggum execution.
 
 ## Best Practices

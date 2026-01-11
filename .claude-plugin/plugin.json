@@ -1,0 +1,12 @@
+{
+  "name": "chief-wiggum",
+  "version": "1.0.0",
+  "description": "Autonomous PRD executor using Claude Code's /ralph-loop for iterative story completion",
+  "author": {
+    "name": "Kobozo",
+    "url": "https://github.com/kobozo"
+  },
+  "repository": "https://github.com/kobozo/chief-wiggum",
+  "license": "MIT",
+  "keywords": ["prd", "automation", "ralph-loop", "user-stories"]
+}

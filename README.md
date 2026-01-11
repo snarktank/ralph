@@ -7,6 +7,10 @@ An autonomous PRD executor plugin for Claude Code. Orchestrates story execution 
 ### Via Claude Code Plugin System
 
 ```bash
+# First, install the required ralph-loop plugin
+claude plugins install ralph-loop
+
+# Then install chief-wiggum
 claude plugins install github:kobozo/chief-wiggum
 ```
 
@@ -21,10 +25,7 @@ git clone https://github.com/kobozo/chief-wiggum ~/.claude/plugins/chief-wiggum
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
-- The `ralph-loop` plugin installed (Claude Code default plugin):
-  ```bash
-  claude plugins install ralph-loop
-  ```
+- The `ralph-loop` plugin installed
 
 ## Quick Start
 
@@ -33,51 +34,66 @@ git clone https://github.com/kobozo/chief-wiggum ~/.claude/plugins/chief-wiggum
    /prd create a task management feature
    ```
 
-2. **Convert to prd.json** using the `/chief-wiggum` skill:
+2. **Convert to prd.json** using the chief-wiggum skill:
    ```
-   /chief-wiggum convert tasks/prd-task-management.md
+   /chief-wiggum:chief-wiggum convert tasks/prd-task-management.md
    ```
 
 3. **Run Chief Wiggum**:
-   ```bash
+   ```
    /chief-wiggum
-   # or directly:
-   ~/.claude/plugins/chief-wiggum/chief-wiggum.sh
    ```
 
 ## Two-Tier Architecture
 
 ```
-/chief-wiggum (Outer Orchestrator)
-    |
-    +-- Reads prd.json from current directory
-    +-- Picks highest priority story where passes: false
-    +-- Spawns Claude Code with /ralph-loop
-    |
-    +-- Detects STORY_COMPLETE or BLOCKED promises
-    +-- Updates prd.json (marks passes: true)
-    +-- Repeats until all stories complete
+/chief-wiggum
+    │
+    ├── Executes chief-wiggum.sh
+    │
+    └── For each story in prd.json:
+        ├── Spawns: claude --print "/ralph-loop <prompt>"
+        ├── Detects STORY_COMPLETE or BLOCKED
+        ├── Updates prd.json (passes: true)
+        └── Continues to next story
 ```
 
 1. **Chief Wiggum (Outer Loop)**: Orchestrates story execution, tracks progress
-2. **Inner Loop**: Each story runs via `/ralph-loop` with iteration support
+2. **Ralph Loop (Inner Loop)**: Each story runs with iteration support until complete
 
 ## Plugin Structure
 
 ```
 chief-wiggum/
-├── plugin.json                 # Plugin manifest
-├── chief-wiggum.sh            # Main orchestrator script
-├── chief-wiggum.config.json   # Configuration
-├── story-prompt.template.md   # Prompt template
-├── hooks/
-│   └── stop-hook.sh           # Optional stop hook
+├── .claude-plugin/
+│   └── plugin.json              # Plugin manifest
+├── commands/
+│   └── chief-wiggum.md          # /chief-wiggum command
+├── agents/
+│   └── story-executor.md        # Optional agent for story execution
 ├── skills/
-│   ├── prd/SKILL.md           # PRD generation skill
-│   └── chief-wiggum/SKILL.md  # PRD-to-JSON converter skill
-├── CLAUDE.md                  # Plugin instructions
-└── README.md                  # This file
+│   ├── prd/
+│   │   └── SKILL.md             # PRD generation skill
+│   └── chief-wiggum/
+│       └── SKILL.md             # PRD-to-JSON converter skill
+├── hooks/
+│   ├── hooks.json               # Hook configuration
+│   └── stop-hook.sh             # Stop event handler
+├── chief-wiggum.sh              # Main orchestrator script
+├── chief-wiggum.config.json     # Configuration
+├── story-prompt.template.md     # Prompt template
+├── CLAUDE.md                    # Plugin instructions
+└── README.md                    # This file
 ```
+
+## Commands & Skills
+
+| Command/Skill | Description |
+|---------------|-------------|
+| `/chief-wiggum` | Execute all stories from prd.json |
+| `/chief-wiggum 5` | Execute max 5 stories |
+| `/prd` | Generate a PRD document |
+| `/chief-wiggum:chief-wiggum` | Convert PRD to prd.json format |
 
 ## User Project Files
 
@@ -110,7 +126,7 @@ Edit `chief-wiggum.config.json`:
 
 Chief Wiggum will:
 
-1. Create a feature branch (from PRD `branchName`)
+1. Read `prd.json` from current directory
 2. Pick the highest priority story where `passes: false`
 3. Spawn Claude Code with `/ralph-loop`:
    ```bash
@@ -146,10 +162,10 @@ Too big (split these):
 
 ### Promise System
 
-- `<promise>STORY_COMPLETE</promise>` - Story successfully implemented (stops loop immediately)
+- `<promise>STORY_COMPLETE</promise>` - Story successfully implemented
 - `<promise>BLOCKED</promise>` - Cannot proceed, needs human intervention
 
-**Note:** The `/ralph-loop` plugin only detects `STORY_COMPLETE` as the completion promise. If Claude outputs `BLOCKED`, the loop will continue until `max-iterations` is reached, then Chief Wiggum detects the blocked status from the output.
+**Note:** The `/ralph-loop` plugin only detects `STORY_COMPLETE` as the completion promise. If Claude outputs `BLOCKED`, the loop will continue until `max-iterations` is reached.
 
 ### Browser Verification
 
