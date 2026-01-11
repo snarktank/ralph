@@ -84,11 +84,38 @@
   text-align: center;
 }
 
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 2px solid;
+}
+
 .instructions {
   text-align: center;
   padding: 12px;
   font-size: 14px;
   color: #999;
+}
+
+.instructions a {
+  color: #666;
+  text-decoration: underline;
+}
+
+.instructions a:hover {
+  color: #333;
 }
 
 .node-content {
