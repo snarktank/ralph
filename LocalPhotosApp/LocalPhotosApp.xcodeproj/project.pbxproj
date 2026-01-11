@@ -16,6 +16,7 @@
 		1A0000000000000000000007 /* PhotoLibraryPermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000017 /* PhotoLibraryPermissionManager.swift */; };
 		1A0000000000000000000008 /* PhotoLibraryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000019 /* PhotoLibraryService.swift */; };
 		1A0000000000000000000009 /* ImageThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001A /* ImageThumbnailView.swift */; };
+		1A000000000000000000000A /* PhotoDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A000000000000000000001B /* PhotoDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 		1A0000000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		1A0000000000000000000019 /* PhotoLibraryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryService.swift; sourceTree = "<group>"; };
 		1A000000000000000000001A /* ImageThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageThumbnailView.swift; sourceTree = "<group>"; };
+		1A000000000000000000001B /* PhotoDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 				1A0000000000000000000015 /* CollectionsView.swift */,
 				1A0000000000000000000016 /* CreateView.swift */,
 				1A000000000000000000001A /* ImageThumbnailView.swift */,
+				1A000000000000000000001B /* PhotoDetailView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -169,6 +172,7 @@
 				1A0000000000000000000007 /* PhotoLibraryPermissionManager.swift in Sources */,
 				1A0000000000000000000008 /* PhotoLibraryService.swift in Sources */,
 				1A0000000000000000000009 /* ImageThumbnailView.swift in Sources */,
+				1A000000000000000000000A /* PhotoDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

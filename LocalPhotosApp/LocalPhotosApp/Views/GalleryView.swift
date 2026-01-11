@@ -94,6 +94,8 @@ struct AuthorizedGalleryContent: View {
     let isLimited: Bool
 
     @StateObject private var photoLibraryService = PhotoLibraryService()
+    @State private var selectedPhotoIndex: Int = 0
+    @State private var isShowingPhotoDetail: Bool = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 2),
@@ -135,11 +137,15 @@ struct AuthorizedGalleryContent: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 2) {
-                        ForEach(photoLibraryService.assets, id: \.localIdentifier) { asset in
+                        ForEach(Array(photoLibraryService.assets.enumerated()), id: \.element.localIdentifier) { index, asset in
                             ImageThumbnailView(
                                 asset: asset,
                                 targetSize: CGSize(width: 120, height: 120)
                             )
+                            .onTapGesture {
+                                selectedPhotoIndex = index
+                                isShowingPhotoDetail = true
+                            }
                         }
                     }
                 }
@@ -147,6 +153,12 @@ struct AuthorizedGalleryContent: View {
         }
         .onAppear {
             photoLibraryService.fetchAllAssets()
+        }
+        .fullScreenCover(isPresented: $isShowingPhotoDetail) {
+            PhotoDetailView(
+                assets: photoLibraryService.assets,
+                selectedIndex: $selectedPhotoIndex
+            )
         }
     }
 }
