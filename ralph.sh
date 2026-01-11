@@ -14,6 +14,7 @@ USAGE:
 
 OPTIONS:
   --tool <name>    AI tool to use: amp, claude, or opencode (default: amp)
+  --stop           Signal Ralph to stop before the next iteration
   --help, -h       Show this help message
 
 ARGUMENTS:
@@ -33,6 +34,7 @@ EXAMPLES:
   ralph.sh 5                      # Run with amp, 5 iterations
   ralph.sh --tool claude 20       # Run with Claude Code, 20 iterations
   ralph.sh --tool opencode        # Run with OpenCode, 10 iterations
+  ralph.sh --stop                 # Stop Ralph before the next iteration
 
 REQUIREMENTS:
   - prd.json must exist in the current directory
@@ -50,6 +52,11 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --help|-h)
       show_help
+      ;;
+    --stop)
+      touch "./.ralph-stop"
+      echo "Stop signal sent. Ralph will stop before the next iteration."
+      exit 0
       ;;
     --tool)
       TOOL="$2"
@@ -79,6 +86,7 @@ PRD_FILE="./prd.json"
 PROGRESS_FILE="./progress.txt"
 ARCHIVE_DIR="./archive"
 LAST_BRANCH_FILE="./.last-branch"
+STOP_FILE="./.ralph-stop"
 
 # Validate prd.json exists in current directory
 if [ ! -f "$PRD_FILE" ]; then
@@ -259,6 +267,14 @@ PROMPT_END
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
+  # Check for stop signal
+  if [ -f "$STOP_FILE" ]; then
+    echo ""
+    echo "Stop signal detected. Stopping gracefully..."
+    rm -f "$STOP_FILE"
+    exit 2
+  fi
+
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
