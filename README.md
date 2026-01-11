@@ -1,19 +1,20 @@
 # Chief Wiggum
 
-![Chief Wiggum](ralph.webp)
+An autonomous PRD executor plugin for Claude Code. Orchestrates story execution using the `/ralph-loop:ralph-loop` skill to iterate until each story is complete.
 
-Chief Wiggum is an autonomous AI agent orchestrator that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with the `/ralph-loop:ralph-loop` skill repeatedly until all PRD items are complete. Each iteration spawns a fresh Claude Code instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+## Installation
 
-Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/) and forked from [snarktank/ralph](https://github.com/snarktank/ralph).
+### Via Claude Code Plugin System
 
-[Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
+```bash
+claude plugins install github:kobozo/chief-wiggum
+```
 
-## Two-Tier Architecture
+### Manual Installation
 
-Chief Wiggum implements a two-tier autonomous execution model:
-
-1. **Chief Wiggum (Outer Loop)**: Orchestrates story execution, tracks progress in `prd.json`, manages state
-2. **Ralph Loop (Inner Loop)**: `/ralph-loop:ralph-loop` skill provides iteration support for each story
+```bash
+git clone https://github.com/kobozo/chief-wiggum ~/.claude/plugins/chief-wiggum
+```
 
 ## Prerequisites
 
@@ -22,87 +23,69 @@ Chief Wiggum implements a two-tier autonomous execution model:
 - A git repository for your project
 - The `/ralph-loop:ralph-loop` skill installed
 
-## Setup
+## Quick Start
 
-### Option 1: Copy to your project
-
-Copy the Chief Wiggum files into your project:
-
-```bash
-# From your project root
-mkdir -p scripts/chief-wiggum
-cp /path/to/chief-wiggum/chief-wiggum.sh scripts/chief-wiggum/
-cp /path/to/chief-wiggum/chief-wiggum.config.json scripts/chief-wiggum/
-cp /path/to/chief-wiggum/story-prompt.template.md scripts/chief-wiggum/
-chmod +x scripts/chief-wiggum/chief-wiggum.sh
-```
-
-### Option 2: Install skills globally
-
-Copy the skills to your Claude Code config for use across all projects:
-
-```bash
-cp -r skills/prd ~/.config/claude-code/skills/
-cp -r skills/ralph ~/.config/claude-code/skills/
-```
-
-## Workflow
-
-### 1. Create a PRD
-
-Use the PRD skill to generate a detailed requirements document:
-
-```
-Load the prd skill and create a PRD for [your feature description]
-```
-
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
-
-### 2. Convert PRD to Chief Wiggum format
-
-Use the Ralph skill to convert the markdown PRD to JSON:
-
-```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
-```
-
-This creates `prd.json` with user stories structured for autonomous execution.
-
-### 3. Run Chief Wiggum
-
-```bash
-./scripts/chief-wiggum/chief-wiggum.sh [max_stories]
-```
-
-Default processes all stories.
-
-Chief Wiggum will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Spawn Claude Code with `/ralph-loop:ralph-loop`:
-   ```bash
-   claude --dangerously-skip-permissions --print "/ralph-loop:ralph-loop \"<prompt>\" --max-iterations 25 --completion-promise STORY_COMPLETE"
+1. **Create a PRD** using the `/prd` skill:
    ```
-4. Implement that single story with iteration support
-5. Run quality checks (typecheck, tests)
-6. Commit if checks pass
-7. Detect `STORY_COMPLETE` promise and update `prd.json` to mark story as `passes: true`
-8. Append learnings to `progress.txt`
-9. Repeat until all stories pass or blocked
+   /prd create a task management feature
+   ```
 
-## Key Files
+2. **Convert to prd.json** using the `/chief-wiggum` skill:
+   ```
+   /chief-wiggum convert tasks/prd-task-management.md
+   ```
+
+3. **Run Chief Wiggum**:
+   ```bash
+   /chief-wiggum
+   # or directly:
+   ~/.claude/plugins/chief-wiggum/commands/chief-wiggum.sh
+   ```
+
+## Two-Tier Architecture
+
+```
+/chief-wiggum (Outer Orchestrator)
+    |
+    +-- Reads prd.json from current directory
+    +-- Picks highest priority story where passes: false
+    +-- Spawns Claude Code with /ralph-loop:ralph-loop
+    |
+    +-- Detects STORY_COMPLETE or BLOCKED promises
+    +-- Updates prd.json (marks passes: true)
+    +-- Repeats until all stories complete
+```
+
+1. **Chief Wiggum (Outer Loop)**: Orchestrates story execution, tracks progress
+2. **Inner Loop**: Each story runs via `/ralph-loop:ralph-loop` with iteration support
+
+## Plugin Structure
+
+```
+chief-wiggum/
+├── plugin.json                 # Plugin manifest
+├── commands/
+│   └── chief-wiggum.sh        # Main orchestrator
+├── hooks/
+│   └── stop-hook.sh           # Optional stop hook
+├── skills/
+│   ├── prd/SKILL.md           # PRD generation skill
+│   └── chief-wiggum/SKILL.md  # PRD-to-JSON converter skill
+├── chief-wiggum.config.json   # Configuration
+├── story-prompt.template.md   # Prompt template
+├── CLAUDE.md                  # Plugin instructions
+└── README.md                  # This file
+```
+
+## User Project Files
+
+These files are created in your project directory:
 
 | File | Purpose |
 |------|---------|
-| `chief-wiggum.sh` | The bash orchestrator that spawns Claude Code instances |
-| `chief-wiggum.config.json` | Configuration for iterations, promises, quality checks |
-| `story-prompt.template.md` | Template for generating story prompts |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
-| `flowchart/` | Interactive visualization of how Chief Wiggum works |
+| `prd.json` | User stories with `passes` status |
+| `progress.txt` | Append-only learnings log |
+| `archive/` | Previous run archives |
 
 ## Configuration
 
@@ -121,75 +104,54 @@ Edit `chief-wiggum.config.json`:
 }
 ```
 
-## Flowchart
+## Workflow
 
-[![Chief Wiggum Flowchart](ralph-flowchart.png)](https://snarktank.github.io/ralph/)
+Chief Wiggum will:
 
-**[View Interactive Flowchart](https://snarktank.github.io/ralph/)** - Click through to see each step with animations.
-
-The `flowchart/` directory contains the source code. To run locally:
-
-```bash
-cd flowchart
-npm install
-npm run dev
-```
+1. Create a feature branch (from PRD `branchName`)
+2. Pick the highest priority story where `passes: false`
+3. Spawn Claude Code with `/ralph-loop:ralph-loop`:
+   ```bash
+   claude --dangerously-skip-permissions --print "/ralph-loop:ralph-loop \"<prompt>\" --max-iterations 25 --completion-promise STORY_COMPLETE"
+   ```
+4. Implement that single story with iteration support
+5. Run quality checks (typecheck, tests)
+6. Commit if checks pass
+7. Detect `STORY_COMPLETE` promise and update `prd.json`
+8. Append learnings to `progress.txt`
+9. Repeat until all stories pass or blocked
 
 ## Critical Concepts
 
 ### Each Story = Fresh Context
 
-Each story spawns a **new Claude Code instance** with clean context via `/ralph-loop:ralph-loop`. The only memory between stories is:
+Each story spawns a **new Claude Code instance** with clean context. Memory persists via:
 - Git history (commits from previous stories)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
 
 ### Small Tasks
 
-Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing and produces poor code.
-
-Right-sized stories:
+Each story must be completable in one context window. Right-sized:
 - Add a database column and migration
 - Add a UI component to an existing page
 - Update a server action with new logic
-- Add a filter dropdown to a list
 
 Too big (split these):
 - "Build the entire dashboard"
 - "Add authentication"
 - "Refactor the API"
 
-### CLAUDE.md Updates Are Critical
-
-After each iteration, Chief Wiggum updates the relevant `CLAUDE.md` files with learnings. This is key because Claude Code automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
-
-Examples of what to add to CLAUDE.md:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
-
-### Feedback Loops
-
-Chief Wiggum only works if there are feedback loops:
-- Typecheck catches type errors
-- Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
-
-### Browser Verification for UI Stories
-
-Frontend stories must include "Verify in browser" in acceptance criteria. Claude Code will navigate to the page, interact with the UI, and confirm changes work.
-
 ### Promise System
 
-Chief Wiggum uses promises to detect story completion:
 - `<promise>STORY_COMPLETE</promise>` - Story successfully implemented
 - `<promise>BLOCKED</promise>` - Cannot proceed, needs human intervention
 
-When all stories have `passes: true`, Chief Wiggum exits successfully.
+### Browser Verification
+
+UI stories must include "Verify in browser" in acceptance criteria.
 
 ## Debugging
-
-Check current state:
 
 ```bash
 # See which stories are done
@@ -204,11 +166,6 @@ git log --oneline -10
 
 ## Customizing story-prompt.template.md
 
-Edit `story-prompt.template.md` to customize Claude Code's behavior for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
-
 Available placeholders:
 - `{{STORY_ID}}`, `{{STORY_TITLE}}`, `{{STORY_DESCRIPTION}}`
 - `{{ACCEPTANCE_CRITERIA}}`
@@ -222,6 +179,5 @@ Chief Wiggum automatically archives previous runs when you start a new feature (
 
 ## References
 
-- [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
-- [Ralph Loop skill](https://github.com/anthropics/claude-code-plugins)
+- [Geoffrey Huntley's iteration pattern](https://ghuntley.com/ralph/)
