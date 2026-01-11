@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) by default) repeatedly until all PRD items are complete. Each iteration is a fresh instance of the agent with clean context to prevent context rot. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -12,40 +12,65 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-  - [OpenCode](https://github.com/AmruthPillai/OpenCode) (`npm install -g @amruthpillai/opencode`)
-- Common utilities:
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+  - [OpenCode](https://github.com/AmruthPillai/OpenCode)
+- Common shell utilities:
   - `jq` for JSON manipulation (`brew install jq` on macOS, `apt-get install jq` on Ubuntu)
   - `sponge` from moreutils for in-place file updates (`brew install moreutils` on macOS, `apt-get install moreutils` on Ubuntu)
 - A git repository for your project
 
 ## Setup
 
-### Option 1: Copy to your project
+### Option 1: Install globally (Recommended)
 
-Copy the ralph script into your project:
+Download and install ralph.sh to your PATH:
+
+```bash
+# Download and install ralph.sh to your PATH
+curl -o ~/.local/bin/ralph.sh https://raw.githubusercontent.com/snarktank/ralph/main/ralph.sh
+chmod +x ~/.local/bin/ralph.sh
+
+# Ensure ~/.local/bin is in PATH (add to ~/.bashrc, ~/.zshrc, or your shell's config)
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Option 2: Install skills
+
+Copy the skills to your Amp or Claude config for use across all projects:
+
+**For Amp:**
+```bash
+# From local clone
+cp -r skills/prd ~/.config/amp/skills/
+cp -r skills/ralph ~/.config/amp/skills/
+
+# Or via curl (no clone needed)
+mkdir -p ~/.config/amp/skills/{prd,ralph}
+curl -o ~/.config/amp/skills/prd/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/prd/SKILL.md
+curl -o ~/.config/amp/skills/ralph/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/ralph/SKILL.md
+```
+
+**For Claude Code:**
+```bash
+# From local clone
+cp -r skills/prd ~/.claude/skills/
+cp -r skills/ralph ~/.claude/skills/
+
+# Or via curl (no clone needed)
+mkdir -p ~/.claude/skills/{prd,ralph}
+curl -o ~/.claude/skills/prd/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/prd/SKILL.md
+curl -o ~/.claude/skills/ralph/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/ralph/SKILL.md
+```
+
+### Option 3: Copy to your project (Alternative)
+
+If you prefer to keep ralph.sh in your project directory:
 
 ```bash
 # From your project root
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
-```
-
-### Option 2: Install skills globally
-
-Copy the skills to your Amp or Claude config for use across all projects:
-
-For AMP
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
-```
-
-For Claude Code
-```bash
-cp -r skills/prd ~/.claude/skills/
-cp -r skills/ralph ~/.claude/skills/
 ```
 
 ### Configure Amp auto-handoff (recommended)
@@ -85,20 +110,20 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default)
-./scripts/ralph/ralph.sh [max_iterations]
+# If ralph.sh is in your PATH (recommended)
+ralph.sh [OPTIONS]
 
-# Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
+# If ralph.sh is in your project directory
+./scripts/ralph/ralph.sh [OPTIONS]
 
-# Using OpenCode
-./scripts/ralph/ralph.sh --tool opencode [max_iterations]
-
-# With a custom prompt
-./scripts/ralph/ralph.sh --custom-prompt ./my-prompt.md
+# Examples
+ralph.sh                           # Amp, default iterations
+ralph.sh --tool claude 20          # Claude Code, 20 iterations
+ralph.sh --tool opencode           # OpenCode, default iterations
+ralph.sh --custom-prompt ./my-prompt.md  # With custom prompt
 ```
 
-Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool opencode` to select your AI coding tool. Run `./ralph.sh --help` for all options.
+Run `ralph.sh --help` for all options.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
