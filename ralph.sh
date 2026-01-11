@@ -26,7 +26,7 @@ OPTIONS:
   --                     Everything after -- is passed to the tool as additional arguments
 
 ARGUMENTS:
-  max_iterations   Maximum iterations to run (default: 10)
+  max_iterations   Maximum iterations to run (default: 50)
   tool_args        Additional arguments to pass to the tool (after --)
 
 FLOW:
@@ -38,11 +38,15 @@ FLOW:
                                                    └────────────────────────────────────┘
                                                         agent reads source for context
 
+FAILURE HANDLING:
+  Ralph detects rapid failures (iterations < 4 seconds) and exits after 5 consecutive
+  quick failures. This prevents rate limit issues and catches configuration errors early.
+
 EXAMPLES:
-  ralph.sh                        # Run with amp, 10 iterations
+  ralph.sh                        # Run with amp, 50 iterations
   ralph.sh 5                      # Run with amp, 5 iterations
   ralph.sh --tool claude 20       # Run with Claude Code, 20 iterations
-  ralph.sh --tool opencode        # Run with OpenCode, 10 iterations
+  ralph.sh --tool opencode        # Run with OpenCode, 50 iterations
   ralph.sh --stop                 # Stop Ralph before the next iteration
   ralph.sh --tool claude -- --model opus  # Pass --model opus to claude
   ralph.sh 15 -- --verbose        # Run 15 iterations with --verbose passed to tool
@@ -76,7 +80,7 @@ EOF
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
-MAX_ITERATIONS=10
+MAX_ITERATIONS=50
 TOOL_ARGS=()  # Additional args to pass to the tool
 CUSTOM_PROMPT=""  # Optional custom prompt file
 TOOL_PATH=""  # Optional explicit path to tool executable
@@ -418,6 +422,11 @@ fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
+# Failure tracking for circuit breaker
+CONSECUTIVE_FAILURES=0
+MAX_FAILURES=5
+MIN_ITERATION_TIME=4  # seconds - iterations faster than this are considered failures
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   # Check for stop signal
   if [ -f "$STOP_FILE" ]; then
@@ -449,6 +458,9 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     PROMPT=$(generate_prompt "$TOOL")
   fi
 
+  # Record start time for failure detection
+  ITERATION_START=$(date +%s)
+
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(echo "$PROMPT" | "$TOOL_CMD" --dangerously-allow-all "${TOOL_ARGS[@]}" 2>&1 | tee /dev/stderr) || true
@@ -464,6 +476,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     fi
   fi
   
+  # Calculate iteration duration
+  ITERATION_END=$(date +%s)
+  ITERATION_DURATION=$((ITERATION_END - ITERATION_START))
+  
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
@@ -476,8 +492,29 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     exit 0
   fi
   
-  echo "Iteration $i complete. Continuing..."
-  sleep 2
+  # Detect rapid failures (tool exiting too quickly)
+  if [ "$ITERATION_DURATION" -lt "$MIN_ITERATION_TIME" ]; then
+    CONSECUTIVE_FAILURES=$((CONSECUTIVE_FAILURES + 1))
+    echo ""
+    echo "Warning: Iteration completed very quickly (${ITERATION_DURATION}s). This may indicate an error."
+    echo "Consecutive quick failures: $CONSECUTIVE_FAILURES/$MAX_FAILURES"
+    
+    if [ "$CONSECUTIVE_FAILURES" -ge "$MAX_FAILURES" ]; then
+      echo ""
+      echo "Error: Too many consecutive quick failures ($MAX_FAILURES)."
+      echo "This usually indicates a configuration problem (e.g., invalid model, missing permissions)."
+      echo "Please check the error messages above and fix the issue before retrying."
+      exit 1
+    fi
+    
+    echo "Sleeping 3 seconds before retry..."
+    sleep 3
+  else
+    # Reset failure counter on successful iteration
+    CONSECUTIVE_FAILURES=0
+    echo "Iteration $i complete. Continuing..."
+    sleep 2
+  fi
 done
 
 echo ""
