@@ -11,7 +11,7 @@ Converts existing PRDs to the prd.json format that Ralph uses for autonomous exe
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+Take a PRD (markdown file or text from any path) and convert it to `./prd.json` in the project root (current working directory). The output path is always `./prd.json` regardless of where the input file is located.
 
 ---
 
@@ -19,6 +19,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
 
 ```json
 {
+  "source": "[path/to/original-prd.md]",
   "project": "[Project Name]",
   "branchName": "ralph/[feature-name-kebab-case]",
   "description": "[Feature description from PRD title/intro]",
@@ -163,6 +164,7 @@ Add ability to mark tasks with different statuses.
 **Output prd.json:**
 ```json
 {
+  "source": "docs/task-status-prd.md",
   "project": "TaskApp",
   "branchName": "ralph/task-status",
   "description": "Task Status Feature - Track task progress with status indicators",

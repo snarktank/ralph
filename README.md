@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs [Amp](https://ampcode.com) repeatedly until all PRD items are complete. Each iteration is a fresh Amp instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) by default) repeatedly until all PRD items are complete. Each iteration is a fresh instance of the agent with clean context to prevent context rot. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -10,31 +10,67 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Prerequisites
 
-- [Amp CLI](https://ampcode.com) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
+- One of the following AI coding tools installed and authenticated:
+  - [Amp CLI](https://ampcode.com) (default)
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+  - [OpenCode](https://github.com/AmruthPillai/OpenCode)
+- Common shell utilities:
+  - `jq` for JSON manipulation (`brew install jq` on macOS, `apt-get install jq` on Ubuntu)
+  - `sponge` from moreutils for in-place file updates (`brew install moreutils` on macOS, `apt-get install moreutils` on Ubuntu)
 - A git repository for your project
 
 ## Setup
 
-### Option 1: Copy to your project
+### Option 1: Install globally (Recommended)
 
-Copy the ralph files into your project:
+Download and install ralph.sh to your PATH:
+
+```bash
+# Download and install ralph.sh to your PATH
+curl -o ~/.local/bin/ralph.sh https://raw.githubusercontent.com/snarktank/ralph/main/ralph.sh
+chmod +x ~/.local/bin/ralph.sh
+
+# Ensure ~/.local/bin is in PATH (add to ~/.bashrc, ~/.zshrc, or your shell's config)
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Option 2: Install skills
+
+Copy the skills to your Amp or Claude config for use across all projects:
+
+**For Amp:**
+```bash
+# From local clone
+cp -r skills/prd ~/.config/amp/skills/
+cp -r skills/ralph ~/.config/amp/skills/
+
+# Or via curl (no clone needed)
+mkdir -p ~/.config/amp/skills/{prd,ralph}
+curl -o ~/.config/amp/skills/prd/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/prd/SKILL.md
+curl -o ~/.config/amp/skills/ralph/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/ralph/SKILL.md
+```
+
+**For Claude Code:**
+```bash
+# From local clone
+cp -r skills/prd ~/.claude/skills/
+cp -r skills/ralph ~/.claude/skills/
+
+# Or via curl (no clone needed)
+mkdir -p ~/.claude/skills/{prd,ralph}
+curl -o ~/.claude/skills/prd/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/prd/SKILL.md
+curl -o ~/.claude/skills/ralph/SKILL.md https://raw.githubusercontent.com/snarktank/ralph/main/skills/ralph/SKILL.md
+```
+
+### Option 3: Copy to your project (Alternative)
+
+If you prefer to keep ralph.sh in your project directory:
 
 ```bash
 # From your project root
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
-```
-
-### Option 2: Install skills globally
-
-Copy the skills to your Amp config for use across all projects:
-
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
 ```
 
 ### Configure Amp auto-handoff (recommended)
@@ -74,10 +110,20 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-./scripts/ralph/ralph.sh [max_iterations]
+# If ralph.sh is in your PATH (recommended)
+ralph.sh [OPTIONS]
+
+# If ralph.sh is in your project directory
+./scripts/ralph/ralph.sh [OPTIONS]
+
+# Examples
+ralph.sh                           # Amp, default iterations
+ralph.sh --tool claude 20          # Claude Code, 20 iterations
+ralph.sh --tool opencode           # OpenCode, default iterations
+ralph.sh --custom-prompt ./my-prompt.md  # With custom prompt
 ```
 
-Default is 10 iterations.
+Run `ralph.sh --help` for all options.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -93,8 +139,7 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Amp instances |
-| `prompt.md` | Instructions given to each Amp instance |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--tool opencode`) |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -120,7 +165,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new Amp instance** with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -142,7 +187,7 @@ Too big (split these):
 
 ### AGENTS.md Updates Are Critical
 
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Amp automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
 
 Examples of what to add to AGENTS.md:
 - Patterns discovered ("this codebase uses X for Y")
@@ -179,12 +224,36 @@ cat progress.txt
 git log --oneline -10
 ```
 
-## Customizing prompt.md
+## Customizing the Prompt
 
-Edit `prompt.md` to customize Ralph's behavior for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+Ralph looks for prompts in this order:
+1. `--custom-prompt <file>` - Explicit flag takes highest priority
+2. `.agents/ralph.md` - Project-local template (if exists)
+3. Embedded default prompt
+
+To customize for your project:
+1. Run `ralph.sh --eject-prompt` which will create `.agents/ralph.md`
+2. Modify it for your needs  
+3. Ralph will automatically use it
+
+### Post-Completion Cleanup
+
+When all stories are complete, Ralph automatically removes working files in a final commit:
+- `prd.json` - The task list
+- `progress.txt` - The iteration log
+- `.last-branch` - Branch tracking file
+- The source PRD file (if specified in `prd.json`)
+
+**This cleanup commit can be reverted:**
+```bash
+# Undo the cleanup
+git revert HEAD
+
+# Recover just the source PRD
+git checkout HEAD~1 -- plans/my-feature.md
+```
+
+**To disable cleanup:** Create a custom prompt template (`.agents/ralph.md`) without the cleanup instructions in the Stop Condition section.
 
 ## Archiving
 
@@ -194,3 +263,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
+- [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
