@@ -105,4 +105,32 @@ class AlbumService: ObservableObject {
         // Refresh albums list after creation
         fetchAlbums()
     }
+
+    func fetchUserAlbums() -> [Album] {
+        var userAlbums: [Album] = []
+
+        let collections = PHAssetCollection.fetchAssetCollections(
+            with: .album,
+            subtype: .albumRegular,
+            options: nil
+        )
+
+        collections.enumerateObjects { collection, _, _ in
+            let album = Album(collection: collection)
+            userAlbums.append(album)
+        }
+
+        return userAlbums
+    }
+
+    func addAssets(_ assets: [PHAsset], to album: Album) async throws {
+        try await PHPhotoLibrary.shared().performChanges {
+            guard let changeRequest = PHAssetCollectionChangeRequest(for: album.collection) else {
+                return
+            }
+            changeRequest.addAssets(assets as NSFastEnumeration)
+        }
+        // Refresh albums list after adding assets
+        fetchAlbums()
+    }
 }

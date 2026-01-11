@@ -11,6 +11,8 @@ import Photos
 struct ImageThumbnailView: View {
     let asset: PHAsset
     let targetSize: CGSize
+    var isSelectionMode: Bool = false
+    var isSelected: Bool = false
 
     @State private var image: UIImage?
 
@@ -40,6 +42,26 @@ struct ImageThumbnailView: View {
                         .font(.system(size: 36))
                         .foregroundStyle(.white, .black.opacity(0.5))
                         .shadow(radius: 2)
+                }
+
+                // Selection checkmark overlay
+                if isSelectionMode {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 24))
+                                .foregroundColor(isSelected ? .blue : .white)
+                                .background(
+                                    Circle()
+                                        .fill(isSelected ? .white : .black.opacity(0.3))
+                                        .frame(width: 22, height: 22)
+                                )
+                                .shadow(radius: 2)
+                                .padding(6)
+                        }
+                        Spacer()
+                    }
                 }
             }
         }
