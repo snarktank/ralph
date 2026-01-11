@@ -105,11 +105,14 @@ while [[ $# -gt 0 ]]; do
       break
       ;;
     *)
-      # Assume it's max_iterations if it's a number
+      # Assume it's max_iterations if it's a number; otherwise, it's an error
       if [[ "$1" =~ ^[0-9]+$ ]]; then
         MAX_ITERATIONS="$1"
+        shift
+      else
+        echo "Error: Unrecognized argument '$1'. See --help for usage." >&2
+        exit 1
       fi
-      shift
       ;;
   esac
 done
