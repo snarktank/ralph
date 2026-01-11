@@ -1,0 +1,49 @@
+{
+  "project": "MyApp",
+  "branchName": "ralph/sample-feature",
+  "description": "Sample Feature - Demonstrates Chief Wiggum with Claude Code",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add sample database table",
+      "description": "As a developer, I need a sample table to demonstrate the workflow.",
+      "acceptanceCriteria": [
+        "Add sample_items table with id, name, status columns",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create sample API endpoint",
+      "description": "As a developer, I need an API endpoint to fetch sample items.",
+      "acceptanceCriteria": [
+        "GET /api/sample-items returns list of items",
+        "Response includes id, name, status for each item",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Display sample items in UI",
+      "description": "As a user, I want to see sample items in the interface.",
+      "acceptanceCriteria": [
+        "Sample items page at /sample-items",
+        "Each item shows name and status badge",
+        "Loading state while fetching",
+        "Typecheck passes",
+        "Verify in browser"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
