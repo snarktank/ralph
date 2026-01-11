@@ -35,7 +35,11 @@ setup_test_env() {
     cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
     cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
     cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$runner_dir/prompt.cursor.md"
+    cp "$CURRENT_SOURCE_DIR/prompt.convert-to-prd-json.md" "$runner_dir/prompt.convert-to-prd-json.md"
+    cp "$CURRENT_SOURCE_DIR/prd.json.example" "$runner_dir/prd.json.example"
+    cp "$CURRENT_SOURCE_DIR/convert-to-prd-json.sh" "$runner_dir/convert-to-prd-json.sh"
     chmod +x "$runner_dir/ralph.sh"
+    chmod +x "$runner_dir/convert-to-prd-json.sh"
     RALPH_SCRIPT="$runner_dir/ralph.sh"
     RALPH_WORK_DIR="$runner_dir"
   elif [[ "$CURRENT_LAYOUT" == "scripts" ]]; then
@@ -44,7 +48,11 @@ setup_test_env() {
     cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
     cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
     cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$runner_dir/prompt.cursor.md"
+    cp "$CURRENT_SOURCE_DIR/prompt.convert-to-prd-json.md" "$runner_dir/prompt.convert-to-prd-json.md"
+    cp "$CURRENT_SOURCE_DIR/prd.json.example" "$runner_dir/prd.json.example"
+    cp "$CURRENT_SOURCE_DIR/convert-to-prd-json.sh" "$runner_dir/convert-to-prd-json.sh"
     chmod +x "$runner_dir/ralph.sh"
+    chmod +x "$runner_dir/convert-to-prd-json.sh"
     RALPH_SCRIPT="$runner_dir/ralph.sh"
     RALPH_WORK_DIR="$runner_dir"
   else
@@ -84,8 +92,8 @@ if [ -t 0 ]; then
 else
   echo "Stub cursor: stdin is not a TTY"
 fi
-# Check for required flags
-if [[ "$*" == *"--model auto"* ]] && [[ "$*" == *"--print"* ]] && [[ "$*" == *"--force"* ]] && [[ "$*" == *"--approve-mcps"* ]]; then
+# Check for required flags (model can vary)
+if [[ "$*" == *"--model"* ]] && [[ "$*" == *"--print"* ]] && [[ "$*" == *"--force"* ]] && [[ "$*" == *"--approve-mcps"* ]]; then
   echo "Stub cursor: all required flags present"
 else
   echo "Stub cursor: WARNING - missing required flags" >&2
@@ -211,6 +219,35 @@ test_cursor_invocation_flags() {
     return 1
   fi
   
+  cleanup_test_env
+}
+
+# Test 4b: PRD->prd.json conversion script can override model
+test_convert_prd_json_model_override() {
+  setup_test_env
+
+  # Create a dummy PRD markdown file
+  mkdir -p "$TEST_DIR/project/tasks"
+  echo "# PRD: Example" > "$TEST_DIR/project/tasks/prd-example.md"
+
+  local convert_script="$RALPH_WORK_DIR/convert-to-prd-json.sh"
+  if [[ ! -f "$convert_script" ]]; then
+    echo -e "${RED}FAIL${NC}: convert-to-prd-json.sh not found"
+    cleanup_test_env
+    return 1
+  fi
+
+  OUTPUT=$(bash "$convert_script" "$TEST_DIR/project/tasks/prd-example.md" --model "gpt-4.1" 2>&1 || true)
+
+  if echo "$OUTPUT" | grep -qF -- "--model gpt-4.1"; then
+    echo -e "${GREEN}PASS${NC}: convert-to-prd-json.sh forwards --model override"
+  else
+    echo -e "${RED}FAIL${NC}: convert-to-prd-json.sh did not forward --model override"
+    echo "Output: $OUTPUT"
+    cleanup_test_env
+    return 1
+  fi
+
   cleanup_test_env
 }
 
@@ -356,6 +393,7 @@ run_variant() {
   if test_cursor_worker_explicit; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_cursor_invocation_flags; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_cursor_no_pty; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
+  if test_convert_prd_json_model_override; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_stop_condition_complete; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_stop_condition_no_complete; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_progress_append_only; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
