@@ -93,8 +93,16 @@ struct PermissionDeniedView: View {
 struct AuthorizedGalleryContent: View {
     let isLimited: Bool
 
+    @StateObject private var photoLibraryService = PhotoLibraryService()
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2),
+        GridItem(.flexible(), spacing: 2)
+    ]
+
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             if isLimited {
                 HStack {
                     Image(systemName: "info.circle")
@@ -103,14 +111,43 @@ struct AuthorizedGalleryContent: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
+                .padding(.vertical, 8)
             }
 
-            Text("Gallery content will be displayed here")
-                .foregroundColor(.secondary)
-
-            Spacer()
+            if photoLibraryService.isLoading {
+                Spacer()
+                ProgressView("Loading photos...")
+                Spacer()
+            } else if photoLibraryService.isEmpty {
+                Spacer()
+                VStack(spacing: 12) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.secondary)
+                    Text("No Photos")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("Your photo library is empty")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 2) {
+                        ForEach(photoLibraryService.assets, id: \.localIdentifier) { asset in
+                            ImageThumbnailView(
+                                asset: asset,
+                                targetSize: CGSize(width: 120, height: 120)
+                            )
+                        }
+                    }
+                }
+            }
         }
-        .padding(.top)
+        .onAppear {
+            photoLibraryService.fetchAllAssets()
+        }
     }
 }
 
