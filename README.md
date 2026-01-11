@@ -4,7 +4,7 @@
 
 Chief Wiggum is an autonomous AI agent orchestrator that runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with the `/ralph-loop:ralph-loop` skill repeatedly until all PRD items are complete. Each iteration spawns a fresh Claude Code instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
-Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
+Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/) and forked from [snarktank/ralph](https://github.com/snarktank/ralph).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
 
