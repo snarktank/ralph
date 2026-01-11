@@ -1,6 +1,6 @@
 ---
-name: ralph
-description: "Convert PRDs to prd.json format for the Chief Wiggum autonomous agent system. Use when you have an existing PRD and need to convert it to Chief Wiggum's JSON format. Triggers on: convert this prd, turn this into ralph format, create prd.json from this, ralph json, chief wiggum json."
+name: chief-wiggum
+description: "Convert PRDs to prd.json format for the Chief Wiggum autonomous agent system. Use when you have an existing PRD and need to convert it to Chief Wiggum's JSON format. Triggers on: convert this prd, create prd.json from this, chief wiggum json, chief-wiggum format."
 ---
 
 # Chief Wiggum PRD Converter
@@ -11,7 +11,7 @@ Converts existing PRDs to the prd.json format that Chief Wiggum uses for autonom
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your Chief Wiggum directory.
+Take a PRD (markdown file or text) and convert it to `prd.json` in your project directory.
 
 ---
 
@@ -20,7 +20,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your Chief Wi
 ```json
 {
   "project": "[Project Name]",
-  "branchName": "ralph/[feature-name-kebab-case]",
+  "branchName": "chief-wiggum/[feature-name-kebab-case]",
   "description": "[Feature description from PRD title/intro]",
   "userStories": [
     {
@@ -121,7 +121,7 @@ Frontend stories are NOT complete until visually verified. Claude Code will navi
 2. **IDs**: Sequential (US-001, US-002, etc.)
 3. **Priority**: Based on dependency order, then document order
 4. **All stories**: `passes: false` and empty `notes`
-5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
+5. **branchName**: Derive from feature name, kebab-case, prefixed with `chief-wiggum/`
 6. **Always add**: "Typecheck passes" to every story's acceptance criteria
 
 ---
@@ -164,7 +164,7 @@ Add ability to mark tasks with different statuses.
 ```json
 {
   "project": "TaskApp",
-  "branchName": "ralph/task-status",
+  "branchName": "chief-wiggum/task-status",
   "description": "Task Status Feature - Track task progress with status indicators",
   "userStories": [
     {
@@ -240,7 +240,7 @@ Add ability to mark tasks with different statuses.
    - Copy current `prd.json` and `progress.txt` to archive
    - Reset `progress.txt` with fresh header
 
-**The chief-wiggum.sh script handles this automatically** when you run it, but if you are manually updating prd.json between runs, archive first.
+**The /chief-wiggum command handles this automatically** when you run it, but if you are manually updating prd.json between runs, archive first.
 
 ---
 
