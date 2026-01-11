@@ -20,7 +20,6 @@ You are an autonomous coding agent working on a software project.
 APPEND to progress.txt (never replace, always append):
 ```
 ## [Date/Time] - [Story ID]
-Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - What was implemented
 - Files changed
 - **Learnings for future iterations:**
@@ -29,8 +28,6 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - Useful context (e.g., "the evaluation panel is in component X")
 ---
 ```
-
-Include the thread URL so future iterations can use the `read_thread` tool to reference previous work if needed.
 
 The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
 
@@ -80,14 +77,30 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+## iOS Build Validation (Required for iOS Projects)
+
+For iOS/Swift projects, you MUST use `xcodebuild` for validation, NOT `swiftc -parse`:
+
+```bash
+# Build for iOS Simulator (catches all compilation errors)
+xcodebuild -scheme <SchemeName> -destination 'generic/platform=iOS Simulator' -configuration Debug build
+
+# If no simulators available, build with SDK flag
+xcodebuild -scheme <SchemeName> -sdk iphonesimulator -configuration Debug build
+```
+
+**Why xcodebuild over swiftc -parse:**
+- `swiftc -parse` only checks syntax, missing type errors, binding issues, and API mismatches
+- `xcodebuild` performs full compilation and catches all errors
+- Stories are NOT complete until xcodebuild succeeds with zero errors
+
 ## Browser Testing (Required for Frontend Stories)
 
 For any story that changes UI, you MUST verify it works in the browser:
 
-1. Load the `dev-browser` skill
-2. Navigate to the relevant page
-3. Verify the UI changes work as expected
-4. Take a screenshot if helpful for the progress log
+1. Use the WebFetch tool or a browser MCP server to navigate to the relevant page
+2. Verify the UI changes work as expected
+3. Take a screenshot if helpful for the progress log
 
 A frontend story is NOT complete until browser verification passes.
 
