@@ -153,3 +153,7 @@ Converts PRD markdown files to `prd.json` format for Chief Wiggum execution.
 3. **Dependency Order**: Schema -> Backend -> UI
 4. **Update CLAUDE.md**: Record reusable patterns
 5. **Browser Testing**: UI stories must include browser verification
+
+## Credits
+
+Forked from [snarktank/ralph](https://github.com/snarktank/ralph) - the original autonomous PRD executor for Claude Code.

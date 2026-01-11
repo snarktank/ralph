@@ -197,7 +197,12 @@ Available placeholders:
 
 Chief Wiggum automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
 
+## Credits
+
+This plugin is forked from [snarktank/ralph](https://github.com/snarktank/ralph), which pioneered the autonomous PRD execution pattern for Claude Code.
+
 ## References
 
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
 - [Geoffrey Huntley's iteration pattern](https://ghuntley.com/ralph/)
+- [snarktank/ralph](https://github.com/snarktank/ralph) - Original implementation
