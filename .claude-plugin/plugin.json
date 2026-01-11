@@ -1,0 +1,10 @@
+{
+  "name": "ralph-skills",
+  "version": "1.0.0",
+  "description": "Skills for the Ralph autonomous agent system - Generate PRDs and convert them to prd.json format for autonomous execution",
+  "author": {
+    "name": "snarktank"
+  },
+  "skills": "./skills/",
+  "keywords": ["ralph", "prd", "automation", "agent", "planning", "requirements"]
+}
