@@ -6,7 +6,15 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_DIR="$SCRIPT_DIR/test-tmp"
-RALPH_SCRIPT="$SCRIPT_DIR/ralph.sh"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# These are set per variant (root canonical vs template)
+CURRENT_VARIANT_NAME=""
+CURRENT_LAYOUT=""
+CURRENT_SOURCE_DIR=""
+
+RALPH_SCRIPT=""
+RALPH_WORK_DIR=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,15 +24,42 @@ NC='\033[0m' # No Color
 
 # Setup test environment
 setup_test_env() {
-  mkdir -p "$TEST_DIR"
-  cd "$TEST_DIR"
+  rm -rf "$TEST_DIR"
+  mkdir -p "$TEST_DIR/project"
+
+  local project_dir="$TEST_DIR/project"
+  local runner_dir=""
+
+  if [[ "$CURRENT_LAYOUT" == "root" ]]; then
+    runner_dir="$project_dir"
+    cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
+    cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
+    cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$runner_dir/prompt.cursor.md"
+    chmod +x "$runner_dir/ralph.sh"
+    RALPH_SCRIPT="$runner_dir/ralph.sh"
+    RALPH_WORK_DIR="$runner_dir"
+  elif [[ "$CURRENT_LAYOUT" == "scripts" ]]; then
+    runner_dir="$project_dir/scripts/ralph"
+    mkdir -p "$runner_dir"
+    cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
+    cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
+    cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$runner_dir/prompt.cursor.md"
+    chmod +x "$runner_dir/ralph.sh"
+    RALPH_SCRIPT="$runner_dir/ralph.sh"
+    RALPH_WORK_DIR="$runner_dir"
+  else
+    echo "Invalid CURRENT_LAYOUT: $CURRENT_LAYOUT" >&2
+    exit 1
+  fi
+
+  cd "$project_dir"
   
   # Create stub binaries
-  mkdir -p bin
-  export PATH="$TEST_DIR/bin:$PATH"
+  mkdir -p "$project_dir/bin"
+  export PATH="$project_dir/bin:$PATH"
   
   # Create stub amp binary
-  cat > bin/amp << 'EOF'
+  cat > "$project_dir/bin/amp" << 'EOF'
 #!/bin/bash
 # Stub amp binary for testing
 echo "Stub amp executed with args: $@"
@@ -37,10 +72,10 @@ fi
 echo "Some amp output"
 echo "<promise>COMPLETE</promise>"
 EOF
-  chmod +x bin/amp
+  chmod +x "$project_dir/bin/amp"
   
   # Create stub cursor binary
-  cat > bin/cursor << 'EOF'
+  cat > "$project_dir/bin/cursor" << 'EOF'
 #!/bin/bash
 # Stub cursor binary for testing
 echo "Stub cursor executed with args: $@"
@@ -58,10 +93,10 @@ fi
 # Simulate output (no COMPLETE by default)
 echo "Some cursor output"
 EOF
-  chmod +x bin/cursor
+  chmod +x "$project_dir/bin/cursor"
   
   # Create test prd.json
-  cat > prd.json << 'EOF'
+  cat > "$RALPH_WORK_DIR/prd.json" << 'EOF'
 {
   "project": "TestProject",
   "branchName": "ralph/test",
@@ -81,14 +116,14 @@ EOF
 EOF
   
   # Create test progress.txt
-  echo "# Ralph Progress Log" > progress.txt
-  echo "Started: $(date)" >> progress.txt
-  echo "---" >> progress.txt
+  echo "# Ralph Progress Log" > "$RALPH_WORK_DIR/progress.txt"
+  echo "Started: $(date)" >> "$RALPH_WORK_DIR/progress.txt"
+  echo "---" >> "$RALPH_WORK_DIR/progress.txt"
 }
 
 # Cleanup test environment
 cleanup_test_env() {
-  cd "$SCRIPT_DIR"
+  cd "$SCRIPT_DIR" || true
   rm -rf "$TEST_DIR"
 }
 
@@ -202,12 +237,12 @@ test_stop_condition_complete() {
   setup_test_env
   
   # Modify stub amp to output COMPLETE
-  cat > bin/amp << 'EOF'
+  cat > "$TEST_DIR/project/bin/amp" << 'EOF'
 #!/bin/bash
 echo "Iteration output"
 echo "<promise>COMPLETE</promise>"
 EOF
-  chmod +x bin/amp
+  chmod +x "$TEST_DIR/project/bin/amp"
   
   OUTPUT=$(bash "$RALPH_SCRIPT" 10 2>&1 || true)
   
@@ -228,11 +263,11 @@ test_stop_condition_no_complete() {
   setup_test_env
   
   # Modify stub amp to NOT output COMPLETE
-  cat > bin/amp << 'EOF'
+  cat > "$TEST_DIR/project/bin/amp" << 'EOF'
 #!/bin/bash
 echo "Iteration output without COMPLETE"
 EOF
-  chmod +x bin/amp
+  chmod +x "$TEST_DIR/project/bin/amp"
   
   OUTPUT=$(bash "$RALPH_SCRIPT" 2 2>&1 || true)
   
@@ -252,12 +287,12 @@ EOF
 test_progress_append_only() {
   setup_test_env
   
-  ORIGINAL_CONTENT=$(cat progress.txt)
+  ORIGINAL_CONTENT=$(cat "$RALPH_WORK_DIR/progress.txt")
   
   # Run one iteration
   bash "$RALPH_SCRIPT" 1 >/dev/null 2>&1 || true
   
-  NEW_CONTENT=$(cat progress.txt)
+  NEW_CONTENT=$(cat "$RALPH_WORK_DIR/progress.txt")
   
   if [[ "$NEW_CONTENT" == "$ORIGINAL_CONTENT"* ]]; then
     echo -e "${GREEN}PASS${NC}: progress.txt is append-only"
@@ -277,7 +312,7 @@ test_prd_json_parsing_failure() {
   setup_test_env
   
   # Create invalid prd.json
-  echo "invalid json content" > prd.json
+  echo "invalid json content" > "$RALPH_WORK_DIR/prd.json"
   
   # Runner should not crash
   if bash "$RALPH_SCRIPT" 1 >/dev/null 2>&1; then
@@ -289,7 +324,7 @@ test_prd_json_parsing_failure() {
   fi
   
   # Test missing prd.json
-  rm -f prd.json
+  rm -f "$RALPH_WORK_DIR/prd.json"
   
   if bash "$RALPH_SCRIPT" 1 >/dev/null 2>&1; then
     echo -e "${GREEN}PASS${NC}: Runner handles missing prd.json gracefully"
@@ -302,14 +337,21 @@ test_prd_json_parsing_failure() {
   cleanup_test_env
 }
 
-# Run all tests
-main() {
-  echo "Running Ralph test suite..."
+run_variant() {
+  local variant_name="$1"
+  local layout="$2"
+  local source_dir="$3"
+
+  CURRENT_VARIANT_NAME="$variant_name"
+  CURRENT_LAYOUT="$layout"
+  CURRENT_SOURCE_DIR="$source_dir"
+
+  echo "Running Ralph test suite (${CURRENT_VARIANT_NAME})..."
   echo ""
-  
+
   local tests_passed=0
   local tests_failed=0
-  
+
   if test_default_worker_amp; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_cursor_worker_explicit; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_cursor_invocation_flags; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
@@ -318,20 +360,40 @@ main() {
   if test_stop_condition_no_complete; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_progress_append_only; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
   if test_prd_json_parsing_failure; then ((tests_passed+=1)); else ((tests_failed+=1)); fi
-  
+
   echo ""
   echo "========================================="
+  echo "Variant: $CURRENT_VARIANT_NAME"
   echo "Tests passed: $tests_passed"
   echo "Tests failed: $tests_failed"
   echo "========================================="
-  
+
   if [ $tests_failed -eq 0 ]; then
     echo -e "${GREEN}All tests passed!${NC}"
-    exit 0
+    return 0
   else
     echo -e "${RED}Some tests failed!${NC}"
-    exit 1
+    return 1
   fi
+}
+
+# Run all tests (canonical + template)
+main() {
+  local overall_failed=0
+
+  # Canonical runner (ralph/ralph.sh)
+  if ! run_variant "canonical-root" "root" "$REPO_ROOT"; then
+    overall_failed=1
+  fi
+
+  echo ""
+
+  # Template runner (ralph/scripts/ralph/ralph.sh)
+  if ! run_variant "template-scripts" "scripts" "$REPO_ROOT/scripts/ralph"; then
+    overall_failed=1
+  fi
+
+  exit $overall_failed
 }
 
 # Run tests
