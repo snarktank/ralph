@@ -186,6 +186,17 @@ Edit `prompt.md` to customize Ralph's behavior for your project:
 - Include codebase conventions
 - Add common gotchas for your stack
 
+## Structured Workflow Examples (Optional)
+
+The `examples/structured-workflow/` directory contains optional examples and templates that help structure work more effectively:
+
+- **`TASK-BREAKDOWN-GUIDE.md`** - Practical guide to breaking work into phases that fit Ralph's execution model
+- **`prd.json.example`** - Shows optional metadata fields (`stage`, `focus`, `responsibility`) for organizing tasks
+- **`prompt-templates/`** - Optional snippets for customizing `prompt.md` by task type
+- **`example-feature/`** - Complete end-to-end example demonstrating structured tasks
+
+These are purely additive and optional. Ralph works perfectly without them. Use them if you want guidance on structuring tasks, or ignore them if you prefer a simpler approach.
+
 ## Archiving
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
