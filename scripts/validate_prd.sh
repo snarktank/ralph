@@ -8,41 +8,39 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
-REQUIRED_FIELDS=("id" "description" "status" "priority")
-VALID_STATUS=("todo" "in_progress" "done")
+if ! command -v jq >/dev/null 2>&1; then
+  echo "✗ jq is required but not installed"
+  exit 1
+fi
 
+REQUIRED_FIELDS=("id" "title" "priority")
 ERROR=0
 
 echo "Validating PRD: $FILE"
 echo "-------------------------"
 
-IDS=$(jq -r '.tasks[].id' "$FILE")
+# Collect all user story IDs
+IDS=$(jq -r '.userStories[].id' "$FILE")
 
-# Duplicate IDs
+# Check for duplicate IDs
 DUP_IDS=$(echo "$IDS" | sort | uniq -d)
 if [ -n "$DUP_IDS" ]; then
-  echo "✗ Duplicate task IDs:"
+  echo "✗ Duplicate userStory IDs:"
   echo "$DUP_IDS"
   ERROR=1
 fi
 
-# Validate each task
-COUNT=$(jq '.tasks | length' "$FILE")
+# Validate each user story
+COUNT=$(jq '.userStories | length' "$FILE")
 
 for ((i=0; i<COUNT; i++)); do
   for FIELD in "${REQUIRED_FIELDS[@]}"; do
-    VALUE=$(jq -r ".tasks[$i].$FIELD // empty" "$FILE")
+    VALUE=$(jq -r ".userStories[$i].$FIELD // empty" "$FILE")
     if [ -z "$VALUE" ]; then
-      echo "✗ Missing field '$FIELD' in task index $i"
+      echo "✗ Missing field '$FIELD' in userStory index $i"
       ERROR=1
     fi
   done
-
-  STATUS=$(jq -r ".tasks[$i].status" "$FILE")
-  if [[ ! " ${VALID_STATUS[*]} " =~ " $STATUS " ]]; then
-    echo "✗ Invalid status '$STATUS' in task index $i"
-    ERROR=1
-  fi
 done
 
 if [ "$ERROR" -eq 0 ]; then
@@ -51,3 +49,8 @@ else
   echo "✗ PRD validation failed"
   exit 1
 fi
+
+
+# // this is the main file that i have added validate_prd.sh file in the main root folder i have made a file name 
+# prd.json.example also in the main root folder
+# // now i will run this script to validate the prd.json file
