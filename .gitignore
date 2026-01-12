@@ -6,5 +6,8 @@ progress.txt
 # Archive is optional to commit
 # archive/
 
+# Plan folder
+plan/
+
 # OS files
 .DS_Store
