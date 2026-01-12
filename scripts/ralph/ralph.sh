@@ -92,8 +92,8 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   
   # Select prompt and execute based on worker
   if [[ "$WORKER" == "amp" ]]; then
-    # Amp worker: use amp/prompt.md and execute amp
-    PROMPT_FILE="$SCRIPT_DIR/amp/prompt.md"
+    # Amp worker: use prompt.md and execute amp
+    PROMPT_FILE="$SCRIPT_DIR/prompt.md"
     OUTPUT=$(cat "$PROMPT_FILE" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   elif [[ "$WORKER" == "cursor" ]]; then
     # Cursor worker: use cursor/prompt.cursor.md and execute cursor CLI

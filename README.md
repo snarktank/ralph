@@ -111,7 +111,7 @@ Note: `--cursor-timeout` only applies if a `timeout` binary is available on your
 | File | Purpose |
 |------|---------|
 | `scripts/ralph/ralph.sh` | The bash loop that spawns fresh worker invocations |
-| `scripts/ralph/amp/prompt.md` | Instructions given to each Amp iteration |
+| `scripts/ralph/prompt.md` | Instructions given to each Amp iteration |
 | `scripts/ralph/cursor/prompt.cursor.md` | Instructions given to each Cursor iteration |
 | `scripts/ralph/cursor/convert-to-prd-json.sh` | Convert PRD markdown → `scripts/ralph/prd.json` via Cursor CLI |
 | `scripts/ralph/prd.json` | User stories with `passes` status (the task list) |
@@ -206,7 +206,7 @@ Edit the worker prompt(s) to customize Ralph's behavior for your project:
 - Add common gotchas for your stack
 
 Worker prompt locations:
-- Amp: `scripts/ralph/amp/prompt.md`
+- Amp: `scripts/ralph/prompt.md`
 - Cursor: `scripts/ralph/cursor/prompt.cursor.md`
 
 ## Archiving

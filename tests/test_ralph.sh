@@ -33,11 +33,10 @@ setup_test_env() {
 
   if [[ "$CURRENT_LAYOUT" == "scripts" ]]; then
     runner_dir="$project_dir/scripts/ralph"
-    mkdir -p "$runner_dir/amp"
     mkdir -p "$runner_dir/cursor"
     cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
+    cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
     cp "$CURRENT_SOURCE_DIR/prd.json.example" "$runner_dir/prd.json.example"
-    cp "$CURRENT_SOURCE_DIR/amp/prompt.md" "$runner_dir/amp/prompt.md"
     cp "$CURRENT_SOURCE_DIR/cursor/prompt.cursor.md" "$runner_dir/cursor/prompt.cursor.md"
     cp "$CURRENT_SOURCE_DIR/cursor/prompt.convert-to-prd-json.md" "$runner_dir/cursor/prompt.convert-to-prd-json.md"
     cp "$CURRENT_SOURCE_DIR/cursor/convert-to-prd-json.sh" "$runner_dir/cursor/convert-to-prd-json.sh"

@@ -23,7 +23,7 @@ cd flowchart && npm run build
 ## Key Files
 
 - `scripts/ralph/ralph.sh` - The bash loop (Amp + optional Cursor worker)
-- `scripts/ralph/amp/prompt.md` - Instructions given to each Amp iteration
+- `scripts/ralph/prompt.md` - Instructions given to each Amp iteration
 - `scripts/ralph/cursor/prompt.cursor.md` - Instructions given to each Cursor iteration
 - `scripts/ralph/cursor/convert-to-prd-json.sh` - Convert PRD markdown → `scripts/ralph/prd.json` via Cursor CLI
 - `scripts/ralph/prd.json.example` - Example PRD format
@@ -48,4 +48,4 @@ npm run dev
 - Memory persists via git history, `scripts/ralph/progress.txt`, and `scripts/ralph/prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations
-- Worker-specific prompts are in `scripts/ralph/amp/` and `scripts/ralph/cursor/` subfolders
+- Cursor-specific prompts are in `scripts/ralph/cursor/` subfolder
