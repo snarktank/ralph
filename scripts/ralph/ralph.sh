@@ -92,14 +92,14 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   
   # Select prompt and execute based on worker
   if [[ "$WORKER" == "amp" ]]; then
-    # Amp worker: use prompt.md and execute amp
-    PROMPT_FILE="$SCRIPT_DIR/prompt.md"
+    # Amp worker: use amp/prompt.md and execute amp
+    PROMPT_FILE="$SCRIPT_DIR/amp/prompt.md"
     OUTPUT=$(cat "$PROMPT_FILE" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   elif [[ "$WORKER" == "cursor" ]]; then
-    # Cursor worker: use prompt.cursor.md and execute cursor CLI
+    # Cursor worker: use cursor/prompt.cursor.md and execute cursor CLI
     # Uses non-interactive headless mode with file edits enabled
     # Always uses normal spawn (never PTY), stdin is closed (no interactive prompts)
-    PROMPT_FILE="$SCRIPT_DIR/prompt.cursor.md"
+    PROMPT_FILE="$SCRIPT_DIR/cursor/prompt.cursor.md"
     PROMPT_TEXT=$(cat "$PROMPT_FILE")
     # Execute cursor with: --model auto --print --force --approve-mcps
     # stdin is automatically closed when using command substitution in bash

@@ -2,11 +2,11 @@
 # Convert PRD markdown -> prd.json using Cursor CLI (template version).
 #
 # Usage:
-#   ./scripts/ralph/convert-to-prd-json.sh <path-to-prd-markdown> [--model MODEL] [--out OUT_JSON]
+#   ./scripts/ralph/cursor/convert-to-prd-json.sh <path-to-prd-markdown> [--model MODEL] [--out OUT_JSON]
 #
 # Defaults:
 # - MODEL: "auto"
-# - OUT_JSON: ./scripts/ralph/prd.json (next to this script)
+# - OUT_JSON: ../prd.json (in scripts/ralph/ directory, same level as prd.json.example)
 #
 # Notes:
 # - This is a convenience helper to streamline PRD->prd.json conversion.
@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PRD_MD_FILE=""
 MODEL="auto"
-OUT_JSON="$SCRIPT_DIR/prd.json"
+OUT_JSON="$SCRIPT_DIR/../prd.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,7 +57,7 @@ if [[ ! -f "$PROMPT_TEMPLATE_FILE" ]]; then
   exit 1
 fi
 
-EXAMPLE_FILE="$SCRIPT_DIR/prd.json.example"
+EXAMPLE_FILE="$SCRIPT_DIR/../prd.json.example"
 if [[ ! -f "$EXAMPLE_FILE" ]]; then
   echo "Error: missing example file: $EXAMPLE_FILE" >&2
   exit 1

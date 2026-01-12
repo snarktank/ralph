@@ -41,31 +41,33 @@ setup_test_env() {
     chmod +x "$runner_dir/ralph.sh"
     chmod +x "$runner_dir/convert-to-prd-json.sh"
 
-    # Copy canonical scripts/ralph/ implementation into the project
-    mkdir -p "$project_dir/scripts/ralph"
+    # Copy canonical scripts/ralph/ implementation into the project (with amp/ and cursor/ subfolders)
+    mkdir -p "$project_dir/scripts/ralph/amp"
+    mkdir -p "$project_dir/scripts/ralph/cursor"
     cp "$CURRENT_SOURCE_DIR/ralph.sh" "$project_dir/scripts/ralph/ralph.sh"
-    cp "$CURRENT_SOURCE_DIR/prompt.md" "$project_dir/scripts/ralph/prompt.md"
-    cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$project_dir/scripts/ralph/prompt.cursor.md"
-    cp "$CURRENT_SOURCE_DIR/prompt.convert-to-prd-json.md" "$project_dir/scripts/ralph/prompt.convert-to-prd-json.md"
     cp "$CURRENT_SOURCE_DIR/prd.json.example" "$project_dir/scripts/ralph/prd.json.example"
-    cp "$CURRENT_SOURCE_DIR/convert-to-prd-json.sh" "$project_dir/scripts/ralph/convert-to-prd-json.sh"
+    cp "$CURRENT_SOURCE_DIR/amp/prompt.md" "$project_dir/scripts/ralph/amp/prompt.md"
+    cp "$CURRENT_SOURCE_DIR/cursor/prompt.cursor.md" "$project_dir/scripts/ralph/cursor/prompt.cursor.md"
+    cp "$CURRENT_SOURCE_DIR/cursor/prompt.convert-to-prd-json.md" "$project_dir/scripts/ralph/cursor/prompt.convert-to-prd-json.md"
+    cp "$CURRENT_SOURCE_DIR/cursor/convert-to-prd-json.sh" "$project_dir/scripts/ralph/cursor/convert-to-prd-json.sh"
     chmod +x "$project_dir/scripts/ralph/ralph.sh"
-    chmod +x "$project_dir/scripts/ralph/convert-to-prd-json.sh"
+    chmod +x "$project_dir/scripts/ralph/cursor/convert-to-prd-json.sh"
 
     # Run via root wrapper, but create PRD/progress files where canonical runner expects them.
     RALPH_SCRIPT="$runner_dir/ralph.sh"
     RALPH_WORK_DIR="$project_dir/scripts/ralph"
   elif [[ "$CURRENT_LAYOUT" == "scripts" ]]; then
     runner_dir="$project_dir/scripts/ralph"
-    mkdir -p "$runner_dir"
+    mkdir -p "$runner_dir/amp"
+    mkdir -p "$runner_dir/cursor"
     cp "$CURRENT_SOURCE_DIR/ralph.sh" "$runner_dir/ralph.sh"
-    cp "$CURRENT_SOURCE_DIR/prompt.md" "$runner_dir/prompt.md"
-    cp "$CURRENT_SOURCE_DIR/prompt.cursor.md" "$runner_dir/prompt.cursor.md"
-    cp "$CURRENT_SOURCE_DIR/prompt.convert-to-prd-json.md" "$runner_dir/prompt.convert-to-prd-json.md"
     cp "$CURRENT_SOURCE_DIR/prd.json.example" "$runner_dir/prd.json.example"
-    cp "$CURRENT_SOURCE_DIR/convert-to-prd-json.sh" "$runner_dir/convert-to-prd-json.sh"
+    cp "$CURRENT_SOURCE_DIR/amp/prompt.md" "$runner_dir/amp/prompt.md"
+    cp "$CURRENT_SOURCE_DIR/cursor/prompt.cursor.md" "$runner_dir/cursor/prompt.cursor.md"
+    cp "$CURRENT_SOURCE_DIR/cursor/prompt.convert-to-prd-json.md" "$runner_dir/cursor/prompt.convert-to-prd-json.md"
+    cp "$CURRENT_SOURCE_DIR/cursor/convert-to-prd-json.sh" "$runner_dir/cursor/convert-to-prd-json.sh"
     chmod +x "$runner_dir/ralph.sh"
-    chmod +x "$runner_dir/convert-to-prd-json.sh"
+    chmod +x "$runner_dir/cursor/convert-to-prd-json.sh"
     RALPH_SCRIPT="$runner_dir/ralph.sh"
     RALPH_WORK_DIR="$runner_dir"
   else
@@ -217,7 +219,7 @@ test_convert_prd_json_model_override() {
   mkdir -p "$TEST_DIR/project/tasks"
   echo "# PRD: Example" > "$TEST_DIR/project/tasks/prd-example.md"
 
-  local convert_script="$RALPH_WORK_DIR/convert-to-prd-json.sh"
+  local convert_script="$RALPH_WORK_DIR/cursor/convert-to-prd-json.sh"
   if [[ ! -f "$convert_script" ]]; then
     echo -e "${RED}FAIL${NC}: convert-to-prd-json.sh not found"
     cleanup_test_env
