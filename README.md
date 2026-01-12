@@ -28,7 +28,7 @@ cp /path/to/ralph/prompt.md scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally
+### Option 2: Install skills globally (Amp)
 
 Copy the skills to your Amp config for use across all projects:
 
@@ -36,6 +36,28 @@ Copy the skills to your Amp config for use across all projects:
 cp -r skills/prd ~/.config/amp/skills/
 cp -r skills/ralph ~/.config/amp/skills/
 ```
+
+### Option 3: Use as Claude Code Marketplace
+
+Add the Ralph marketplace to Claude Code:
+
+```bash
+/plugin marketplace add snarktank/ralph
+```
+
+Then install the skills:
+
+```bash
+/plugin install ralph-skills@ralph-marketplace
+```
+
+Available skills after installation:
+- `/prd` - Generate Product Requirements Documents
+- `/ralph` - Convert PRDs to prd.json format
+
+Skills are automatically invoked when you ask Claude to:
+- "create a prd", "write prd for", "plan this feature"
+- "convert this prd", "turn into ralph format", "create prd.json"
 
 ### Configure Amp auto-handoff (recommended)
 
@@ -98,8 +120,9 @@ Ralph will:
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
+| `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
+| `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+| `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
