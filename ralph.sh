@@ -11,6 +11,13 @@ CLI_TOOL=${2:-amp}
 MODEL=${3:-}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_FILE="$SCRIPT_DIR/prompt-$CLI_TOOL.md"
+
+# Set opencode permissions via environment variable (equivalent to --dangerously-allow-all)
+if [ "$CLI_TOOL" = "opencode" ]; then
+	export OPENCODE_PERMISSION='{"*": "allow"}'
+	export OPENCODE_DISABLE_AUTOCOMPACT=true
+fi
+
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
