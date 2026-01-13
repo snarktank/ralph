@@ -47,7 +47,7 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
 3. What is the scope?
    A. Minimal viable version
    B. Full-featured implementation
-   C. Just the backend/API
+   C. Just the backend/
    D. Just the UI
 ```
 
