@@ -1,0 +1,103 @@
+.save-json-step .card {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.save-json-step .card.success {
+  text-align: center;
+}
+
+.save-json-step .card.success h2 {
+  color: #27ae60;
+  margin-bottom: 1rem;
+}
+
+.save-json-step .card.success p {
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.save-json-step .card.success code {
+  display: block;
+  background-color: #f8f9fa;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+  font-family: monospace;
+}
+
+.save-json-step .card.success .next-steps {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+}
+
+.save-json-step h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.save-info {
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+}
+
+.save-info p {
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.save-info p:last-child {
+  margin-bottom: 0;
+}
+
+.error-message {
+  color: #e74c3c;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #fee;
+  border-radius: 4px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.form-actions button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-actions button[type="button"] {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.form-actions button[type="button"]:hover:not(:disabled) {
+  background-color: #7f8c8d;
+}
+
+.form-actions button[type="submit"] {
+  background-color: #27ae60;
+  color: white;
+}
+
+.form-actions button[type="submit"]:hover:not(:disabled) {
+  background-color: #229954;
+}
+
+.form-actions button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}

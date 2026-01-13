@@ -42,9 +42,25 @@ Note: Cursor CLI automatically handles context management, so no additional conf
 ### Option 3: Copy ralph_install.sh to project and run
 Copy the ralph_install.sh from copy_to_project/ralph_install.sh
 
+### Option 4: Use the PRD Web UI
+
+Ralph includes a web-based UI for creating PRDs and converting them to JSON format. This provides a user-friendly alternative to using Cursor CLI skills.
+
+See [PRD UI Documentation](prd-ui/README.md) for setup and usage instructions.
+
 ## Workflow
 
 ### 1. Create a PRD
+
+**Option A: Using the Web UI (Recommended)**
+
+1. Start the PRD UI (see [PRD UI Documentation](prd-ui/README.md))
+2. Navigate to "Create PRD"
+3. Select your project directory
+4. Follow the guided wizard to create your PRD
+5. The PRD will be saved to `tasks/prd-[feature-name].md`
+
+**Option B: Using Cursor CLI Skills**
 
 Use the PRD skill to generate a detailed requirements document:
 
@@ -55,6 +71,16 @@ Load the prd skill and create a PRD for [your feature description]
 Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
 
 ### 2. Convert PRD to Ralph format
+
+**Option A: Using the Web UI (Recommended)**
+
+1. In the PRD UI, navigate to "Convert to JSON"
+2. Select your project directory
+3. Choose an existing PRD file or paste PRD content
+4. Review the generated JSON
+5. Save `prd.json` to your project root
+
+**Option B: Using Cursor CLI Skills**
 
 Use the Ralph skill to convert the markdown PRD to JSON:
 
@@ -94,6 +120,7 @@ Ralph will:
 | `skills/prd/` | Skill for generating PRDs |
 | `skills/ralph/` | Skill for converting PRDs to JSON |
 | `flowchart/` | Interactive visualization of how Ralph works |
+| `prd-ui/` | Web UI for creating PRDs and converting to JSON |
 
 ## Flowchart
 
@@ -182,6 +209,17 @@ Edit `prompt.md` to customize Ralph's behavior for your project:
 ## Archiving
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+
+## PRD Web UI
+
+Ralph includes a full-stack web application for creating and managing PRDs through a user-friendly interface. The PRD UI provides:
+
+- **Guided PRD Creation**: Multi-step wizard for creating PRDs
+- **PRD to JSON Conversion**: Convert markdown PRDs to Ralph's JSON format
+- **Project Management**: Point to any project directory to manage PRDs
+- **Real-time Preview**: See PRD markdown and JSON previews as you work
+
+See the [PRD UI Documentation](prd-ui/README.md) for detailed setup and usage instructions.
 
 ## References
 

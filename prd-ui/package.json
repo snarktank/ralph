@@ -1,0 +1,16 @@
+{
+  "name": "prd-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PRD Web UI for Ralph",
+  "scripts": {
+    "dev:backend": "pnpm --filter prd-ui-backend dev",
+    "dev:frontend": "pnpm --filter prd-ui-frontend dev",
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm --filter prd-ui-frontend build",
+    "test": "pnpm -r test",
+    "test:frontend": "pnpm --filter prd-ui-frontend test",
+    "test:backend": "pnpm --filter prd-ui-backend test",
+    "test:coverage": "pnpm -r test:coverage"
+  }
+}

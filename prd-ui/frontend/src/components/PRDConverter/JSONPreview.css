@@ -1,0 +1,117 @@
+.json-preview .card {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.json-preview h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.error-message {
+  color: #e74c3c;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: #fee;
+  border-radius: 4px;
+}
+
+.validation-warnings {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+}
+
+.validation-warnings h3 {
+  margin-bottom: 0.5rem;
+  color: #856404;
+}
+
+.validation-warnings ul {
+  margin-left: 1.5rem;
+  color: #856404;
+}
+
+.json-container {
+  margin-bottom: 1.5rem;
+  max-height: 600px;
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.form-actions button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-actions button[type="button"]:first-of-type {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.form-actions button[type="button"]:first-of-type:hover {
+  background-color: #7f8c8d;
+}
+
+.form-actions button[type="button"]:nth-of-type(2) {
+  background-color: #f39c12;
+  color: white;
+}
+
+.form-actions button[type="button"]:nth-of-type(2):hover {
+  background-color: #e67e22;
+}
+
+.form-actions button[type="button"]:last-of-type {
+  background-color: #3498db;
+  color: white;
+}
+
+.form-actions button[type="button"]:last-of-type:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.form-actions button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
