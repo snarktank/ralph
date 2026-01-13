@@ -1,17 +1,278 @@
 ---
 name: ralph
-description: "Convert PRDs to prd.json format for the Ralph autonomous agent system. Use when you have an existing PRD and need to convert it to Ralph's JSON format. Triggers on: convert this prd, turn this into ralph format, create prd.json from this, ralph json."
+description: "Execute Ralph autonomous agent loop to implement user stories from prd.json iteratively. Also converts PRDs to prd.json format. Use when you have prd.json and want to implement stories autonomously, or when you need to convert a PRD to Ralph's JSON format. Triggers on: run ralph, execute ralph, implement stories from prd.json, convert this prd, turn this into ralph format, create prd.json from this, ralph json."
 ---
 
-# Ralph PRD Converter
+# Ralph Autonomous Agent
 
-Converts existing PRDs to the prd.json format that Ralph uses for autonomous execution.
+Execute the Ralph autonomous agent loop to implement user stories iteratively, or convert PRDs to prd.json format for execution.
 
 ---
 
-## The Job
+## Primary Use: Executing Stories
+
+When you have a `prd.json` file, use this skill to execute the Ralph autonomous loop:
+
+1. **Read state files** - Load prd.json and progress.txt
+2. **Pick next story** - Select highest priority story where `passes: false`
+3. **Implement story** - Complete the story following acceptance criteria
+4. **Verify and commit** - Run quality checks, commit if passing
+5. **Update state** - Mark story as complete, append progress
+6. **Continue or complete** - Loop until all stories pass
+
+See [Executing Stories](#executing-stories) section below for complete workflow.
+
+---
+
+## Secondary Use: Converting PRDs
 
 Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+
+---
+
+## Executing Stories
+
+When executing the Ralph loop, follow this workflow for each iteration:
+
+### Step 1: Bootstrap Session
+
+**If starting a new session, check for handoff state:**
+
+1. Check for `HANDOFF.md` file in the project root
+2. If exists, read it to understand previous state and where to continue
+3. Read `prd.json` to see current story status
+4. Read `progress.txt` (especially the `## Codebase Patterns` section at the top)
+5. Check git history for recent commits: `git log --oneline -10`
+
+**Always read these files at session start:**
+- `prd.json` - Current story status
+- `progress.txt` - Previous learnings and patterns
+- Git branch status - Ensure on correct branch
+
+### Step 2: Select Next Story
+
+1. Read `prd.json` from project root (or `ralph/prd.json` if using ralph directory)
+2. Find the **highest priority** user story where `passes: false`
+3. If multiple stories have same priority, pick the first one (lowest ID)
+4. Verify the story's acceptance criteria are clear and verifiable
+
+**If all stories have `passes: true`, signal completion:**
+```
+<promise>COMPLETE</promise>
+```
+
+### Step 3: Check Branch
+
+1. Read `branchName` from `prd.json`
+2. Check current git branch: `git branch --show-current`
+3. If not on correct branch:
+   - Check if branch exists: `git branch -a | grep <branchName>`
+   - If exists: `git checkout <branchName>`
+   - If not exists: `git checkout -b <branchName>` (from main or master)
+
+### Step 4: Implement the Story
+
+1. **Read Codebase Patterns** - Check the `## Codebase Patterns` section in `progress.txt` first
+2. **Understand requirements** - Review the story's description and acceptance criteria
+3. **Implement changes** - Make code changes to satisfy all acceptance criteria
+4. **Follow existing patterns** - Use patterns discovered in previous iterations
+5. **Keep changes focused** - Only modify what's needed for this story
+
+### Step 5: Run Quality Checks
+
+Run your project's standard quality checks:
+
+- **Typecheck**: `npm run typecheck` or `tsc --noEmit` or equivalent
+- **Lint**: `npm run lint` or equivalent
+- **Tests**: `npm test` or equivalent (if story has testable logic)
+- **Build**: `npm run build` or equivalent (if applicable)
+
+**Do NOT commit if checks fail.** Fix issues first.
+
+### Step 6: Browser Verification (UI Stories Only)
+
+For any story that changes UI:
+
+1. Load the `dev-browser` skill if available
+2. Start dev server if not running: `npm run dev`
+3. Navigate to the relevant page
+4. Verify UI changes work as expected
+5. Interact with the feature to confirm it meets acceptance criteria
+6. Take a screenshot if helpful for documentation
+
+**A frontend story is NOT complete until browser verification passes.**
+
+### Step 7: Update AGENTS.md Files
+
+Before committing, check if any edited files have learnings worth preserving:
+
+1. **Identify directories with edited files** - Note which directories you modified
+2. **Check for existing AGENTS.md** - Look for AGENTS.md in those directories or parent directories
+3. **Add valuable learnings** - If you discovered reusable patterns:
+   - API patterns or conventions specific to that module
+   - Gotchas or non-obvious requirements
+   - Dependencies between files
+   - Testing approaches for that area
+   - Configuration or environment requirements
+
+**Examples of good AGENTS.md additions:**
+- "When modifying X, also update Y to keep them in sync"
+- "This module uses pattern Z for all API calls"
+- "Tests require the dev server running on PORT 3000"
+- "Field names must match the template exactly"
+
+**Do NOT add:**
+- Story-specific implementation details
+- Temporary debugging notes
+- Information already in progress.txt
+
+Only update AGENTS.md if you have **genuinely reusable knowledge** that would help future work.
+
+### Step 8: Commit Changes
+
+If all quality checks pass:
+
+1. Stage all changes: `git add .`
+2. Commit with message: `feat: [Story ID] - [Story Title]`
+   - Example: `feat: US-001 - Add priority field to database`
+3. Verify commit succeeded: `git log -1 --oneline`
+
+**Do NOT commit broken code.** All commits must pass quality checks.
+
+### Step 9: Update State Files
+
+**Update prd.json:**
+1. Read current `prd.json`
+2. Find the completed story by ID
+3. Set `passes: true` for that story
+4. Optionally add notes if there were important learnings
+5. Write updated `prd.json` back
+
+**Append to progress.txt:**
+1. Read current `progress.txt`
+2. Append new entry at the end:
+```
+## [Date/Time] - [Story ID]
+- What was implemented
+- Files changed
+- **Learnings for future iterations:**
+  - Patterns discovered (e.g., "this codebase uses X for Y")
+  - Gotchas encountered (e.g., "don't forget to update Z when changing W")
+  - Useful context (e.g., "the settings panel is in component X")
+---
+```
+
+**Consolidate Patterns:**
+If you discovered a **reusable pattern**, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist):
+
+```
+## Codebase Patterns
+- Pattern 1: Description
+- Pattern 2: Description
+```
+
+Only add patterns that are **general and reusable**, not story-specific details.
+
+### Step 10: Check Completion
+
+After updating state:
+
+1. Read updated `prd.json`
+2. Check if ALL stories have `passes: true`
+3. If all complete, signal: `<promise>COMPLETE</promise>`
+4. If more stories remain, end response normally (user will continue loop)
+
+### Step 11: Context Management
+
+**Monitor context usage throughout execution:**
+
+- Be aware of token usage as you work
+- If approaching ~90% of context window:
+  1. **Commit current work** - Even if story not complete, commit what you have
+  2. **Update prd.json** - Mark current story progress in `notes` field
+  3. **Append to progress.txt** - Document what was done and what remains
+  4. **Create HANDOFF.md** - See [Context Detection & Handoff](#context-detection--handoff) section
+  5. **Signal handoff** - Tell user to start new session with handoff file
+
+For detailed context management procedures, see [CONTEXT.md](CONTEXT.md) when needed.
+
+---
+
+## Context Detection & Handoff
+
+When context is filling up (~90% threshold), prepare for handoff:
+
+### Handoff Preparation
+
+1. **Commit in-progress work:**
+   - Stage all changes: `git add .`
+   - Commit with message: `feat: [Story ID] - [Story Title] (in progress)`
+   - Document what's done vs. what remains
+
+2. **Update prd.json:**
+   - Add progress notes to current story's `notes` field
+   - Document what's complete and what still needs work
+
+3. **Append to progress.txt:**
+   - Document current state
+   - List files changed so far
+   - Note what remains to be done
+
+4. **Create HANDOFF.md:**
+   - See [HANDOFF.md](HANDOFF.md) template for structure
+   - Include current story being worked on
+   - List files changed
+   - Document next steps needed
+   - Include state snapshot
+
+5. **Signal to user:**
+   - "Context approaching limit. Handoff file created at HANDOFF.md"
+   - "Please start a new session and load HANDOFF.md to continue"
+
+### Session Bootstrap
+
+When starting a new session after handoff:
+
+1. **Read HANDOFF.md** - Understand previous state
+2. **Read prd.json** - See current story status
+3. **Read progress.txt** - Load Codebase Patterns section
+4. **Check git history** - See recent commits
+5. **Continue from handoff point** - Resume implementation
+
+---
+
+## State Persistence
+
+Ralph persists state across sessions via:
+
+### prd.json
+- Location: Project root or `ralph/prd.json`
+- Contains: Project info, branch name, user stories with `passes` status
+- Updated: After each story completion
+
+### progress.txt
+- Location: Project root or `ralph/progress.txt`
+- Contains: Append-only log of iterations and learnings
+- Structure:
+  - `## Codebase Patterns` section at top (consolidated patterns)
+  - Individual iteration entries below
+- Updated: After each iteration
+
+### Git History
+- Commits: Each story gets a commit when complete
+- Format: `feat: [Story ID] - [Story Title]`
+- Purpose: Provides code history and context for future sessions
+
+### AGENTS.md Files
+- Location: Throughout codebase (near relevant code)
+- Contains: Reusable patterns and gotchas for specific modules
+- Updated: When discovering reusable patterns
+
+### HANDOFF.md (temporary)
+- Location: Project root
+- Created: When context limit approached
+- Contains: State snapshot for session continuation
+- Deleted: After successful handoff (or manually)
 
 ---
 
@@ -240,7 +501,7 @@ Add ability to mark tasks with different statuses.
    - Copy current `prd.json` and `progress.txt` to archive
    - Reset `progress.txt` with fresh header
 
-**The ralph.sh script handles this automatically** when you run it, but if you are manually updating prd.json between runs, archive first.
+**When converting a PRD to prd.json**, always check for existing runs and archive if needed.
 
 ---
 

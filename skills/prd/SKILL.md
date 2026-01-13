@@ -73,6 +73,26 @@ Each story needs:
 
 Each story should be small enough to implement in one focused session.
 
+**Story Sizing for Ralph Execution:**
+
+Stories must be sized to fit within a single context window. If a story is too large, the agent will run out of context before completing it, resulting in broken code.
+
+**Right-sized stories (fit in one context window):**
+- Add a database column and migration
+- Add a UI component to an existing page
+- Update a server action with new logic
+- Add a filter dropdown to a list
+- Create a single API endpoint
+
+**Too big (split these):**
+- "Build the entire dashboard" → Split into: schema, queries, UI components, filters
+- "Add authentication" → Split into: schema, middleware, login UI, session handling
+- "Refactor the API" → Split into one story per endpoint or pattern
+
+**Rule of thumb:** If you cannot describe the change in 2-3 sentences, it is too big. Each story should be completable in one focused iteration without context overflow.
+
+After creating the PRD, use the `ralph` skill to convert it to `prd.json` format and begin autonomous execution.
+
 **Format:**
 ```markdown
 ### US-001: [Title]
@@ -234,7 +254,9 @@ Before saving the PRD:
 
 - [ ] Asked clarifying questions with lettered options
 - [ ] Incorporated user's answers
-- [ ] User stories are small and specific
+- [ ] User stories are small and specific (each fits in one context window)
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
 - [ ] Saved to `tasks/prd-[feature-name].md`
+
+**Next step:** After creating the PRD, use the `ralph` skill to convert it to `prd.json` format and begin autonomous execution of the stories.
