@@ -5,21 +5,33 @@
  */
 
 import { parsePRD, extractFeatureName } from '../utils/markdownParser.js';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { spawn } from 'child_process';
 
 /**
  * Check if Cursor CLI agent command is available
  */
 async function isAgentAvailable() {
-  try {
-    await execAsync('agent --version', { timeout: 5000 });
-    return true;
-  } catch (error) {
-    return false;
-  }
+  return new Promise((resolve) => {
+    const child = spawn('agent', ['--version'], { 
+      shell: false,
+      stdio: 'ignore'
+    });
+    
+    const timeoutId = setTimeout(() => {
+      child.kill();
+      resolve(false);
+    }, 5000);
+    
+    child.on('close', (code) => {
+      clearTimeout(timeoutId);
+      resolve(code === 0);
+    });
+    
+    child.on('error', () => {
+      clearTimeout(timeoutId);
+      resolve(false);
+    });
+  });
 }
 
 /**
@@ -39,35 +51,141 @@ function buildJSONConversionPrompt(markdown, projectName) {
 
 /**
  * Extract JSON from agent output
+ * Handles both wrapped (--output-format json) and unwrapped responses
+ * @param {string} output - The raw output from the agent command
+ * @returns {object} The extracted and parsed JSON object
  */
-function extractJSONFromOutput(output) {
-  // Look for JSON object in the output
-  const jsonMatch = output.match(/\{[\s\S]*\}/);
+export function extractJSONFromOutput(output) {
+  if (!output || typeof output !== 'string') {
+    throw new Error('Invalid output: empty or not a string');
+  }
+  
+  // Step 1: Try to parse output as JSON (might be the metadata wrapper)
+  try {
+    const parsed = JSON.parse(output);
+    
+    // If it's the agent metadata wrapper with a 'result' field
+    if (parsed.result && typeof parsed.result === 'string') {
+      return extractJSONFromString(parsed.result);
+    }
+    
+    // If it's already the PRD JSON (has project, branchName, userStories)
+    if (parsed.project || parsed.branchName || parsed.userStories) {
+      return parsed;
+    }
+    
+    // Otherwise, it might be wrapped differently
+    return parsed;
+  } catch (e) {
+    // Not valid JSON, try extracting from text
+    return extractJSONFromString(output);
+  }
+}
+
+/**
+ * Extract JSON from a string that might contain markdown code fences or mixed content
+ */
+function extractJSONFromString(text) {
+  // Try to extract from markdown code fence first (```json ... ```)
+  const markdownMatch = text.match(/```json\s*\n([\s\S]*?)\n```/);
+  if (markdownMatch) {
+    try {
+      return JSON.parse(markdownMatch[1]);
+    } catch (e) {
+      // Continue to other methods
+    }
+  }
+  
+  // Try to extract from any code fence (``` ... ```)
+  const codeMatch = text.match(/```\s*\n([\s\S]*?)\n```/);
+  if (codeMatch) {
+    try {
+      return JSON.parse(codeMatch[1]);
+    } catch (e) {
+      // Continue to other methods
+    }
+  }
+  
+  // Try to find JSON object in the text
+  const jsonMatch = text.match(/\{[\s\S]*"userStories"[\s\S]*\}/);
   if (jsonMatch) {
     try {
       return JSON.parse(jsonMatch[0]);
     } catch (e) {
-      // Try to find JSON with better pattern
-      const betterMatch = output.match(/\{[\s\S]*"userStories"[\s\S]*\}/);
-      if (betterMatch) {
-        try {
-          return JSON.parse(betterMatch[0]);
-        } catch (e2) {
-          // Last resort: try parsing the whole output
-          return JSON.parse(output.trim());
-        }
-      }
+      // Continue to other methods
     }
   }
   
-  throw new Error('Could not extract JSON from agent output');
+  // Try to find any JSON object
+  const anyJsonMatch = text.match(/\{[\s\S]*\}/);
+  if (anyJsonMatch) {
+    try {
+      return JSON.parse(anyJsonMatch[0]);
+    } catch (e) {
+      // Continue to other methods
+    }
+  }
+  
+  // Last resort: try parsing the whole text
+  try {
+    return JSON.parse(text.trim());
+  } catch (e) {
+    throw new Error('Could not extract valid JSON from agent output');
+  }
 }
 
 /**
- * Escape prompt for shell execution
+ * Execute Cursor CLI agent command using spawn for proper argument handling
+ * Avoids all shell escaping issues by passing arguments directly to the process
+ * @param {string} prompt - The prompt to send to the agent
+ * @param {string} outputFormat - The output format (text or json)
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise<{stdout: string, stderr: string}>}
  */
-function escapePromptForShell(prompt) {
-  return prompt.replace(/'/g, "'\\''");
+export async function execAgentCommand(prompt, outputFormat = 'json', timeout = 120000) {
+  return new Promise((resolve, reject) => {
+    const args = ['--print', '--force', '--output-format', outputFormat, prompt];
+    
+    const child = spawn('agent', args, { 
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    let timeoutId;
+    
+    // Set up timeout
+    if (timeout > 0) {
+      timeoutId = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error('Command timeout'));
+      }, timeout);
+    }
+    
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    child.on('close', (code) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with exit code ${code}${stderr ? ': ' + stderr : ''}`));
+      }
+    });
+    
+    child.on('error', (error) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      reject(error);
+    });
+  });
 }
 
 /**
@@ -80,22 +198,15 @@ async function convertPRDToJSONWithAgent(markdown, projectName, updateProgress =
 
   log('building', 'Building prompt for Cursor CLI agent...');
   const prompt = buildJSONConversionPrompt(markdown, projectName);
-  const escapedPrompt = escapePromptForShell(prompt);
   
   try {
     log('executing', 'Executing Cursor CLI agent command...');
     // --print flag is required to enable shell execution (bash access)
     // --force flag forces allow commands unless explicitly denied
-    const command = `agent --print --force --output-format json '${escapedPrompt}'`;
-    
+    // Use spawn to avoid shell escaping issues with long prompts
     log('waiting', 'Waiting for agent response (this may take 30-120 seconds)...');
-    const { stdout, stderr } = await execAsync(
-      command,
-      { 
-        timeout: 120000, // 120 second timeout
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
-      }
-    );
+    
+    const { stdout, stderr } = await execAgentCommand(prompt, 'json', 120000);
     
     log('parsing', 'Parsing agent output...');
     const json = extractJSONFromOutput(stdout);

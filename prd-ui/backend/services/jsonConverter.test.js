@@ -1,9 +1,101 @@
-import { describe, it, expect } from '@jest/globals';
-import { convertPRDToJSON, validateJSON } from './jsonConverter.js';
+import { describe, it, expect, beforeAll } from '@jest/globals';
+import { convertPRDToJSON, validateJSON, execAgentCommand, extractJSONFromOutput } from './jsonConverter.js';
+import { spawn } from 'child_process';
 
 describe('jsonConverter', () => {
+  describe('extractJSONFromOutput', () => {
+    it('extracts JSON from agent metadata wrapper', () => {
+      const wrappedOutput = JSON.stringify({
+        type: 'result',
+        subtype: 'success',
+        result: JSON.stringify({
+          project: 'TestProject',
+          branchName: 'ralph/test',
+          description: 'Test',
+          userStories: []
+        })
+      });
+
+      const result = extractJSONFromOutput(wrappedOutput);
+      
+      expect(result.project).toBe('TestProject');
+      expect(result.branchName).toBe('ralph/test');
+      expect(result.userStories).toEqual([]);
+    });
+
+    it('extracts JSON from markdown code fence in result field', () => {
+      const wrappedOutput = JSON.stringify({
+        type: 'result',
+        result: '```json\n{\n  "project": "TestProject",\n  "branchName": "ralph/test",\n  "userStories": []\n}\n```'
+      });
+
+      const result = extractJSONFromOutput(wrappedOutput);
+      
+      expect(result.project).toBe('TestProject');
+      expect(result.branchName).toBe('ralph/test');
+    });
+
+    it('extracts JSON from mixed text with markdown code fence', () => {
+      const output = 'Here is the JSON:\n```json\n{\n  "project": "Test",\n  "branchName": "ralph/test",\n  "userStories": []\n}\n```\nDone!';
+
+      const result = extractJSONFromOutput(output);
+      
+      expect(result.project).toBe('Test');
+    });
+
+    it('extracts JSON from plain code fence', () => {
+      const output = '```\n{\n  "project": "Test",\n  "branchName": "ralph/test",\n  "userStories": []\n}\n```';
+
+      const result = extractJSONFromOutput(output);
+      
+      expect(result.project).toBe('Test');
+    });
+
+    it('handles already parsed PRD JSON directly', () => {
+      const directJson = JSON.stringify({
+        project: 'Test',
+        branchName: 'ralph/test',
+        userStories: []
+      });
+
+      const result = extractJSONFromOutput(directJson);
+      
+      expect(result.project).toBe('Test');
+    });
+
+    it('finds JSON object in mixed text', () => {
+      const output = 'Some text before {"project": "Test", "branchName": "ralph/test", "userStories": []} some text after';
+
+      const result = extractJSONFromOutput(output);
+      
+      expect(result.project).toBe('Test');
+    });
+
+    it('handles agent wrapper with markdown in result', () => {
+      const realExample = {
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+        result: 'Converting to JSON:\n```json\n{\n  "project": "TestProject",\n  "branchName": "ralph/feature",\n  "description": "Add feature",\n  "userStories": [\n    {\n      "id": "US-001",\n      "title": "Test",\n      "description": "Test",\n      "acceptanceCriteria": ["Test"],\n      "priority": 1,\n      "passes": false,\n      "notes": ""\n    }\n  ]\n}\n```'
+      };
+
+      const result = extractJSONFromOutput(JSON.stringify(realExample));
+      
+      expect(result.project).toBe('TestProject');
+      expect(result.branchName).toBe('ralph/feature');
+      expect(result.userStories).toHaveLength(1);
+      expect(result.userStories[0].id).toBe('US-001');
+    });
+
+    it('throws error for invalid input', () => {
+      expect(() => extractJSONFromOutput('')).toThrow();
+      expect(() => extractJSONFromOutput(null)).toThrow();
+      expect(() => extractJSONFromOutput('not json at all')).toThrow();
+    });
+  });
+
   describe('convertPRDToJSON', () => {
-    it('converts PRD markdown to JSON format', () => {
+    it('converts PRD markdown to JSON format', async () => {
       const markdown = `# PRD: Test Feature
 
 ## Introduction
@@ -20,7 +112,7 @@ Test feature description
 - [ ] Typecheck passes
 `;
 
-      const result = convertPRDToJSON(markdown, 'TestProject');
+      const result = await convertPRDToJSON(markdown, 'TestProject');
 
       expect(result.project).toBe('TestProject');
       expect(result.branchName).toMatch(/^ralph\//);
@@ -29,7 +121,7 @@ Test feature description
       expect(result.userStories[0].passes).toBe(false);
     });
 
-    it('adds Typecheck passes to acceptance criteria if missing', () => {
+    it('adds Typecheck passes to acceptance criteria if missing', async () => {
       const markdown = `# PRD: Test
 
 ## User Stories
@@ -41,13 +133,13 @@ Test feature description
 - [ ] Some criterion
 `;
 
-      const result = convertPRDToJSON(markdown, 'Test');
+      const result = await convertPRDToJSON(markdown, 'Test');
 
       const criteria = result.userStories[0].acceptanceCriteria;
       expect(criteria).toContain('Typecheck passes');
     });
 
-    it('orders stories by dependencies', () => {
+    it('orders stories by dependencies', async () => {
       const markdown = `# PRD: Test
 
 ## User Stories
@@ -59,7 +151,7 @@ Test feature description
 **Description:** Add database schema
 `;
 
-      const result = convertPRDToJSON(markdown, 'Test');
+      const result = await convertPRDToJSON(markdown, 'Test');
 
       // Database stories should come before UI stories
       const dbStory = result.userStories.find(s => s.title.includes('Database'));
@@ -124,5 +216,82 @@ Test feature description
       expect(result.valid).toBe(false);
       expect(result.errors.some(e => e.includes('ID'))).toBe(true);
     });
+  });
+
+  describe('execAgentCommand', () => {
+    let agentAvailable = false;
+
+    beforeAll(async () => {
+      // Check if agent is available
+      agentAvailable = await new Promise((resolve) => {
+        const child = spawn('agent', ['--version'], { shell: false, stdio: 'ignore' });
+        const timeoutId = setTimeout(() => {
+          child.kill();
+          resolve(false);
+        }, 5000);
+        child.on('close', (code) => {
+          clearTimeout(timeoutId);
+          resolve(code === 0);
+        });
+        child.on('error', () => {
+          clearTimeout(timeoutId);
+          resolve(false);
+        });
+      });
+    });
+
+    it('executes agent command with simple prompt', async () => {
+      if (!agentAvailable) {
+        console.log('Skipping test: agent command not available');
+        return;
+      }
+
+      const prompt = 'Convert this to JSON: {"test": "value"}';
+      const result = await execAgentCommand(prompt, 'json', 30000);
+      
+      expect(result).toHaveProperty('stdout');
+      expect(result).toHaveProperty('stderr');
+      expect(typeof result.stdout).toBe('string');
+      expect(result.stdout.length).toBeGreaterThan(0);
+    }, 35000);
+
+    it('handles prompts with special characters', async () => {
+      if (!agentAvailable) {
+        console.log('Skipping test: agent command not available');
+        return;
+      }
+
+      const prompt = "Convert PRD with 'quotes' and /slashes";
+      const result = await execAgentCommand(prompt, 'json', 30000);
+      
+      expect(result).toHaveProperty('stdout');
+      expect(result.stdout.length).toBeGreaterThan(0);
+    }, 35000);
+
+    it('handles long PRD markdown content', async () => {
+      if (!agentAvailable) {
+        console.log('Skipping test: agent command not available');
+        return;
+      }
+
+      const longPRD = '# PRD: Test\n\n' + 'A'.repeat(1000);
+      const result = await execAgentCommand(longPRD, 'json', 30000);
+      
+      expect(result).toHaveProperty('stdout');
+      expect(result.stdout.length).toBeGreaterThan(0);
+    }, 35000);
+
+    it('respects timeout', async () => {
+      if (!agentAvailable) {
+        console.log('Skipping test: agent command not available');
+        return;
+      }
+
+      const prompt = 'Convert this to JSON';
+      
+      await expect(
+        execAgentCommand(prompt, 'json', 1000) // 1 second timeout
+      ).rejects.toThrow();
+    }, 5000);
   });
 });

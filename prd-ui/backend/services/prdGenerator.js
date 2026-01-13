@@ -3,10 +3,7 @@
  * Implements logic from skills/prd/SKILL.md
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { spawn } from 'child_process';
 
 /**
  * Generate clarifying questions based on feature description
@@ -794,12 +791,27 @@ function buildPRDPrompt(featureDescription, answers) {
  * Check if Cursor CLI agent command is available
  */
 async function isAgentAvailable() {
-  try {
-    await execAsync('agent --version', { timeout: 5000 });
-    return true;
-  } catch (error) {
-    return false;
-  }
+  return new Promise((resolve) => {
+    const child = spawn('agent', ['--version'], { 
+      shell: false,
+      stdio: 'ignore'
+    });
+    
+    const timeoutId = setTimeout(() => {
+      child.kill();
+      resolve(false);
+    }, 5000);
+    
+    child.on('close', (code) => {
+      clearTimeout(timeoutId);
+      resolve(code === 0);
+    });
+    
+    child.on('error', () => {
+      clearTimeout(timeoutId);
+      resolve(false);
+    });
+  });
 }
 
 /**
@@ -824,13 +836,57 @@ function extractPRDFromOutput(output) {
 }
 
 /**
- * Escape prompt for shell execution
- * Handles quotes, dollar signs, and other special characters
+ * Execute Cursor CLI agent command using spawn for proper argument handling
+ * Avoids all shell escaping issues by passing arguments directly to the process
+ * @param {string} prompt - The prompt to send to the agent
+ * @param {string} outputFormat - The output format (text or json)
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise<{stdout: string, stderr: string}>}
  */
-function escapePromptForShell(prompt) {
-  // Replace single quotes with '\'' (end quote, escaped quote, start quote)
-  // Then wrap entire string in single quotes
-  return prompt.replace(/'/g, "'\\''");
+export async function execAgentCommand(prompt, outputFormat = 'text', timeout = 120000) {
+  return new Promise((resolve, reject) => {
+    const args = ['--print', '--force', '--output-format', outputFormat, prompt];
+    
+    const child = spawn('agent', args, { 
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    let timeoutId;
+    
+    // Set up timeout
+    if (timeout > 0) {
+      timeoutId = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error('Command timeout'));
+      }, timeout);
+    }
+    
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    child.on('close', (code) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with exit code ${code}${stderr ? ': ' + stderr : ''}`));
+      }
+    });
+    
+    child.on('error', (error) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      reject(error);
+    });
+  });
 }
 
 /**
@@ -844,24 +900,14 @@ async function generatePRDWithAgent(featureDescription, answers, projectName, up
   log('building', 'Building prompt for Cursor CLI agent...');
   const prompt = buildPRDPrompt(featureDescription, answers);
   
-  // Escape the prompt for shell execution using single quotes
-  const escapedPrompt = escapePromptForShell(prompt);
-  
   try {
     log('executing', 'Executing Cursor CLI agent command...');
     // --print flag is required to enable shell execution (bash access)
     // --force flag forces allow commands unless explicitly denied
-    // Use single quotes to wrap the prompt to avoid issues with special characters
-    const command = `agent --print --force --output-format text '${escapedPrompt}'`;
-    
+    // Use spawn to avoid shell escaping issues with long prompts
     log('waiting', 'Waiting for agent response (this may take 30-120 seconds)...');
-    const { stdout, stderr } = await execAsync(
-      command,
-      { 
-        timeout: 120000, // 120 second timeout (2 minutes)
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
-      }
-    );
+    
+    const { stdout, stderr } = await execAgentCommand(prompt, 'text', 120000);
     
     log('parsing', 'Parsing agent output...');
     // Extract PRD from output
