@@ -6,7 +6,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Prerequisites
 
-- Claude Desktop (Claude Code) or Claude API with Skills support
+- Claude Desktop (Claude Code), Claude API with Skills support, or Cursor CLI
 - A git repository for your project
 - Project with quality checks (typecheck, lint, test)
 
@@ -29,6 +29,39 @@ cp -r skills/ralph ~/.claude/skills/
 ### Option 2: Use via Claude API
 
 Upload skills via the Skills API (`/v1/skills` endpoints). Skills are shared organization-wide via the API.
+
+### Option 3: Install for Cursor CLI
+
+**Global installation (recommended):**
+
+```bash
+./setup-cursor-cli.sh
+```
+
+This installs rules and commands to `~/.cursor/` for use across all projects.
+
+**Project-specific installation:**
+
+If you prefer project-specific installation, copy rules and commands manually:
+
+```bash
+# Create .cursor directory if it doesn't exist
+mkdir -p .cursor/rules .cursor/commands
+
+# Copy rules (automatically loaded by Cursor CLI)
+cp -r cursor-cli/rules/* .cursor/rules/
+
+# Copy commands (use /commands to set up)
+cp -r cursor-cli/commands/* .cursor/commands/
+```
+
+**Using commands:**
+
+After copying, use `/commands` in Cursor CLI to set up the `/prd` and `/ralph` commands, or use natural language triggers like "create a PRD for..." or "run ralph".
+
+**Browser verification:**
+
+Cursor CLI automatically includes the `cursor-ide-browser` MCP server, which provides browser verification tools. No additional setup needed.
 
 ## Skills Overview
 
@@ -101,10 +134,16 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `prd/SKILL.md` | Instructions for generating PRDs |
-| `ralph/SKILL.md` | Main execution workflow and PRD conversion |
+| `prd/SKILL.md` | Instructions for generating PRDs (Claude Code) |
+| `ralph/SKILL.md` | Main execution workflow and PRD conversion (Claude Code) |
 | `ralph/HANDOFF.md` | Handoff template (loaded when context limit reached) |
 | `ralph/CONTEXT.md` | Context management guide (loaded when needed) |
+| `cursor-cli/rules/prd.md` | PRD generation rules (Cursor CLI) |
+| `cursor-cli/rules/ralph.md` | Ralph execution rules (Cursor CLI) |
+| `cursor-cli/rules/ralph-handoff.md` | Handoff template (Cursor CLI) |
+| `cursor-cli/rules/ralph-context.md` | Context management guide (Cursor CLI) |
+| `cursor-cli/commands/prd.md` | `/prd` command definition (Cursor CLI) |
+| `cursor-cli/commands/ralph.md` | `/ralph` command definition (Cursor CLI) |
 | `prd.json` | User stories with `passes` status (created in your project) |
 | `progress.txt` | Append-only learnings for future iterations (created in your project) |
 
@@ -160,7 +199,7 @@ This helps future iterations (and human developers) understand the codebase bett
 
 ### Browser Verification
 
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate, interact with the UI, and confirm changes work.
+Frontend stories must include "Verify in browser using cursor-ide-browser MCP" (Cursor CLI) or "Verify in browser using dev-browser skill" (Claude Code) in acceptance criteria. Ralph will use the appropriate browser tools to navigate, interact with the UI, and confirm changes work.
 
 ### Feedback Loops
 
@@ -174,6 +213,7 @@ Ralph only works if there are feedback loops:
 
 ### Creating a PRD
 
+**Claude Code:**
 ```
 Load the prd skill and create a PRD for adding task priority levels
 
@@ -182,16 +222,44 @@ Load the prd skill and create a PRD for adding task priority levels
 PRD saved to tasks/prd-task-priority.md
 ```
 
+**Cursor CLI:**
+```
+/prd create a PRD for adding task priority levels
+
+[Answer clarifying questions: 1A, 2C, 3B]
+
+PRD saved to tasks/prd-task-priority.md
+```
+
+Or use natural language:
+```
+create a PRD for adding task priority levels
+```
+
 ### Converting to JSON
 
+**Claude Code:**
 ```
 Load the ralph skill and convert tasks/prd-task-priority.md to prd.json
 
 prd.json created with 4 user stories
 ```
 
+**Cursor CLI:**
+```
+/ralph convert tasks/prd-task-priority.md to prd.json
+
+prd.json created with 4 user stories
+```
+
+Or use natural language:
+```
+convert this PRD to ralph format
+```
+
 ### Executing Stories
 
+**Claude Code:**
 ```
 Load the ralph skill and execute stories from prd.json
 
@@ -203,6 +271,26 @@ Load the ralph skill and execute stories from prd.json
 ✓ Appended to progress.txt
 
 [Claude continues with US-002, US-003, etc.]
+```
+
+**Cursor CLI:**
+```
+/ralph execute stories from prd.json
+
+[Agent implements US-001: Add priority field to database]
+✓ Typecheck passes
+✓ Migration successful
+✓ Committed: feat: US-001 - Add priority field to database
+✓ Updated prd.json: US-001 passes: true
+✓ Appended to progress.txt
+
+[Agent continues with US-002, US-003, etc.]
+```
+
+Or use natural language:
+```
+run ralph
+execute stories from prd.json
 ```
 
 ### Handling Context Overflow
@@ -260,13 +348,28 @@ The `ralph` skill handles this automatically when converting PRDs.
 
 | Feature | Amp Version | Skills Version |
 |---------|------------|----------------|
-| Loop execution | External bash script (`ralph.sh`) | Claude executes loop directly |
+| Loop execution | External bash script (`ralph.sh`) | Agent executes loop directly |
 | Context handoff | Automatic (`amp.experimental.autoHandoff`) | Manual (create HANDOFF.md) |
 | Session spawning | Script spawns fresh instances | User starts new sessions |
 | State files | Same (`prd.json`, `progress.txt`) | Same |
 | Workflow | Same (PRD → JSON → Execute) | Same |
 
 The skills version provides the same functionality but requires manual session management instead of automatic loop execution.
+
+## Platform-Specific Notes
+
+### Cursor CLI
+
+- Rules are automatically loaded from `.cursor/rules/` directory
+- Use `/commands` to set up `/prd` and `/ralph` commands
+- Browser verification uses `cursor-ide-browser` MCP (automatically available)
+- Natural language triggers work: "create a PRD for...", "run ralph", etc.
+
+### Claude Code
+
+- Skills loaded via `.claude/skills/` directory or Skills API
+- Trigger with "Load the [skill] skill and..."
+- Browser verification uses dev-browser skill (if available)
 
 ## References
 
