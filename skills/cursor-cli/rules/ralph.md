@@ -1,8 +1,3 @@
----
-name: ralph
-description: "Execute Ralph autonomous agent loop to implement user stories from prd.json iteratively. Also converts PRDs to prd.json format. Use when you have prd.json and want to implement stories autonomously, or when you need to convert a PRD to Ralph's JSON format. Triggers on: run ralph, execute ralph, implement stories from prd.json, convert this prd, turn this into ralph format, create prd.json from this, ralph json."
----
-
 # Ralph Autonomous Agent
 
 Execute the Ralph autonomous agent loop to implement user stories iteratively, or convert PRDs to prd.json format for execution.
@@ -11,7 +6,7 @@ Execute the Ralph autonomous agent loop to implement user stories iteratively, o
 
 ## Primary Use: Executing Stories
 
-When you have a `prd.json` file, use this skill to execute the Ralph autonomous loop:
+When you have a `prd.json` file, use this workflow to execute the Ralph autonomous loop:
 
 1. **Read state files** - Load prd.json and progress.txt
 2. **Pick next story** - Select highest priority story where `passes: false`
@@ -93,12 +88,12 @@ Run your project's standard quality checks:
 
 For any story that changes UI:
 
-1. Load the `dev-browser` skill if available
+1. Use the cursor-ide-browser MCP tools (automatically available in Cursor CLI)
 2. Start dev server if not running: `npm run dev`
-3. Navigate to the relevant page
-4. Verify UI changes work as expected
+3. Navigate to the relevant page using `browser_navigate`
+4. Verify UI changes work as expected using `browser_snapshot` and `browser_click`
 5. Interact with the feature to confirm it meets acceptance criteria
-6. Take a screenshot if helpful for documentation
+6. Take a screenshot if helpful for documentation using `browser_take_screenshot`
 
 **A frontend story is NOT complete until browser verification passes.**
 
@@ -194,7 +189,7 @@ After updating state:
   4. **Create HANDOFF.md** - See [Context Detection & Handoff](#context-detection--handoff) section
   5. **Signal handoff** - Tell user to start new session with handoff file
 
-For detailed context management procedures, see [CONTEXT.md](CONTEXT.md) when needed.
+For detailed context management procedures, see the ralph-context rule when needed.
 
 ---
 
@@ -219,7 +214,7 @@ When context is filling up (~90% threshold), prepare for handoff:
    - Note what remains to be done
 
 4. **Create HANDOFF.md:**
-   - See [HANDOFF.md](HANDOFF.md) template for structure
+   - See the ralph-handoff rule template for structure
    - Include current story being worked on
    - List files changed
    - Document next steps needed
@@ -307,7 +302,7 @@ Ralph persists state across sessions via:
 
 **Each story must be completable in ONE Ralph iteration (one context window).**
 
-Ralph spawns a fresh Amp instance per iteration with no memory of previous work. If a story is too big, the LLM runs out of context before finishing and produces broken code.
+If a story is too big, the agent runs out of context before finishing and produces broken code.
 
 ### Right-sized stories:
 - Add a database column and migration
@@ -369,10 +364,10 @@ For stories with testable logic, also include:
 
 ### For stories that change UI, also include:
 ```
-"Verify in browser using dev-browser skill"
+"Verify in browser using cursor-ide-browser MCP"
 ```
 
-Frontend stories are NOT complete until visually verified. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
+Frontend stories are NOT complete until visually verified. Use the cursor-ide-browser MCP tools to navigate to the page, interact with the UI, and confirm changes work.
 
 ---
 
@@ -449,7 +444,7 @@ Add ability to mark tasks with different statuses.
         "Each task card shows colored status badge",
         "Badge colors: gray=pending, blue=in_progress, green=done",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using cursor-ide-browser MCP"
       ],
       "priority": 2,
       "passes": false,
@@ -464,7 +459,7 @@ Add ability to mark tasks with different statuses.
         "Changing status saves immediately",
         "UI updates without page refresh",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using cursor-ide-browser MCP"
       ],
       "priority": 3,
       "passes": false,
@@ -478,7 +473,7 @@ Add ability to mark tasks with different statuses.
         "Filter dropdown: All | Pending | In Progress | Done",
         "Filter persists in URL params",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using cursor-ide-browser MCP"
       ],
       "priority": 4,
       "passes": false,
@@ -513,6 +508,6 @@ Before writing prd.json, verify:
 - [ ] Each story is completable in one iteration (small enough)
 - [ ] Stories are ordered by dependency (schema to backend to UI)
 - [ ] Every story has "Typecheck passes" as criterion
-- [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
+- [ ] UI stories have "Verify in browser using cursor-ide-browser MCP" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
