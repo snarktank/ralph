@@ -62,13 +62,40 @@ export function extractJSONFromOutput(output) {
     throw new Error('Invalid output: empty or not a string');
   }
   
+  // Trim whitespace
+  const trimmedOutput = output.trim();
+  
+  if (!trimmedOutput) {
+    throw new Error('Invalid output: empty after trimming');
+  }
+  
   // Step 1: Try to parse output as JSON (might be the metadata wrapper)
   try {
-    const parsed = JSON.parse(output);
+    const parsed = JSON.parse(trimmedOutput);
     
     // If it's the agent metadata wrapper with a 'result' field
-    if (parsed.result && typeof parsed.result === 'string') {
-      return extractJSONFromString(parsed.result);
+    if (parsed.result !== undefined) {
+      if (typeof parsed.result === 'string') {
+        return extractJSONFromString(parsed.result);
+      }
+      // Result might be a nested object
+      if (typeof parsed.result === 'object' && parsed.result !== null) {
+        if (parsed.result.project || parsed.result.branchName || parsed.result.userStories) {
+          return parsed.result;
+        }
+      }
+    }
+    
+    // Check for 'output' field (some agent versions use this)
+    if (parsed.output !== undefined) {
+      if (typeof parsed.output === 'string') {
+        return extractJSONFromString(parsed.output);
+      }
+      if (typeof parsed.output === 'object' && parsed.output !== null) {
+        if (parsed.output.project || parsed.output.branchName || parsed.output.userStories) {
+          return parsed.output;
+        }
+      }
     }
     
     // If it's already the PRD JSON (has project, branchName, userStories)
@@ -76,11 +103,33 @@ export function extractJSONFromOutput(output) {
       return parsed;
     }
     
-    // Otherwise, it might be wrapped differently
+    // Check if there's a nested structure we should extract from
+    for (const key of Object.keys(parsed)) {
+      const value = parsed[key];
+      if (typeof value === 'object' && value !== null) {
+        if (value.project || value.branchName || value.userStories) {
+          return value;
+        }
+      }
+    }
+    
+    // Otherwise, it might be wrapped differently - try to extract from any string field
+    for (const key of Object.keys(parsed)) {
+      const value = parsed[key];
+      if (typeof value === 'string' && value.includes('{') && value.includes('userStories')) {
+        try {
+          return extractJSONFromString(value);
+        } catch (e) {
+          // Continue
+        }
+      }
+    }
+    
+    // Last resort: return parsed as-is
     return parsed;
   } catch (e) {
     // Not valid JSON, try extracting from text
-    return extractJSONFromString(output);
+    return extractJSONFromString(trimmedOutput);
   }
 }
 
@@ -88,28 +137,45 @@ export function extractJSONFromOutput(output) {
  * Extract JSON from a string that might contain markdown code fences or mixed content
  */
 function extractJSONFromString(text) {
+  if (!text || typeof text !== 'string') {
+    throw new Error('Invalid text input for JSON extraction');
+  }
+
+  // Normalize the text (handle escaped newlines, etc.)
+  const normalizedText = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+  
   // Try to extract from markdown code fence first (```json ... ```)
-  const markdownMatch = text.match(/```json\s*\n([\s\S]*?)\n```/);
+  const markdownMatch = normalizedText.match(/```json\s*\n?([\s\S]*?)\n?```/);
   if (markdownMatch) {
     try {
-      return JSON.parse(markdownMatch[1]);
+      return JSON.parse(markdownMatch[1].trim());
     } catch (e) {
       // Continue to other methods
     }
   }
   
   // Try to extract from any code fence (``` ... ```)
-  const codeMatch = text.match(/```\s*\n([\s\S]*?)\n```/);
+  const codeMatch = normalizedText.match(/```\s*\n?([\s\S]*?)\n?```/);
   if (codeMatch) {
     try {
-      return JSON.parse(codeMatch[1]);
+      return JSON.parse(codeMatch[1].trim());
     } catch (e) {
       // Continue to other methods
     }
   }
   
-  // Try to find JSON object in the text
-  const jsonMatch = text.match(/\{[\s\S]*"userStories"[\s\S]*\}/);
+  // Try to find JSON object with "project" field (our specific format)
+  const projectMatch = normalizedText.match(/\{[^{}]*"project"[^{}]*"userStories"\s*:\s*\[[\s\S]*?\]\s*\}/);
+  if (projectMatch) {
+    try {
+      return JSON.parse(projectMatch[0]);
+    } catch (e) {
+      // Continue to other methods
+    }
+  }
+  
+  // Try to find JSON object in the text with userStories
+  const jsonMatch = normalizedText.match(/\{[\s\S]*"userStories"[\s\S]*\}/);
   if (jsonMatch) {
     try {
       return JSON.parse(jsonMatch[0]);
@@ -118,19 +184,34 @@ function extractJSONFromString(text) {
     }
   }
   
-  // Try to find any JSON object
-  const anyJsonMatch = text.match(/\{[\s\S]*\}/);
-  if (anyJsonMatch) {
-    try {
-      return JSON.parse(anyJsonMatch[0]);
-    } catch (e) {
-      // Continue to other methods
+  // Try to find any JSON object that starts with { and ends with }
+  // Use a more careful approach - find balanced braces
+  const firstBrace = normalizedText.indexOf('{');
+  if (firstBrace !== -1) {
+    let depth = 0;
+    let lastBrace = -1;
+    for (let i = firstBrace; i < normalizedText.length; i++) {
+      if (normalizedText[i] === '{') depth++;
+      if (normalizedText[i] === '}') {
+        depth--;
+        if (depth === 0) {
+          lastBrace = i;
+          break;
+        }
+      }
+    }
+    if (lastBrace !== -1) {
+      try {
+        return JSON.parse(normalizedText.substring(firstBrace, lastBrace + 1));
+      } catch (e) {
+        // Continue to other methods
+      }
     }
   }
   
   // Last resort: try parsing the whole text
   try {
-    return JSON.parse(text.trim());
+    return JSON.parse(normalizedText.trim());
   } catch (e) {
     throw new Error('Could not extract valid JSON from agent output');
   }
@@ -211,6 +292,7 @@ async function convertPRDToJSONWithAgent(markdown, projectName, updateProgress =
     const { stdout, stderr } = await execAgentCommand(prompt, 'json', 120000);
     
     log('parsing', 'Parsing agent output...');
+    
     const json = extractJSONFromOutput(stdout);
     
     // Validate the JSON structure
