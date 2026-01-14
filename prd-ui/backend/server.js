@@ -22,6 +22,7 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const BODY_LIMIT = process.env.BODY_LIMIT || '2mb';
 
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'];
@@ -31,8 +32,8 @@ app.use(cors({
 }));
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: BODY_LIMIT }));
 
 // Routes
 app.use('/api/prd', prdRoutes);
@@ -46,6 +47,11 @@ app.get('/api/health', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: `Request payload too large. Increase BODY_LIMIT (currently ${BODY_LIMIT}).`
+    });
+  }
   console.error('Error:', err);
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error'

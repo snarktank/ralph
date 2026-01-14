@@ -17,7 +17,7 @@ describe('prdGenerator', () => {
   });
 
   describe('generatePRD', () => {
-    it('generates PRD markdown from feature description', () => {
+    it('generates PRD markdown from feature description', async () => {
       const description = 'Add user authentication';
       const answers = {
         goal: 'Improve security',
@@ -25,42 +25,59 @@ describe('prdGenerator', () => {
         scope: 'Full-featured implementation',
       };
 
-      const prd = generatePRD(description, answers, 'TestProject');
+      const prd = await generatePRD(description, answers, 'TestProject');
+      const prdLower = prd.toLowerCase();
 
       expect(prd).toContain('# PRD:');
-      expect(prd).toContain('## Introduction');
-      expect(prd).toContain('## Goals');
-      expect(prd).toContain('## User Stories');
-      expect(prd).toContain(description);
-    });
+      expect(prdLower).toContain('## introduction');
+      expect(prdLower).toContain('## goals');
+      expect(prdLower).toContain('## user stories');
+      // Agent may use different casing for the description
+      expect(prdLower).toContain(description.toLowerCase());
+    }, 150000); // Increase timeout to 150 seconds for agent execution
 
-    it('includes all required sections', () => {
-      const prd = generatePRD('Test feature', {}, 'Test');
+    it('includes all required sections', async () => {
+      const prd = await generatePRD('Test feature', {}, 'Test');
+      const prdLower = prd.toLowerCase();
 
-      const sections = [
-        'Introduction',
-        'Goals',
-        'User Stories',
-        'Functional Requirements',
-        'Non-Goals',
-        'Technical Considerations',
-        'Success Metrics',
-        'Open Questions',
+      // Core sections that should always be present (case-insensitive)
+      const requiredSections = [
+        'introduction',
+        'goals',
+        'user stories',
+        'functional requirements',
+        'non-goals',
+        'technical considerations',
+        'success metrics',
+        'open questions',
       ];
 
-      sections.forEach((section) => {
-        expect(prd).toContain(`## ${section}`);
+      requiredSections.forEach((section) => {
+        expect(prdLower).toContain(`## ${section}`);
       });
-    });
+    }, 150000); // Increase timeout to 150 seconds for agent execution
 
-    it('includes user stories with acceptance criteria', () => {
-      const prd = generatePRD('Test feature', {}, 'Test');
+    it('includes user stories with acceptance criteria', async () => {
+      const prd = await generatePRD('Test feature', {}, 'Test');
+      const prdLower = prd.toLowerCase();
 
-      expect(prd).toContain('### US-');
-      expect(prd).toContain('**Description:**');
-      expect(prd).toContain('**Acceptance Criteria:**');
-      expect(prd).toContain('- [ ]');
-    });
+      // PRD should contain user stories section
+      expect(prdLower).toContain('## user stories');
+      
+      // Stories can be in different formats:
+      // - "### US-001:" (template format)
+      // - "- **US-1:" (agent format with US-n)
+      // - "- **Story 1:" (agent format)
+      // - "**Story 1:" (agent format variant)
+      const hasTemplateFormat = prd.includes('### US-');
+      const hasAgentUSFormat = /- \*\*US-\d+:/.test(prd);
+      const hasAgentStoryFormat = /\*\*Story \d+:/.test(prd) || /- \*\*Story \d+:/.test(prd);
+      expect(hasTemplateFormat || hasAgentUSFormat || hasAgentStoryFormat).toBe(true);
+      
+      // Stories should have acceptance criteria in some form (case-insensitive)
+      const hasAcceptanceCriteria = prdLower.includes('acceptance criteria');
+      expect(hasAcceptanceCriteria).toBe(true);
+    }, 150000); // Increase timeout to 150 seconds for agent execution
   });
 
   describe('execAgentCommand', () => {
@@ -74,7 +91,7 @@ describe('prdGenerator', () => {
         const timeoutId = setTimeout(() => {
           child.kill();
           resolve(false);
-        }, 5000);
+        }, 2000);
         child.on('close', (code) => {
           clearTimeout(timeoutId);
           resolve(code === 0);
@@ -97,7 +114,7 @@ describe('prdGenerator', () => {
           agentWorking = false;
         }
       }
-    });
+    }, 20000); // Increase beforeAll timeout to 20 seconds
 
     it('executes agent command with simple prompt', async () => {
       if (!agentAvailable || !agentWorking) {

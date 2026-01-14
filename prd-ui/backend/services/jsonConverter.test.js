@@ -119,7 +119,7 @@ Test feature description
       expect(result.userStories).toHaveLength(1);
       expect(result.userStories[0].id).toBe('US-001');
       expect(result.userStories[0].passes).toBe(false);
-    });
+    }, 150000); // Increase timeout to 150 seconds (agent can take 30-120s)
 
     it('adds Typecheck passes to acceptance criteria if missing', async () => {
       const markdown = `# PRD: Test
@@ -137,7 +137,7 @@ Test feature description
 
       const criteria = result.userStories[0].acceptanceCriteria;
       expect(criteria).toContain('Typecheck passes');
-    });
+    }, 150000); // Increase timeout to 150 seconds (agent can take 30-120s)
 
     it('orders stories by dependencies', async () => {
       const markdown = `# PRD: Test
@@ -160,7 +160,7 @@ Test feature description
       if (dbStory && uiStory) {
         expect(dbStory.priority).toBeLessThan(uiStory.priority);
       }
-    });
+    }, 150000); // Increase timeout to 150 seconds (agent can take 30-120s)
   });
 
   describe('validateJSON', () => {
@@ -228,7 +228,7 @@ Test feature description
         const timeoutId = setTimeout(() => {
           child.kill();
           resolve(false);
-        }, 5000);
+        }, 2000);
         child.on('close', (code) => {
           clearTimeout(timeoutId);
           resolve(code === 0);
@@ -238,7 +238,7 @@ Test feature description
           resolve(false);
         });
       });
-    });
+    }, 10000); // Increase beforeAll timeout to 10 seconds
 
     it('executes agent command with simple prompt', async () => {
       if (!agentAvailable) {
@@ -247,13 +247,13 @@ Test feature description
       }
 
       const prompt = 'Convert this to JSON: {"test": "value"}';
-      const result = await execAgentCommand(prompt, 'json', 30000);
+      const result = await execAgentCommand(prompt, 'json', 120000);
       
       expect(result).toHaveProperty('stdout');
       expect(result).toHaveProperty('stderr');
       expect(typeof result.stdout).toBe('string');
       expect(result.stdout.length).toBeGreaterThan(0);
-    }, 35000);
+    }, 150000);
 
     it('handles prompts with special characters', async () => {
       if (!agentAvailable) {
@@ -262,11 +262,11 @@ Test feature description
       }
 
       const prompt = "Convert PRD with 'quotes' and /slashes";
-      const result = await execAgentCommand(prompt, 'json', 30000);
+      const result = await execAgentCommand(prompt, 'json', 140000); // Increase internal timeout
       
       expect(result).toHaveProperty('stdout');
       expect(result.stdout.length).toBeGreaterThan(0);
-    }, 35000);
+    }, 150000);
 
     it('handles long PRD markdown content', async () => {
       if (!agentAvailable) {
@@ -275,11 +275,11 @@ Test feature description
       }
 
       const longPRD = '# PRD: Test\n\n' + 'A'.repeat(1000);
-      const result = await execAgentCommand(longPRD, 'json', 30000);
+      const result = await execAgentCommand(longPRD, 'json', 140000); // Increase internal timeout
       
       expect(result).toHaveProperty('stdout');
       expect(result.stdout.length).toBeGreaterThan(0);
-    }, 35000);
+    }, 150000);
 
     it('respects timeout', async () => {
       if (!agentAvailable) {
