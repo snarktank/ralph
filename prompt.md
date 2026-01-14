@@ -105,3 +105,6 @@ If there are still stories with `passes: false`, end your response normally (ano
 - Commit frequently
 - Keep CI green
 - Read the Codebase Patterns section in progress.txt before starting
+- **NEVER run `git clean` or `git checkout -f`** - this will delete prd.json and progress.txt which are untracked files
+- When switching branches, use `git checkout <branch>` or `git switch <branch>` WITHOUT the `-f` flag
+- If you encounter merge conflicts, resolve them manually rather than using destructive git commands

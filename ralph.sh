@@ -80,10 +80,15 @@ fi
 
 echo "Starting Ralph - Max iterations: $MAX_ITERATIONS"
 
-for i in $(seq 1 $MAX_ITERATIONS); do
+CONSECUTIVE_ERRORS=0
+MAX_RETRIES=3
+RETRY_DELAY=10
+ITERATION=1
+
+while [ $ITERATION -le $MAX_ITERATIONS ]; do
   echo ""
   echo "═══════════════════════════════════════════════════════"
-  echo "  Ralph Iteration $i of $MAX_ITERATIONS"
+  echo "  Ralph Iteration $ITERATION of $MAX_ITERATIONS"
   echo "═══════════════════════════════════════════════════════"
   
   # Run Cursor CLI agent with the ralph prompt
@@ -92,15 +97,40 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   # --workspace sets the working directory (where prd.json is located)
   OUTPUT=$(agent --print --force --workspace "$PROJECT_ROOT" --output-format text "$(cat "$SCRIPT_DIR/prompt.md")" 2>&1 | tee /dev/stderr) || true
   
+  # Check for connection errors - these mean the iteration didn't actually run
+  if echo "$OUTPUT" | grep -qE "ConnectError|ETIMEDOUT|ECONNRESET|ENOTFOUND"; then
+    CONSECUTIVE_ERRORS=$((CONSECUTIVE_ERRORS + 1))
+    echo ""
+    echo "⚠️  Connection error detected ($CONSECUTIVE_ERRORS consecutive)"
+    
+    if [ $CONSECUTIVE_ERRORS -ge $MAX_RETRIES ]; then
+      echo "❌ Too many consecutive connection errors. Stopping."
+      echo "   Check your network connection and Cursor CLI status."
+      exit 1
+    fi
+    
+    # Exponential backoff: 10s, 20s, 40s...
+    WAIT_TIME=$((RETRY_DELAY * CONSECUTIVE_ERRORS))
+    echo "   Waiting ${WAIT_TIME}s before retry..."
+    sleep $WAIT_TIME
+    
+    # Don't increment iteration - retry this one
+    continue
+  fi
+  
+  # Reset error counter on successful connection
+  CONSECUTIVE_ERRORS=0
+  
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
-    echo "Ralph completed all tasks!"
-    echo "Completed at iteration $i of $MAX_ITERATIONS"
+    echo "✅ Ralph completed all tasks!"
+    echo "Completed at iteration $ITERATION of $MAX_ITERATIONS"
     exit 0
   fi
   
-  echo "Iteration $i complete. Continuing..."
+  echo "Iteration $ITERATION complete. Continuing..."
+  ITERATION=$((ITERATION + 1))
   sleep 2
 done
 

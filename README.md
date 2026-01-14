@@ -11,8 +11,22 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 ## Prerequisites
 
 - [Cursor CLI](https://cursor.com/docs/cli) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
+- `jq` installed (`brew install jq` on macOS, `choco install jq` on Windows)
 - A git repository for your project
+
+### Windows Users
+
+Ralph includes a PowerShell version (`ralph.ps1`) for native Windows support:
+
+```powershell
+# Run Ralph on Windows
+.\ralph.ps1 [max_iterations]
+
+# Or with explicit iteration count
+.\ralph.ps1 -MaxIterations 12
+```
+
+Alternatively, use WSL (Windows Subsystem for Linux) to run `ralph.sh`.
 
 ## Setup
 
@@ -20,12 +34,21 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 Copy the ralph files into your project:
 
+**macOS/Linux:**
 ```bash
 # From your project root
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
 cp /path/to/ralph/prompt.md scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+# From your project root
+mkdir -Force scripts\ralph
+Copy-Item C:\path\to\ralph\ralph.ps1 scripts\ralph\
+Copy-Item C:\path\to\ralph\prompt.md scripts\ralph\
 ```
 
 ### Option 2: Install skills globally
@@ -114,7 +137,8 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Cursor CLI agent instances (uses `--print --force` flags for shell execution) |
+| `ralph.sh` | The bash loop that spawns fresh Cursor CLI agent instances (macOS/Linux) |
+| `ralph.ps1` | PowerShell version for Windows |
 | `prompt.md` | Instructions given to each Cursor CLI agent instance |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
