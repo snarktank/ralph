@@ -11,6 +11,14 @@ PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 
+
+# Fail fast on malformed PRDs before starting the agent loop
+if [ -f "$SCRIPT_DIR/validator_prd.sh" ]; then
+  "$SCRIPT_DIR/validator_prd.sh" "$PRD_FILE"
+fi
+
+
+
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
