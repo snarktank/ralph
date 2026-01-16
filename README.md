@@ -24,6 +24,14 @@ Install from the latest stable release:
 curl -sSL https://github.com/snarktank/ralph/releases/latest/download/install-from-release.sh | bash
 ```
 
+Or download and inspect first:
+
+```bash
+curl -O https://github.com/snarktank/ralph/releases/latest/download/install-from-release.sh
+less install-from-release.sh  # inspect the script
+bash install-from-release.sh
+```
+
 Or install a specific version:
 
 ```bash
