@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: ralph
+            asset_name: ralph-linux-x86_64
+
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact_name: ralph
+            asset_name: ralph-linux-aarch64
+
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact_name: ralph
+            asset_name: ralph-macos-x86_64
+
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact_name: ralph
+            asset_name: ralph-macos-aarch64
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact_name: ralph.exe
+            asset_name: ralph-windows-x86_64.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-release-
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          # Move and rename artifacts
+          mv artifacts/ralph-linux-x86_64/ralph release/ralph-linux-x86_64
+          mv artifacts/ralph-linux-aarch64/ralph release/ralph-linux-aarch64
+          mv artifacts/ralph-macos-x86_64/ralph release/ralph-macos-x86_64
+          mv artifacts/ralph-macos-aarch64/ralph release/ralph-macos-aarch64
+          mv artifacts/ralph-windows-x86_64.exe/ralph.exe release/ralph-windows-x86_64.exe
+          # Make binaries executable (Linux/macOS)
+          chmod +x release/ralph-linux-x86_64
+          chmod +x release/ralph-linux-aarch64
+          chmod +x release/ralph-macos-x86_64
+          chmod +x release/ralph-macos-aarch64
+          # List prepared assets
+          ls -la release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
