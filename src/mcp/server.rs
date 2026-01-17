@@ -5,6 +5,9 @@
 
 use crate::mcp::tools::get_status::{GetStatusRequest, GetStatusResponse};
 use crate::mcp::tools::list_stories::{load_stories, ListStoriesRequest, ListStoriesResponse};
+use crate::mcp::tools::load_prd::{
+    create_error_response, create_success_response, validate_prd, LoadPrdRequest,
+};
 use crate::quality::QualityConfig;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -323,6 +326,73 @@ impl RalphMcpServer {
         serde_json::to_string_pretty(&response)
             .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))
     }
+
+    /// Load a PRD file into the Ralph MCP server.
+    ///
+    /// This tool loads a PRD JSON file from the specified path, validates its structure,
+    /// and makes it available for other tools like list_stories and run_story.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` - Path to the PRD JSON file to load. Can be absolute or relative.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `success`: Whether the PRD was loaded successfully
+    /// - `story_count`: Number of user stories in the PRD (if successful)
+    /// - `project`: Project name from the PRD (if successful)
+    /// - `branch_name`: Branch name from the PRD (if successful)
+    /// - `message`: Success or error message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if:
+    /// - The file does not exist
+    /// - The file cannot be read
+    /// - The JSON is invalid
+    /// - The PRD structure is invalid (missing required fields)
+    #[tool(
+        name = "load_prd",
+        description = "Load a PRD file into Ralph. Validates the PRD JSON structure and returns story count on success, or an error message on failure. The PRD must have project, branchName, and userStories fields."
+    )]
+    pub async fn load_prd(&self, Parameters(req): Parameters<LoadPrdRequest>) -> String {
+        // Convert path string to PathBuf
+        let path = std::path::PathBuf::from(&req.path);
+
+        // Canonicalize the path to handle relative paths
+        let canonical_path = if path.is_absolute() {
+            path.clone()
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(&path))
+                .unwrap_or(path.clone())
+        };
+
+        // Validate the PRD file
+        match validate_prd(&canonical_path) {
+            Ok(prd) => {
+                // Update server state with the new PRD path
+                {
+                    let mut state = self.state.write().await;
+                    state.prd_path = Some(canonical_path);
+                }
+
+                // Create success response
+                let response = create_success_response(&prd);
+                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                })
+            }
+            Err(e) => {
+                // Create error response
+                let response = create_error_response(&e);
+                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                })
+            }
+        }
+    }
 }
 
 /// Implementation of the MCP ServerHandler trait for RalphMcpServer.
@@ -640,5 +710,171 @@ mod tests {
         assert_eq!(json["state"], "failed");
         assert_eq!(json["story_id"], "US-001");
         assert_eq!(json["error"], "Build failed: syntax error");
+    }
+
+    #[tokio::test]
+    async fn test_load_prd_success() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let server = RalphMcpServer::new();
+
+        // Create a valid PRD file
+        let mut file = NamedTempFile::new().unwrap();
+        let prd_content = r#"{
+            "project": "TestProject",
+            "branchName": "feature/test",
+            "description": "Test PRD",
+            "userStories": [
+                {"id": "US-001", "title": "First story", "priority": 1, "passes": false}
+            ]
+        }"#;
+        file.write_all(prd_content.as_bytes()).unwrap();
+
+        let result = server
+            .load_prd(Parameters(LoadPrdRequest {
+                path: file.path().to_string_lossy().to_string(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["story_count"], 1);
+        assert_eq!(json["project"], "TestProject");
+        assert_eq!(json["branch_name"], "feature/test");
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("Successfully loaded"));
+
+        // Verify the PRD path was set in server state
+        let state = server.state().await;
+        assert!(state.prd_path.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_load_prd_file_not_found() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        let result = server
+            .load_prd(Parameters(LoadPrdRequest {
+                path: "/nonexistent/path/to/prd.json".to_string(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["message"].as_str().unwrap().contains("not found"));
+
+        // Verify the PRD path was NOT set in server state
+        let state = server.state().await;
+        assert!(state.prd_path.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_load_prd_invalid_json() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let server = RalphMcpServer::new();
+
+        // Create an invalid JSON file
+        let mut file = NamedTempFile::new().unwrap();
+        file.write_all(b"not valid json").unwrap();
+
+        let result = server
+            .load_prd(Parameters(LoadPrdRequest {
+                path: file.path().to_string_lossy().to_string(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["message"].as_str().unwrap().contains("parse"));
+
+        // Verify the PRD path was NOT set in server state
+        let state = server.state().await;
+        assert!(state.prd_path.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_load_prd_invalid_structure() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let server = RalphMcpServer::new();
+
+        // Create a JSON file with invalid PRD structure (empty userStories)
+        let mut file = NamedTempFile::new().unwrap();
+        let content = r#"{
+            "project": "Test",
+            "branchName": "main",
+            "userStories": []
+        }"#;
+        file.write_all(content.as_bytes()).unwrap();
+
+        let result = server
+            .load_prd(Parameters(LoadPrdRequest {
+                path: file.path().to_string_lossy().to_string(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("No user stories"));
+    }
+
+    #[tokio::test]
+    async fn test_load_prd_updates_state() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let server = RalphMcpServer::new();
+
+        // Verify initial state has no PRD
+        {
+            let state = server.state().await;
+            assert!(state.prd_path.is_none());
+        }
+
+        // Create a valid PRD file
+        let mut file = NamedTempFile::new().unwrap();
+        let prd_content = r#"{
+            "project": "TestProject",
+            "branchName": "feature/test",
+            "userStories": [
+                {"id": "US-001", "title": "Test", "priority": 1, "passes": false}
+            ]
+        }"#;
+        file.write_all(prd_content.as_bytes()).unwrap();
+
+        // Load the PRD
+        let _ = server
+            .load_prd(Parameters(LoadPrdRequest {
+                path: file.path().to_string_lossy().to_string(),
+            }))
+            .await;
+
+        // Verify state was updated
+        {
+            let state = server.state().await;
+            assert!(state.prd_path.is_some());
+            // The path should contain our temp file path
+            let prd_path = state.prd_path.as_ref().unwrap();
+            assert!(prd_path.exists());
+        }
     }
 }
