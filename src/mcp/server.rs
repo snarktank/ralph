@@ -4,6 +4,8 @@
 #![allow(dead_code)]
 
 use crate::quality::QualityConfig;
+use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
+use rmcp::ServerHandler;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
@@ -217,6 +219,39 @@ impl Default for RalphMcpServer {
     }
 }
 
+/// Implementation of the MCP ServerHandler trait for RalphMcpServer.
+///
+/// This implementation provides the server information including name, version,
+/// and enabled capabilities (tools and resources).
+impl ServerHandler for RalphMcpServer {
+    /// Returns server information for MCP initialization.
+    ///
+    /// The returned `ServerInfo` includes:
+    /// - Server name: "ralph"
+    /// - Version: from Cargo.toml (CARGO_PKG_VERSION)
+    /// - Capabilities: tools and resources enabled
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            protocol_version: Default::default(),
+            capabilities: ServerCapabilities::builder()
+                .enable_tools()
+                .enable_resources()
+                .build(),
+            server_info: Implementation {
+                name: "ralph".to_string(),
+                title: Some("Ralph Autonomous Agent".to_string()),
+                version: env!("CARGO_PKG_VERSION").to_string(),
+                icons: None,
+                website_url: None,
+            },
+            instructions: Some(
+                "Ralph is an autonomous AI agent framework for executing PRD-based user stories."
+                    .to_string(),
+            ),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -369,5 +404,43 @@ mod tests {
                 _ => panic!("Expected Running state"),
             }
         }
+    }
+
+    #[test]
+    fn test_server_handler_get_info() {
+        let server = RalphMcpServer::new();
+        let info = server.get_info();
+
+        // Check server name
+        assert_eq!(info.server_info.name, "ralph");
+
+        // Check version is set (matches Cargo.toml version)
+        assert_eq!(info.server_info.version, env!("CARGO_PKG_VERSION"));
+
+        // Check title is set
+        assert_eq!(
+            info.server_info.title,
+            Some("Ralph Autonomous Agent".to_string())
+        );
+
+        // Check instructions are set
+        assert!(info.instructions.is_some());
+        assert!(info
+            .instructions
+            .as_ref()
+            .unwrap()
+            .contains("autonomous AI agent"));
+    }
+
+    #[test]
+    fn test_server_handler_capabilities() {
+        let server = RalphMcpServer::new();
+        let info = server.get_info();
+
+        // Check tools capability is enabled
+        assert!(info.capabilities.tools.is_some());
+
+        // Check resources capability is enabled
+        assert!(info.capabilities.resources.is_some());
     }
 }
