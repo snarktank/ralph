@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs [Amp](https://ampcode.com) repeatedly until all PRD items are complete. Each iteration is a fresh Amp instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs Claude Code repeatedly until all PRD items are complete. Each iteration is a fresh Claude Code instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -10,44 +10,30 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Prerequisites
 
-- [Amp CLI](https://ampcode.com) installed and authenticated
+- Claude Code (Claude CLI) installed and authenticated
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
 ## Setup
 
-### Option 1: Copy to your project
-
 Copy the ralph files into your project:
 
 ```bash
 # From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
-chmod +x scripts/ralph/ralph.sh
+mkdir -p ralph
+cp /path/to/ralph/ralph.sh ralph/
+cp /path/to/ralph/prompt.md ralph/
+chmod +x ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally
+### Optional: Install skills globally
 
-Copy the skills to your Amp config for use across all projects:
+Copy the skills to your Claude Code config for use across all projects:
 
 ```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
+cp -r skills/prd ~/.config/claude/skills/
+cp -r skills/ralph ~/.config/claude/skills/
 ```
-
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
-
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
-
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
 
 ## Workflow
 
@@ -74,27 +60,33 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-./scripts/ralph/ralph.sh [max_iterations]
+.ralph/ralph.sh [project_dir] [max_iterations]
 ```
 
-Default is 10 iterations.
+Defaults: current directory (`.`) and 10 iterations.
+
+Example:
+```bash
+.ralph/ralph.sh ~/code/my-app 20
+```
 
 Ralph will:
-1. Create a feature branch (from PRD `branchName`)
+1. Read `prd.json` and `progress.txt`
 2. Pick the highest priority story where `passes: false`
 3. Implement that single story
 4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
+5. Commit with message: `feat: [ID] - [Title]`
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
+9. Output `<promise>COMPLETE</promise>` when all stories have `passes: true`
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Amp instances |
-| `prompt.md` | Instructions given to each Amp instance |
+| `ralph.sh` | The bash loop that spawns fresh Claude Code instances |
+| `prompt.md` | Instructions given to each Claude Code instance |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -120,7 +112,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new Amp instance** with clean context. The only memory between iterations is:
+Each iteration spawns a **new Claude Code instance** with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -142,7 +134,7 @@ Too big (split these):
 
 ### AGENTS.md Updates Are Critical
 
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Amp automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because Claude Code automatically reads these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
 
 Examples of what to add to AGENTS.md:
 - Patterns discovered ("this codebase uses X for Y")
@@ -156,9 +148,18 @@ Ralph only works if there are feedback loops:
 - Tests verify behavior
 - CI must stay green (broken code compounds across iterations)
 
-### Browser Verification for UI Stories
+### Progress Format
 
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
+When appending to `progress.txt`, Ralph uses this format:
+
+```
+## [Date] - [Story ID]
+- What was implemented
+- Files changed
+- **Learnings:**
+  - Patterns discovered
+  - Gotchas encountered
+```
 
 ### Stop Condition
 
@@ -181,10 +182,15 @@ git log --oneline -10
 
 ## Customizing prompt.md
 
-Edit `prompt.md` to customize Ralph's behavior for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+Edit `prompt.md` to customize Ralph's behavior for your project. The prompt includes:
+- Task instructions (read prd.json, pick story, implement, run checks, commit, update status)
+- Progress format specification for `progress.txt`
+- Stop condition when all tasks are complete
+
+You can add:
+- Project-specific quality check commands
+- Codebase conventions
+- Common gotchas for your stack
 
 ## Archiving
 
@@ -193,4 +199,3 @@ Ralph automatically archives previous runs when you start a new feature (differe
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(command -v:*)",
+      "Bash(jq:*)",
+      "Bash(npm install*)",
+      "Bash(npm run*)",
+      "Bash(npm test*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git checkout*)",
+      "Bash(git branch*)"
+    ]
+  }
+}
