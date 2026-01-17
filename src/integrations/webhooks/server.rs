@@ -5,10 +5,12 @@
 
 #![allow(dead_code)]
 
+use super::github::GitHubWebhookHandler;
+use super::linear::LinearWebhookHandler;
 use axum::{
     body::Bytes,
     extract::State,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -262,17 +264,48 @@ pub async fn health_handler(State(state): State<AppState>) -> Json<HealthRespons
     })
 }
 
+/// Verify GitHub webhook signature
+///
+/// Returns Ok(()) if the signature is valid or no secret is configured.
+/// Returns Err(WebhookError::InvalidSignature) if the signature is invalid.
+fn verify_github_signature(
+    secret: Option<&str>,
+    payload: &[u8],
+    headers: &HeaderMap,
+) -> Result<(), WebhookError> {
+    let Some(secret) = secret else {
+        // No secret configured, skip verification
+        return Ok(());
+    };
+
+    let signature = headers
+        .get("X-Hub-Signature-256")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(WebhookError::InvalidSignature)?;
+
+    let handler = GitHubWebhookHandler::new(secret);
+    if handler.verify_signature(payload, signature) {
+        Ok(())
+    } else {
+        Err(WebhookError::InvalidSignature)
+    }
+}
+
 /// GitHub webhook endpoint handler
 ///
 /// POST /webhooks/github
 ///
-/// Receives webhook events from GitHub. The signature will be verified
-/// in US-038 when webhook signature verification is implemented.
+/// Receives webhook events from GitHub. The signature is verified using
+/// HMAC-SHA256 if a secret is configured. Returns 401 Unauthorized on
+/// invalid signature.
 pub async fn github_webhook_handler(
-    State(_state): State<AppState>,
-    headers: axum::http::HeaderMap,
+    State(state): State<AppState>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<GitHubWebhookResponse>, WebhookError> {
+    // Verify the signature if a secret is configured
+    verify_github_signature(state.config.github_secret.as_deref(), &body, &headers)?;
+
     // Extract the event type from headers
     let event_type = headers
         .get("X-GitHub-Event")
@@ -301,16 +334,48 @@ pub async fn github_webhook_handler(
     }))
 }
 
+/// Verify Linear webhook signature
+///
+/// Returns Ok(()) if the signature is valid or no secret is configured.
+/// Returns Err(WebhookError::InvalidSignature) if the signature is invalid.
+fn verify_linear_signature(
+    secret: Option<&str>,
+    payload: &[u8],
+    headers: &HeaderMap,
+) -> Result<(), WebhookError> {
+    let Some(secret) = secret else {
+        // No secret configured, skip verification
+        return Ok(());
+    };
+
+    let signature = headers
+        .get("Linear-Signature")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(WebhookError::InvalidSignature)?;
+
+    let handler = LinearWebhookHandler::new(secret);
+    if handler.verify_signature(payload, signature) {
+        Ok(())
+    } else {
+        Err(WebhookError::InvalidSignature)
+    }
+}
+
 /// Linear webhook endpoint handler
 ///
 /// POST /webhooks/linear
 ///
-/// Receives webhook events from Linear. The signature will be verified
-/// in US-038 when webhook signature verification is implemented.
+/// Receives webhook events from Linear. The signature is verified using
+/// HMAC-SHA256 if a secret is configured. Returns 401 Unauthorized on
+/// invalid signature.
 pub async fn linear_webhook_handler(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<LinearWebhookResponse>, WebhookError> {
+    // Verify the signature if a secret is configured
+    verify_linear_signature(state.config.linear_secret.as_deref(), &body, &headers)?;
+
     // Parse the payload
     let payload: LinearWebhookPayload =
         serde_json::from_slice(&body).map_err(|e| WebhookError::ParseError(e.to_string()))?;
@@ -613,5 +678,269 @@ mod tests {
             payload.url,
             Some("https://linear.app/issue/123".to_string())
         );
+    }
+
+    // ===== Signature Verification Tests =====
+
+    fn create_test_state_with_secrets() -> AppState {
+        AppState::new(
+            WebhookConfig::new(3000)
+                .with_github_secret("github-test-secret")
+                .with_linear_secret("linear-test-secret"),
+        )
+    }
+
+    #[test]
+    fn test_verify_github_signature_no_secret() {
+        // When no secret is configured, verification should pass
+        let headers = HeaderMap::new();
+        let payload = b"test";
+        let result = verify_github_signature(None, payload, &headers);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_github_signature_valid() {
+        let secret = "test-secret";
+        let payload = b"test payload";
+        let handler = GitHubWebhookHandler::new(secret);
+        let signature = handler.compute_signature(payload);
+
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Hub-Signature-256", signature.parse().unwrap());
+
+        let result = verify_github_signature(Some(secret), payload, &headers);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_github_signature_invalid() {
+        let secret = "test-secret";
+        let payload = b"test payload";
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "X-Hub-Signature-256",
+            "sha256=0000000000000000000000000000000000000000000000000000000000000000"
+                .parse()
+                .unwrap(),
+        );
+
+        let result = verify_github_signature(Some(secret), payload, &headers);
+        assert!(matches!(result, Err(WebhookError::InvalidSignature)));
+    }
+
+    #[test]
+    fn test_verify_github_signature_missing_header() {
+        let secret = "test-secret";
+        let payload = b"test payload";
+        let headers = HeaderMap::new();
+
+        let result = verify_github_signature(Some(secret), payload, &headers);
+        assert!(matches!(result, Err(WebhookError::InvalidSignature)));
+    }
+
+    #[test]
+    fn test_verify_linear_signature_no_secret() {
+        // When no secret is configured, verification should pass
+        let headers = HeaderMap::new();
+        let payload = b"test";
+        let result = verify_linear_signature(None, payload, &headers);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_linear_signature_valid() {
+        let secret = "test-secret";
+        let payload = b"test payload";
+        let handler = LinearWebhookHandler::new(secret);
+        let signature = handler.compute_signature(payload);
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Linear-Signature", signature.parse().unwrap());
+
+        let result = verify_linear_signature(Some(secret), payload, &headers);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_verify_linear_signature_invalid() {
+        let secret = "test-secret";
+        let payload = b"test payload";
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Linear-Signature",
+            "0000000000000000000000000000000000000000000000000000000000000000"
+                .parse()
+                .unwrap(),
+        );
+
+        let result = verify_linear_signature(Some(secret), payload, &headers);
+        assert!(matches!(result, Err(WebhookError::InvalidSignature)));
+    }
+
+    #[test]
+    fn test_verify_linear_signature_missing_header() {
+        let secret = "test-secret";
+        let payload = b"test payload";
+        let headers = HeaderMap::new();
+
+        let result = verify_linear_signature(Some(secret), payload, &headers);
+        assert!(matches!(result, Err(WebhookError::InvalidSignature)));
+    }
+
+    #[tokio::test]
+    async fn test_github_webhook_with_valid_signature() {
+        let state = create_test_state_with_secrets();
+        let app = create_webhook_router(state.clone());
+
+        let payload =
+            r#"{"action": "opened", "repository": {"name": "test", "full_name": "owner/test"}}"#;
+        let handler = GitHubWebhookHandler::new("github-test-secret");
+        let signature = handler.compute_signature(payload.as_bytes());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/webhooks/github")
+                    .header("Content-Type", "application/json")
+                    .header("X-GitHub-Event", "issues")
+                    .header("X-Hub-Signature-256", signature)
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_github_webhook_with_invalid_signature() {
+        let state = create_test_state_with_secrets();
+        let app = create_webhook_router(state);
+
+        let payload =
+            r#"{"action": "opened", "repository": {"name": "test", "full_name": "owner/test"}}"#;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/webhooks/github")
+                    .header("Content-Type", "application/json")
+                    .header("X-GitHub-Event", "issues")
+                    .header(
+                        "X-Hub-Signature-256",
+                        "sha256=0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_github_webhook_missing_signature_header() {
+        let state = create_test_state_with_secrets();
+        let app = create_webhook_router(state);
+
+        let payload =
+            r#"{"action": "opened", "repository": {"name": "test", "full_name": "owner/test"}}"#;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/webhooks/github")
+                    .header("Content-Type", "application/json")
+                    .header("X-GitHub-Event", "issues")
+                    // No X-Hub-Signature-256 header
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_linear_webhook_with_valid_signature() {
+        let state = create_test_state_with_secrets();
+        let app = create_webhook_router(state.clone());
+
+        let payload = r#"{"action": "create", "type": "Issue", "data": {"id": "123"}, "createdAt": "2024-01-01T00:00:00Z"}"#;
+        let handler = LinearWebhookHandler::new("linear-test-secret");
+        let signature = handler.compute_signature(payload.as_bytes());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/webhooks/linear")
+                    .header("Content-Type", "application/json")
+                    .header("Linear-Signature", signature)
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_linear_webhook_with_invalid_signature() {
+        let state = create_test_state_with_secrets();
+        let app = create_webhook_router(state);
+
+        let payload = r#"{"action": "create", "type": "Issue", "data": {"id": "123"}, "createdAt": "2024-01-01T00:00:00Z"}"#;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/webhooks/linear")
+                    .header("Content-Type", "application/json")
+                    .header(
+                        "Linear-Signature",
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                    )
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_linear_webhook_missing_signature_header() {
+        let state = create_test_state_with_secrets();
+        let app = create_webhook_router(state);
+
+        let payload = r#"{"action": "create", "type": "Issue", "data": {"id": "123"}, "createdAt": "2024-01-01T00:00:00Z"}"#;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/webhooks/linear")
+                    .header("Content-Type", "application/json")
+                    // No Linear-Signature header
+                    .body(Body::from(payload))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }
