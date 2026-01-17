@@ -12,6 +12,10 @@ use crate::mcp::tools::run_story::{
     check_already_running, create_error_response as create_run_error_response,
     create_started_response, current_timestamp, find_story, RunStoryError, RunStoryRequest,
 };
+use crate::mcp::tools::stop_execution::{
+    create_cancelled_response, create_not_running_response, get_running_story_id,
+    state_description, StopExecutionRequest,
+};
 use crate::quality::QualityConfig;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -491,6 +495,57 @@ impl RalphMcpServer {
         let response = create_started_response(&story, max_iterations);
         serde_json::to_string_pretty(&response)
             .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))
+    }
+
+    /// Stop the currently executing story.
+    ///
+    /// This tool sends a cancellation signal to stop the currently running story execution.
+    /// If no execution is in progress, it returns a message indicating the current state.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `success`: Always true (the operation itself succeeded)
+    /// - `was_running`: Whether an execution was actually cancelled
+    /// - `story_id`: The ID of the story that was cancelled (if any)
+    /// - `message`: Description of what happened
+    ///
+    /// # Notes
+    ///
+    /// The cancellation is cooperative - the executing task will stop at the next safe point
+    /// (e.g., between iterations). It does not forcibly terminate the execution.
+    #[tool(
+        name = "stop_execution",
+        description = "Stop the currently executing story. Sends a cancellation signal that will stop execution at the next safe point. Returns confirmation whether anything was running."
+    )]
+    pub async fn stop_execution(
+        &self,
+        Parameters(_req): Parameters<StopExecutionRequest>,
+    ) -> String {
+        // Get the current execution state
+        let current_state = {
+            let state = self.state.read().await;
+            state.execution_state.clone()
+        };
+
+        // Check if anything is running
+        if let Some(story_id) = get_running_story_id(&current_state) {
+            // Signal cancellation
+            self.cancel();
+
+            // Create response indicating cancellation was sent
+            let response = create_cancelled_response(&story_id);
+            serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+            })
+        } else {
+            // Nothing running - return appropriate message
+            let state_desc = state_description(&current_state);
+            let response = create_not_running_response(state_desc);
+            serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+            })
+        }
     }
 }
 
@@ -1289,5 +1344,151 @@ mod tests {
 
         // Verify cancel was reset
         assert!(!server.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_stop_execution_nothing_running() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        let result = server
+            .stop_execution(Parameters(StopExecutionRequest {}))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["was_running"], false);
+        assert!(json.get("story_id").is_none());
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("No execution in progress"));
+        assert!(json["message"].as_str().unwrap().contains("idle"));
+    }
+
+    #[tokio::test]
+    async fn test_stop_execution_while_running() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set state to running
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Running {
+                story_id: "US-001".to_string(),
+                started_at: 1234567890,
+                iteration: 5,
+                max_iterations: 10,
+            };
+        }
+
+        // Verify not cancelled initially
+        assert!(!server.is_cancelled());
+
+        let result = server
+            .stop_execution(Parameters(StopExecutionRequest {}))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["was_running"], true);
+        assert_eq!(json["story_id"], "US-001");
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("Cancellation signal sent"));
+        assert!(json["message"].as_str().unwrap().contains("US-001"));
+
+        // Verify cancel signal was sent
+        assert!(server.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_stop_execution_after_completed() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set state to completed
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Completed {
+                story_id: "US-001".to_string(),
+                commit_hash: Some("abc123".to_string()),
+            };
+        }
+
+        let result = server
+            .stop_execution(Parameters(StopExecutionRequest {}))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["was_running"], false);
+        assert!(json["message"].as_str().unwrap().contains("completed"));
+    }
+
+    #[tokio::test]
+    async fn test_stop_execution_after_failed() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set state to failed
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Failed {
+                story_id: "US-001".to_string(),
+                error: "Build failed".to_string(),
+            };
+        }
+
+        let result = server
+            .stop_execution(Parameters(StopExecutionRequest {}))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["was_running"], false);
+        assert!(json["message"].as_str().unwrap().contains("failed"));
+    }
+
+    #[tokio::test]
+    async fn test_stop_execution_sets_cancel_flag() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set state to running
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Running {
+                story_id: "US-002".to_string(),
+                started_at: 1234567890,
+                iteration: 3,
+                max_iterations: 10,
+            };
+        }
+
+        // Initially not cancelled
+        assert!(!server.is_cancelled());
+
+        // Stop execution
+        let _ = server
+            .stop_execution(Parameters(StopExecutionRequest {}))
+            .await;
+
+        // Cancel flag should now be set
+        assert!(server.is_cancelled());
+
+        // Clone should also see the cancel flag (shared state)
+        let cloned = server.clone();
+        assert!(cloned.is_cancelled());
     }
 }
