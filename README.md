@@ -19,15 +19,8 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 ### Homebrew (macOS/Linux)
 
 ```bash
-# Install directly from the repo
-brew install --HEAD kcirtapfromspace/ralph/ralph
-
-# Or tap first, then install
-brew tap kcirtapfromspace/ralph
-brew install ralph
+brew install --HEAD https://raw.githubusercontent.com/kcirtapfromspace/ralph/main/Formula/ralph.rb
 ```
-
-Note: To set up the tap, create a repo named `homebrew-ralph` with the formula from `Formula/ralph.rb`.
 
 ### Manual Installation
 

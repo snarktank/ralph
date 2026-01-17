@@ -6,14 +6,23 @@ set -e
 
 VERSION="1.0.0"
 
-# Find where ralph is installed (resolve symlinks)
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "$SOURCE" ]; do
-  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
-  SOURCE="$(readlink "$SOURCE")"
-  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-done
-RALPH_HOME="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+# Find where ralph is installed (resolve symlinks - works on macOS and Linux)
+resolve_symlink() {
+  local file="$1"
+  (
+    cd "$(dirname "$file")"
+    file=$(basename "$file")
+    while [ -L "$file" ]; do
+      file=$(readlink "$file")
+      cd "$(dirname "$file")"
+      file=$(basename "$file")
+    done
+    echo "$(pwd -P)/$file"
+  )
+}
+
+SCRIPT_PATH=$(resolve_symlink "${BASH_SOURCE[0]}")
+RALPH_HOME="$(dirname "$(dirname "$SCRIPT_PATH")")"
 
 # Defaults
 MAX_ITERATIONS=10
