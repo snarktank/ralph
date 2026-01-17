@@ -103,6 +103,58 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "axum"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
+dependencies = [
+ "axum-core",
+ "bytes",
+ "form_urlencoded",
+ "futures-util",
+ "http 1.4.0",
+ "http-body 1.0.1",
+ "http-body-util",
+ "hyper 1.8.1",
+ "hyper-util",
+ "itoa",
+ "matchit",
+ "memchr",
+ "mime",
+ "percent-encoding",
+ "pin-project-lite",
+ "serde_core",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_urlencoded",
+ "sync_wrapper 1.0.2",
+ "tokio",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "axum-core"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08c78f31d7b1291f7ee735c1c6780ccde7785daae9a9206026862dab7d8792d1"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "http 1.4.0",
+ "http-body 1.0.1",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
+ "sync_wrapper 1.0.2",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -125,6 +177,15 @@ name = "bitflags"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
+
+[[package]]
+name = "block-buffer"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
+dependencies = [
+ "generic-array",
+]
 
 [[package]]
 name = "bumpalo"
@@ -263,6 +324,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
+name = "cpufeatures"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "crypto-common"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
+
+[[package]]
 name = "darling"
 version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -304,6 +384,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
 dependencies = [
  "powerfmt",
+]
+
+[[package]]
+name = "digest"
+version = "0.10.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
+dependencies = [
+ "block-buffer",
+ "crypto-common",
+ "subtle",
 ]
 
 [[package]]
@@ -486,6 +577,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic-array"
+version = "0.14.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+dependencies = [
+ "typenum",
+ "version_check",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -626,6 +727,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
+]
+
+[[package]]
 name = "http"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -730,6 +840,7 @@ dependencies = [
  "http 1.4.0",
  "http-body 1.0.1",
  "httparse",
+ "httpdate",
  "itoa",
  "pin-project-lite",
  "pin-utils",
@@ -1068,6 +1179,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "matchit"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
+
+[[package]]
 name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1401,9 +1518,11 @@ name = "ralph"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "axum",
  "clap",
  "config",
  "graphql_client",
+ "hmac",
  "octocrab",
  "regex",
  "reqwest 0.12.28",
@@ -1411,11 +1530,14 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
  "toml",
+ "tower",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1857,6 +1979,17 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]
@@ -2380,6 +2513,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
+name = "typenum"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2427,6 +2566,12 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "version_check"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "want"
