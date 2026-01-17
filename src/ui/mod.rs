@@ -12,6 +12,7 @@ mod interrupt;
 mod quality_gates;
 mod spinner;
 mod story_view;
+mod summary;
 
 pub use colors::Theme;
 pub use display::RalphDisplay;
@@ -27,3 +28,4 @@ pub use spinner::{
     progress_chars, spinner_chars, IterationProgress, ProgressManager, RalphSpinner, SpinnerStyle,
 };
 pub use story_view::{StoryInfo, StoryView, StoryViewState};
+pub use summary::{ExecutionSummary, GateStatistics, StoryResult, SummaryRenderer};
