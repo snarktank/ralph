@@ -1,0 +1,97 @@
+# cargo-deny configuration for Ralph
+# https://embarkstudios.github.io/cargo-deny/
+
+# General settings
+[graph]
+# The targets to check dependencies for
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+# Include all features when checking
+all-features = true
+
+# =============================================================================
+# Advisories - Check for security vulnerabilities
+# =============================================================================
+[advisories]
+version = 2
+# The database of known vulnerable crates
+db-path = "~/.cargo/advisory-db"
+# The url(s) of the advisory database to use
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Specific advisory IDs to ignore (use sparingly and document why)
+ignore = [
+    # paste: unmaintained but used by rmcp (MCP SDK). No vulnerability, just unmaintained.
+    # rmcp is the official MCP SDK and this is a transitive dependency.
+    "RUSTSEC-2024-0436",
+    # rustls-pemfile: unmaintained, used by graphql_client -> reqwest 0.11.
+    # No vulnerability, transitioning to rustls-pki-types. Cannot upgrade until graphql_client updates.
+    "RUSTSEC-2025-0134",
+]
+
+# =============================================================================
+# Licenses - Ensure dependency licenses are acceptable
+# =============================================================================
+[licenses]
+version = 2
+# Confidence threshold for license detection (0.0 to 1.0)
+confidence-threshold = 0.8
+# List of allowed licenses (SPDX identifiers)
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "CC0-1.0",
+    "Unlicense",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+]
+# License exceptions for specific crates (document why each is needed)
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 },
+]
+
+# =============================================================================
+# Bans - Disallow specific crates or versions
+# =============================================================================
+[bans]
+# Lint level for multiple versions of the same crate
+multiple-versions = "warn"
+# Lint level for crates not explicitly in the allow list (if using allow-list mode)
+wildcards = "allow"
+# Don't highlight the crate causing version duplication
+highlight = "all"
+# List of crates to deny
+deny = [
+    # Add crates to ban here with explanations, e.g.:
+    # { name = "openssl", reason = "Use rustls instead for better security" },
+]
+# Specific crate versions to skip checking (e.g., for transitive dependencies)
+skip = []
+# Tree of dependencies to skip
+skip-tree = []
+
+# =============================================================================
+# Sources - Where crates are allowed to come from
+# =============================================================================
+[sources]
+# Lint level for crates not from an allowed source
+unknown-registry = "deny"
+# Lint level for crates not from an allowed git repository
+unknown-git = "warn"
+# List of allowed registries
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# List of allowed git repositories (add if needed)
+allow-git = []

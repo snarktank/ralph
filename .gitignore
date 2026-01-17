@@ -1,0 +1,17 @@
+# Ralph working files (generated during runs)
+prd.json
+progress.txt
+.last-branch
+
+# Archive is optional to commit
+# archive/
+
+# Rust build artifacts
+/target/
+
+# OS files
+.DS_Store
+
+# Rust build artifacts
+cli/target/
+bin/ralph

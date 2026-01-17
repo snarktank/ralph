@@ -1,0 +1,245 @@
+#!/bin/bash
+# Ralph - Autonomous AI agent loop using Claude Code
+# https://github.com/kcirtapfromspace/ralph
+
+set -e
+
+VERSION="1.0.0"
+
+# Find where ralph is installed (resolve symlinks - works on macOS and Linux)
+resolve_symlink() {
+  local file="$1"
+  (
+    cd "$(dirname "$file")"
+    file=$(basename "$file")
+    while [ -L "$file" ]; do
+      file=$(readlink "$file")
+      cd "$(dirname "$file")"
+      file=$(basename "$file")
+    done
+    echo "$(pwd -P)/$file"
+  )
+}
+
+SCRIPT_PATH=$(resolve_symlink "${BASH_SOURCE[0]}")
+RALPH_HOME="$(dirname "$(dirname "$SCRIPT_PATH")")"
+
+# Defaults
+MAX_ITERATIONS=10
+WORK_DIR="$(pwd)"
+PROMPT_FILE="$RALPH_HOME/prompt.md"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+usage() {
+  cat <<EOF
+Ralph v${VERSION} - Autonomous AI agent loop using Claude Code
+
+Usage: ralph [OPTIONS] [max_iterations]
+
+Options:
+  -d, --dir <path>       Working directory (default: current directory)
+  -p, --prompt <file>    Custom prompt file (default: \$RALPH_HOME/prompt.md)
+  -n, --iterations <n>   Max iterations (default: 10)
+  -i, --init             Initialize a new project with prd.json template
+  -h, --help             Show this help message
+  -v, --version          Show version
+      --home             Show Ralph installation directory
+
+Examples:
+  ralph                  Run in current directory with defaults
+  ralph 20               Run with 20 max iterations
+  ralph -d ./my-project  Run in specified directory
+  ralph --init           Create prd.json template in current directory
+
+Project files (created in working directory):
+  prd.json       Task list with user stories
+  progress.txt   Append-only learnings log
+  archive/       Previous run archives
+
+For more info: https://github.com/kcirtapfromspace/ralph
+EOF
+}
+
+init_project() {
+  local target_dir="$1"
+  local prd_file="$target_dir/prd.json"
+
+  if [ -f "$prd_file" ]; then
+    echo -e "${YELLOW}Warning:${NC} prd.json already exists in $target_dir"
+    read -p "Overwrite? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "Aborted."
+      exit 1
+    fi
+  fi
+
+  cp "$RALPH_HOME/prd.json.example" "$prd_file"
+  echo -e "${GREEN}Created${NC} $prd_file"
+  echo ""
+  echo "Next steps:"
+  echo "  1. Edit prd.json with your user stories"
+  echo "  2. Run 'ralph' to start the agent loop"
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d|--dir)
+      WORK_DIR="$2"
+      shift 2
+      ;;
+    -p|--prompt)
+      PROMPT_FILE="$2"
+      shift 2
+      ;;
+    -n|--iterations)
+      MAX_ITERATIONS="$2"
+      shift 2
+      ;;
+    -i|--init)
+      init_project "$WORK_DIR"
+      exit 0
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -v|--version)
+      echo "ralph v${VERSION}"
+      exit 0
+      ;;
+    --home)
+      echo "$RALPH_HOME"
+      exit 0
+      ;;
+    -*)
+      echo -e "${RED}Error:${NC} Unknown option: $1"
+      echo "Run 'ralph --help' for usage"
+      exit 1
+      ;;
+    *)
+      # Positional argument = max iterations
+      MAX_ITERATIONS="$1"
+      shift
+      ;;
+  esac
+done
+
+# Validate working directory
+if [ ! -d "$WORK_DIR" ]; then
+  echo -e "${RED}Error:${NC} Directory not found: $WORK_DIR"
+  exit 1
+fi
+
+# Convert to absolute path
+WORK_DIR="$(cd "$WORK_DIR" && pwd)"
+
+# Validate prompt file
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo -e "${RED}Error:${NC} Prompt file not found: $PROMPT_FILE"
+  exit 1
+fi
+
+# File paths in working directory
+PRD_FILE="$WORK_DIR/prd.json"
+PROGRESS_FILE="$WORK_DIR/progress.txt"
+ARCHIVE_DIR="$WORK_DIR/archive"
+LAST_BRANCH_FILE="$WORK_DIR/.last-branch"
+
+# Check for prd.json
+if [ ! -f "$PRD_FILE" ]; then
+  echo -e "${RED}Error:${NC} No prd.json found in $WORK_DIR"
+  echo ""
+  echo "To get started:"
+  echo "  ralph --init    Create a prd.json template"
+  echo ""
+  echo "Or create prd.json manually. See: $RALPH_HOME/prd.json.example"
+  exit 1
+fi
+
+# Archive previous run if branch changed
+if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+  LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
+
+  if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
+    DATE=$(date +%Y-%m-%d)
+    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
+    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
+
+    echo -e "${BLUE}Archiving previous run:${NC} $LAST_BRANCH"
+    mkdir -p "$ARCHIVE_FOLDER"
+    [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
+    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
+    echo "  Archived to: $ARCHIVE_FOLDER"
+
+    # Reset progress file for new run
+    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+    echo "Started: $(date)" >> "$PROGRESS_FILE"
+    echo "---" >> "$PROGRESS_FILE"
+  fi
+fi
+
+# Track current branch
+if [ -f "$PRD_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+  if [ -n "$CURRENT_BRANCH" ]; then
+    echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
+  fi
+fi
+
+# Initialize progress file if it doesn't exist
+if [ ! -f "$PROGRESS_FILE" ]; then
+  echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+  echo "Started: $(date)" >> "$PROGRESS_FILE"
+  echo "---" >> "$PROGRESS_FILE"
+fi
+
+# Header
+echo ""
+echo -e "${GREEN}╔═══════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║${NC}                    ${BLUE}Ralph v${VERSION}${NC}                       ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC}          Autonomous AI Agent Loop                    ${GREEN}║${NC}"
+echo -e "${GREEN}╚═══════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "  ${BLUE}Directory:${NC}   $WORK_DIR"
+echo -e "  ${BLUE}Iterations:${NC}  $MAX_ITERATIONS max"
+echo -e "  ${BLUE}PRD:${NC}         $PRD_FILE"
+echo ""
+
+# Change to working directory
+cd "$WORK_DIR"
+
+for i in $(seq 1 $MAX_ITERATIONS); do
+  echo ""
+  echo -e "${YELLOW}═══════════════════════════════════════════════════════${NC}"
+  echo -e "${YELLOW}  Iteration $i of $MAX_ITERATIONS${NC}"
+  echo -e "${YELLOW}═══════════════════════════════════════════════════════${NC}"
+
+  # Run Claude Code with the ralph prompt
+  OUTPUT=$(cat "$PROMPT_FILE" | claude --dangerously-skip-permissions --print 2>&1 | tee /dev/stderr) || true
+
+  # Check for completion signal
+  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+    echo ""
+    echo -e "${GREEN}✓ Ralph completed all tasks!${NC}"
+    echo "  Finished at iteration $i of $MAX_ITERATIONS"
+    exit 0
+  fi
+
+  echo ""
+  echo -e "Iteration $i complete. Continuing..."
+  sleep 2
+done
+
+echo ""
+echo -e "${YELLOW}Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks.${NC}"
+echo "Check $PROGRESS_FILE for status."
+exit 1
