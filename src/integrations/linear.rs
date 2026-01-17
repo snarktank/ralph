@@ -177,6 +177,200 @@ impl LinearProvider {
             .issue
             .ok_or_else(|| TrackerError::ApiError("No issue in response".to_string()))
     }
+
+    /// Update an issue using the issueUpdate mutation
+    async fn update_issue(
+        &self,
+        issue_id: &str,
+        title: Option<&str>,
+        description: Option<&str>,
+        state_id: Option<&str>,
+    ) -> TrackerResult<LinearIssue> {
+        let mut fields = Vec::new();
+
+        if let Some(t) = title {
+            fields.push(format!(r#"title: "{}""#, escape_graphql_string(t)));
+        }
+        if let Some(d) = description {
+            fields.push(format!(r#"description: "{}""#, escape_graphql_string(d)));
+        }
+        if let Some(s) = state_id {
+            fields.push(format!(r#"stateId: "{}""#, s));
+        }
+
+        if fields.is_empty() {
+            return Err(TrackerError::InvalidInput(
+                "No fields to update".to_string(),
+            ));
+        }
+
+        let mutation = format!(
+            r#"mutation {{
+                issueUpdate(id: "{issue_id}", input: {{
+                    {fields}
+                }}) {{
+                    success
+                    issue {{
+                        id
+                        identifier
+                        title
+                        url
+                    }}
+                }}
+            }}"#,
+            issue_id = issue_id,
+            fields = fields.join(", ")
+        );
+
+        let response: GraphQLResponse<IssueUpdateData> = self.execute_graphql(&mutation).await?;
+
+        // Check for GraphQL errors
+        if let Some(errors) = response.errors {
+            let error_msg = errors
+                .first()
+                .map(|e| e.message.clone())
+                .unwrap_or_else(|| "Unknown GraphQL error".to_string());
+            return Err(TrackerError::ApiError(error_msg));
+        }
+
+        let data = response
+            .data
+            .ok_or_else(|| TrackerError::ApiError("No data in response".to_string()))?;
+
+        if !data.issue_update.success {
+            return Err(TrackerError::ApiError("Issue update failed".to_string()));
+        }
+
+        data.issue_update
+            .issue
+            .ok_or_else(|| TrackerError::ApiError("No issue in response".to_string()))
+    }
+
+    /// Fetch workflow states for the team to map ItemStatus to Linear state IDs
+    async fn fetch_workflow_states(&self) -> TrackerResult<Vec<WorkflowState>> {
+        let query = format!(
+            r#"query {{
+                team(id: "{team_id}") {{
+                    states {{
+                        nodes {{
+                            id
+                            name
+                            type
+                        }}
+                    }}
+                }}
+            }}"#,
+            team_id = self.config.team_id
+        );
+
+        let response: GraphQLResponse<TeamStatesData> = self.execute_graphql(&query).await?;
+
+        // Check for GraphQL errors
+        if let Some(errors) = response.errors {
+            let error_msg = errors
+                .first()
+                .map(|e| e.message.clone())
+                .unwrap_or_else(|| "Unknown GraphQL error".to_string());
+            return Err(TrackerError::ApiError(error_msg));
+        }
+
+        let data = response
+            .data
+            .ok_or_else(|| TrackerError::ApiError("No data in response".to_string()))?;
+
+        Ok(data.team.states.nodes)
+    }
+
+    /// Map an ItemStatus to a Linear workflow state ID
+    ///
+    /// Linear uses workflow states with types: backlog, unstarted, started, completed, canceled
+    async fn find_state_id_for_status(&self, status: ItemStatus) -> TrackerResult<String> {
+        let states = self.fetch_workflow_states().await?;
+
+        // Map our ItemStatus to Linear state types and names
+        let (expected_type, expected_names) = match status {
+            ItemStatus::Todo => ("unstarted", vec!["todo", "to do", "backlog"]),
+            ItemStatus::InProgress => ("started", vec!["in progress", "doing", "started"]),
+            ItemStatus::InReview => ("started", vec!["in review", "review", "reviewing"]),
+            ItemStatus::Done => ("completed", vec!["done", "completed", "closed"]),
+            ItemStatus::Blocked => ("started", vec!["blocked", "on hold", "paused"]),
+            ItemStatus::Cancelled => ("canceled", vec!["cancelled", "canceled", "won't do"]),
+        };
+
+        // First, try to find a state with matching name
+        for state in &states {
+            let state_name_lower = state.name.to_lowercase();
+            for expected_name in &expected_names {
+                if state_name_lower.contains(expected_name) {
+                    return Ok(state.id.clone());
+                }
+            }
+        }
+
+        // If no name match, try to find a state with matching type
+        for state in &states {
+            if state.state_type == expected_type {
+                return Ok(state.id.clone());
+            }
+        }
+
+        // If still no match, return error with available states
+        let available: Vec<String> = states
+            .iter()
+            .map(|s| format!("{} ({})", s.name, s.state_type))
+            .collect();
+        Err(TrackerError::ApiError(format!(
+            "No matching state found for '{}'. Available states: {}",
+            status,
+            available.join(", ")
+        )))
+    }
+
+    /// Add a comment to an issue using the commentCreate mutation
+    async fn create_comment(&self, issue_id: &str, body: &str) -> TrackerResult<LinearComment> {
+        let mutation = format!(
+            r#"mutation {{
+                commentCreate(input: {{
+                    issueId: "{issue_id}",
+                    body: "{body}"
+                }}) {{
+                    success
+                    comment {{
+                        id
+                        body
+                        url
+                    }}
+                }}
+            }}"#,
+            issue_id = issue_id,
+            body = escape_graphql_string(body)
+        );
+
+        let response: GraphQLResponse<CommentCreateData> = self.execute_graphql(&mutation).await?;
+
+        // Check for GraphQL errors
+        if let Some(errors) = response.errors {
+            let error_msg = errors
+                .first()
+                .map(|e| e.message.clone())
+                .unwrap_or_else(|| "Unknown GraphQL error".to_string());
+            return Err(TrackerError::ApiError(error_msg));
+        }
+
+        let data = response
+            .data
+            .ok_or_else(|| TrackerError::ApiError("No data in response".to_string()))?;
+
+        if !data.comment_create.success {
+            return Err(TrackerError::ApiError(
+                "Comment creation failed".to_string(),
+            ));
+        }
+
+        data.comment_create
+            .comment
+            .ok_or_else(|| TrackerError::ApiError("No comment in response".to_string()))
+    }
 }
 
 /// Generic GraphQL response wrapper
@@ -219,6 +413,75 @@ pub struct LinearIssue {
     pub url: String,
 }
 
+/// Response data from issueUpdate mutation
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IssueUpdateData {
+    issue_update: IssueUpdateResult,
+}
+
+/// Result of issueUpdate mutation
+#[derive(Debug, Deserialize)]
+struct IssueUpdateResult {
+    success: bool,
+    issue: Option<LinearIssue>,
+}
+
+/// Response data from team states query
+#[derive(Debug, Deserialize)]
+struct TeamStatesData {
+    team: TeamData,
+}
+
+/// Team data containing workflow states
+#[derive(Debug, Deserialize)]
+struct TeamData {
+    states: StatesConnection,
+}
+
+/// States connection for pagination
+#[derive(Debug, Deserialize)]
+struct StatesConnection {
+    nodes: Vec<WorkflowState>,
+}
+
+/// Linear workflow state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowState {
+    /// State ID
+    pub id: String,
+    /// State name (e.g., "Todo", "In Progress", "Done")
+    pub name: String,
+    /// State type (backlog, unstarted, started, completed, canceled)
+    #[serde(rename = "type")]
+    pub state_type: String,
+}
+
+/// Response data from commentCreate mutation
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommentCreateData {
+    comment_create: CommentCreateResult,
+}
+
+/// Result of commentCreate mutation
+#[derive(Debug, Deserialize)]
+struct CommentCreateResult {
+    success: bool,
+    comment: Option<LinearComment>,
+}
+
+/// Linear comment representation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinearComment {
+    /// Comment ID
+    pub id: String,
+    /// Comment body
+    pub body: String,
+    /// URL to view the comment
+    pub url: String,
+}
+
 /// Escape special characters for GraphQL string values
 fn escape_graphql_string(s: &str) -> String {
     s.replace('\\', "\\\\")
@@ -248,35 +511,86 @@ impl ProjectTracker for LinearProvider {
 
     async fn update_item(
         &self,
-        _item_id: &str,
-        _request: UpdateItemRequest,
+        item_id: &str,
+        request: UpdateItemRequest,
     ) -> TrackerResult<ItemInfo> {
-        // Will be implemented in US-033
-        Err(TrackerError::ApiError(
-            "update_item not yet implemented".to_string(),
-        ))
+        // If status is provided, get the state ID
+        let state_id = if let Some(status) = request.status {
+            Some(self.find_state_id_for_status(status).await?)
+        } else {
+            None
+        };
+
+        let issue = self
+            .update_issue(
+                item_id,
+                request.title.as_deref(),
+                request.description.as_deref(),
+                state_id.as_deref(),
+            )
+            .await?;
+
+        Ok(ItemInfo {
+            id: issue.id,
+            title: issue.title,
+            url: Some(issue.url),
+        })
     }
 
-    async fn create_failure_issue(&self, _request: FailureIssueRequest) -> TrackerResult<ItemInfo> {
-        // Will be implemented in US-033
-        Err(TrackerError::ApiError(
-            "create_failure_issue not yet implemented".to_string(),
-        ))
+    async fn create_failure_issue(&self, request: FailureIssueRequest) -> TrackerResult<ItemInfo> {
+        let title = format!("[Ralph Failure] {}", request.story_title);
+        let body = format_failure_issue_body(&request);
+
+        let issue = self.create_issue(&title, Some(&body)).await?;
+
+        Ok(ItemInfo {
+            id: issue.id,
+            title: issue.title,
+            url: Some(issue.url),
+        })
     }
 
-    async fn add_comment(&self, _item_id: &str, _comment: &str) -> TrackerResult<()> {
-        // Will be implemented in US-033
-        Err(TrackerError::ApiError(
-            "add_comment not yet implemented".to_string(),
-        ))
+    async fn add_comment(&self, item_id: &str, comment: &str) -> TrackerResult<()> {
+        self.create_comment(item_id, comment).await?;
+        Ok(())
     }
 
-    async fn update_status(&self, _item_id: &str, _status: ItemStatus) -> TrackerResult<ItemInfo> {
-        // Will be implemented in US-033
-        Err(TrackerError::ApiError(
-            "update_status not yet implemented".to_string(),
-        ))
+    async fn update_status(&self, item_id: &str, status: ItemStatus) -> TrackerResult<ItemInfo> {
+        // Find the state ID for the given status
+        let state_id = self.find_state_id_for_status(status).await?;
+
+        // Update the issue with the new state
+        let issue = self
+            .update_issue(item_id, None, None, Some(&state_id))
+            .await?;
+
+        Ok(ItemInfo {
+            id: issue.id,
+            title: issue.title,
+            url: Some(issue.url),
+        })
     }
+}
+
+/// Format the body for a failure issue
+fn format_failure_issue_body(request: &FailureIssueRequest) -> String {
+    let mut body = format!(
+        "## Story Information\n\n\
+         - **Story ID:** {}\n\
+         - **Story Title:** {}\n\n\
+         ## Error Details\n\n\
+         ```\n{}\n```",
+        request.story_id, request.story_title, request.error
+    );
+
+    if let Some(context) = &request.context {
+        body.push_str(&format!(
+            "\n\n<details>\n<summary>Additional Context</summary>\n\n{}\n</details>",
+            context
+        ));
+    }
+
+    body
 }
 
 #[cfg(test)]
@@ -378,65 +692,155 @@ mod tests {
         assert_eq!(provider.name(), "linear");
     }
 
-    #[tokio::test]
-    async fn test_update_item_not_implemented() {
-        let config = LinearConfig::new("test_key".to_string(), "team_id".to_string());
-        let provider = LinearProvider::new(config).unwrap();
-        let request = UpdateItemRequest {
-            title: None,
-            description: None,
-            status: Some(ItemStatus::Done),
-            add_labels: vec![],
-            remove_labels: vec![],
-        };
+    #[test]
+    fn test_issue_update_data_deserialize() {
+        let json = r#"{
+            "data": {
+                "issueUpdate": {
+                    "success": true,
+                    "issue": {
+                        "id": "updated-id",
+                        "identifier": "ENG-42",
+                        "title": "Updated Title",
+                        "url": "https://linear.app/test/ENG-42"
+                    }
+                }
+            }
+        }"#;
 
-        let result = provider.update_item("item-123", request).await;
-        assert!(result.is_err());
-        if let Err(TrackerError::ApiError(msg)) = result {
-            assert!(msg.contains("not yet implemented"));
-        }
+        let response: GraphQLResponse<IssueUpdateData> = serde_json::from_str(json).unwrap();
+        assert!(response.errors.is_none());
+        let data = response.data.unwrap();
+        assert!(data.issue_update.success);
+        let issue = data.issue_update.issue.unwrap();
+        assert_eq!(issue.id, "updated-id");
+        assert_eq!(issue.identifier, "ENG-42");
+        assert_eq!(issue.title, "Updated Title");
     }
 
-    #[tokio::test]
-    async fn test_add_comment_not_implemented() {
-        let config = LinearConfig::new("test_key".to_string(), "team_id".to_string());
-        let provider = LinearProvider::new(config).unwrap();
+    #[test]
+    fn test_workflow_state_deserialize() {
+        let json = r#"{
+            "id": "state-123",
+            "name": "In Progress",
+            "type": "started"
+        }"#;
 
-        let result = provider.add_comment("item-123", "Test comment").await;
-        assert!(result.is_err());
-        if let Err(TrackerError::ApiError(msg)) = result {
-            assert!(msg.contains("not yet implemented"));
-        }
+        let state: WorkflowState = serde_json::from_str(json).unwrap();
+        assert_eq!(state.id, "state-123");
+        assert_eq!(state.name, "In Progress");
+        assert_eq!(state.state_type, "started");
     }
 
-    #[tokio::test]
-    async fn test_update_status_not_implemented() {
-        let config = LinearConfig::new("test_key".to_string(), "team_id".to_string());
-        let provider = LinearProvider::new(config).unwrap();
+    #[test]
+    fn test_team_states_data_deserialize() {
+        let json = r#"{
+            "data": {
+                "team": {
+                    "states": {
+                        "nodes": [
+                            {"id": "s1", "name": "Todo", "type": "unstarted"},
+                            {"id": "s2", "name": "In Progress", "type": "started"},
+                            {"id": "s3", "name": "Done", "type": "completed"}
+                        ]
+                    }
+                }
+            }
+        }"#;
 
-        let result = provider.update_status("item-123", ItemStatus::Done).await;
-        assert!(result.is_err());
-        if let Err(TrackerError::ApiError(msg)) = result {
-            assert!(msg.contains("not yet implemented"));
-        }
+        let response: GraphQLResponse<TeamStatesData> = serde_json::from_str(json).unwrap();
+        let data = response.data.unwrap();
+        let states = &data.team.states.nodes;
+        assert_eq!(states.len(), 3);
+        assert_eq!(states[0].name, "Todo");
+        assert_eq!(states[1].name, "In Progress");
+        assert_eq!(states[2].name, "Done");
     }
 
-    #[tokio::test]
-    async fn test_create_failure_issue_not_implemented() {
-        let config = LinearConfig::new("test_key".to_string(), "team_id".to_string());
-        let provider = LinearProvider::new(config).unwrap();
+    #[test]
+    fn test_linear_comment_deserialize() {
+        let json = r#"{
+            "id": "comment-123",
+            "body": "Test comment body",
+            "url": "https://linear.app/test/comment"
+        }"#;
+
+        let comment: LinearComment = serde_json::from_str(json).unwrap();
+        assert_eq!(comment.id, "comment-123");
+        assert_eq!(comment.body, "Test comment body");
+        assert_eq!(comment.url, "https://linear.app/test/comment");
+    }
+
+    #[test]
+    fn test_comment_create_data_deserialize() {
+        let json = r#"{
+            "data": {
+                "commentCreate": {
+                    "success": true,
+                    "comment": {
+                        "id": "c-456",
+                        "body": "New comment",
+                        "url": "https://linear.app/comment/c-456"
+                    }
+                }
+            }
+        }"#;
+
+        let response: GraphQLResponse<CommentCreateData> = serde_json::from_str(json).unwrap();
+        let data = response.data.unwrap();
+        assert!(data.comment_create.success);
+        let comment = data.comment_create.comment.unwrap();
+        assert_eq!(comment.id, "c-456");
+        assert_eq!(comment.body, "New comment");
+    }
+
+    #[test]
+    fn test_format_failure_issue_body_basic() {
         let request = FailureIssueRequest {
             story_id: "US-001".to_string(),
             story_title: "Test story".to_string(),
-            error: "Test error".to_string(),
+            error: "Test error message".to_string(),
             context: None,
         };
 
-        let result = provider.create_failure_issue(request).await;
-        assert!(result.is_err());
-        if let Err(TrackerError::ApiError(msg)) = result {
-            assert!(msg.contains("not yet implemented"));
-        }
+        let body = format_failure_issue_body(&request);
+        assert!(body.contains("## Story Information"));
+        assert!(body.contains("**Story ID:** US-001"));
+        assert!(body.contains("**Story Title:** Test story"));
+        assert!(body.contains("## Error Details"));
+        assert!(body.contains("Test error message"));
+        assert!(!body.contains("<details>"));
+    }
+
+    #[test]
+    fn test_format_failure_issue_body_with_context() {
+        let request = FailureIssueRequest {
+            story_id: "US-002".to_string(),
+            story_title: "Another story".to_string(),
+            error: "Error occurred".to_string(),
+            context: Some("Stack trace here".to_string()),
+        };
+
+        let body = format_failure_issue_body(&request);
+        assert!(body.contains("<details>"));
+        assert!(body.contains("<summary>Additional Context</summary>"));
+        assert!(body.contains("Stack trace here"));
+        assert!(body.contains("</details>"));
+    }
+
+    #[test]
+    fn test_format_failure_issue_body_special_characters() {
+        let request = FailureIssueRequest {
+            story_id: "US-003".to_string(),
+            story_title: "Story with \"quotes\"".to_string(),
+            error: "Error with\nnewlines".to_string(),
+            context: None,
+        };
+
+        let body = format_failure_issue_body(&request);
+        // The body should contain the special characters (not escaped in markdown)
+        assert!(body.contains("Story with \"quotes\""));
+        assert!(body.contains("Error with\nnewlines"));
     }
 
     #[test]
