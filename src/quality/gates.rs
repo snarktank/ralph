@@ -335,6 +335,141 @@ impl QualityGateChecker {
         }
     }
 
+    /// Check code linting using cargo clippy.
+    ///
+    /// Runs `cargo clippy -- -D warnings` which treats all warnings as errors.
+    ///
+    /// # Returns
+    ///
+    /// A `GateResult` indicating whether clippy passed without warnings.
+    pub fn check_lint(&self) -> GateResult {
+        if !self.profile.ci.lint_check {
+            return GateResult::skipped("lint", "Lint checking not enabled in profile");
+        }
+
+        let output = Command::new("cargo")
+            .args(["clippy", "--", "-D", "warnings"])
+            .current_dir(&self.project_root)
+            .output();
+
+        match output {
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+
+                if output.status.success() {
+                    GateResult::pass("lint", "No clippy warnings found")
+                } else {
+                    // Extract the error details from stderr
+                    let details = Self::extract_clippy_errors(&stderr);
+                    GateResult::fail("lint", "Clippy found warnings or errors", Some(details))
+                }
+            }
+            Err(e) => GateResult::fail(
+                "lint",
+                "Failed to run cargo clippy",
+                Some(format!("Error: {}. Is clippy installed?", e)),
+            ),
+        }
+    }
+
+    /// Extract relevant error messages from clippy stderr output.
+    fn extract_clippy_errors(stderr: &str) -> String {
+        // Clippy outputs errors and warnings to stderr
+        // Filter to show the most relevant lines (errors, warnings, and their context)
+        let relevant_lines: Vec<&str> = stderr
+            .lines()
+            .filter(|line| {
+                line.contains("error")
+                    || line.contains("warning")
+                    || line.starts_with("  -->")
+                    || line.starts_with("   |")
+            })
+            .take(50) // Limit to first 50 lines to avoid huge output
+            .collect();
+
+        if relevant_lines.is_empty() {
+            stderr.to_string()
+        } else {
+            relevant_lines.join("\n")
+        }
+    }
+
+    /// Check code formatting using cargo fmt.
+    ///
+    /// Runs `cargo fmt --check` which returns non-zero if formatting changes are needed.
+    ///
+    /// # Returns
+    ///
+    /// A `GateResult` indicating whether code is properly formatted.
+    pub fn check_format(&self) -> GateResult {
+        if !self.profile.ci.format_check {
+            return GateResult::skipped("format", "Format checking not enabled in profile");
+        }
+
+        let output = Command::new("cargo")
+            .args(["fmt", "--check"])
+            .current_dir(&self.project_root)
+            .output();
+
+        match output {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+
+                if output.status.success() {
+                    GateResult::pass("format", "All files are properly formatted")
+                } else {
+                    // cargo fmt --check outputs files that need formatting to stdout
+                    let details = Self::extract_format_errors(&stdout, &stderr);
+                    GateResult::fail("format", "Some files need formatting", Some(details))
+                }
+            }
+            Err(e) => GateResult::fail(
+                "format",
+                "Failed to run cargo fmt",
+                Some(format!("Error: {}. Is rustfmt installed?", e)),
+            ),
+        }
+    }
+
+    /// Extract relevant information from cargo fmt output.
+    fn extract_format_errors(stdout: &str, stderr: &str) -> String {
+        // cargo fmt --check outputs "Diff in <file>" for each unformatted file
+        let mut result = String::new();
+
+        // Count files needing formatting
+        let unformatted_files: Vec<&str> = stdout
+            .lines()
+            .filter(|line| line.starts_with("Diff in"))
+            .collect();
+
+        if !unformatted_files.is_empty() {
+            result.push_str(&format!(
+                "{} file(s) need formatting:\n",
+                unformatted_files.len()
+            ));
+            for file in unformatted_files.iter().take(20) {
+                result.push_str(file);
+                result.push('\n');
+            }
+            if unformatted_files.len() > 20 {
+                result.push_str(&format!(
+                    "... and {} more files\n",
+                    unformatted_files.len() - 20
+                ));
+            }
+            result.push_str("\nRun `cargo fmt` to fix formatting issues.");
+        } else if !stderr.is_empty() {
+            result = stderr.to_string();
+        } else if !stdout.is_empty() {
+            result = stdout.to_string();
+        } else {
+            result = "Formatting check failed (no additional details)".to_string();
+        }
+
+        result
+    }
+
     /// Run all quality gates configured in the profile.
     ///
     /// Returns a vector of `GateResult` for each gate that was run.
@@ -349,31 +484,11 @@ impl QualityGateChecker {
         // Check coverage gate
         results.push(self.check_coverage());
 
-        // Check lint gate (will be implemented in US-011)
-        if self.profile.ci.lint_check {
-            results.push(GateResult::skipped(
-                "lint",
-                "Lint checking not yet implemented",
-            ));
-        } else {
-            results.push(GateResult::skipped(
-                "lint",
-                "Lint checking not enabled in profile",
-            ));
-        }
+        // Check lint gate
+        results.push(self.check_lint());
 
-        // Check format gate (will be implemented in US-011)
-        if self.profile.ci.format_check {
-            results.push(GateResult::skipped(
-                "format",
-                "Format checking not yet implemented",
-            ));
-        } else {
-            results.push(GateResult::skipped(
-                "format",
-                "Format checking not enabled in profile",
-            ));
-        }
+        // Check format gate
+        results.push(self.check_format());
 
         // Check security audit gate (will be implemented in US-012)
         if self.profile.security.cargo_audit {
@@ -668,5 +783,136 @@ mod tests {
         let result = checker.evaluate_coverage(70.0, "test-tool");
 
         assert!(result.passed, "Coverage at exactly threshold should pass");
+    }
+
+    // Lint gate tests
+
+    #[test]
+    fn test_check_lint_disabled() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+        let result = checker.check_lint();
+
+        assert!(result.passed);
+        assert_eq!(result.gate_name, "lint");
+        assert!(result.message.contains("Skipped"));
+        assert!(result.message.contains("not enabled"));
+    }
+
+    #[test]
+    fn test_check_lint_enabled() {
+        // This test runs against a real project directory if available
+        let profile = create_test_profile(0, true, false, false);
+        // Use the actual Ralph project directory for testing
+        let project_root = std::env::current_dir().unwrap_or_else(|_| "/tmp/test".into());
+        let checker = QualityGateChecker::new(profile, &project_root);
+        let result = checker.check_lint();
+
+        assert_eq!(result.gate_name, "lint");
+        // Result depends on whether clippy finds issues
+        // If it passes or fails, the message should reflect that
+        if result.passed {
+            assert!(result.message.contains("No clippy warnings"));
+        } else {
+            assert!(
+                result.message.contains("warnings")
+                    || result.message.contains("errors")
+                    || result.message.contains("Failed"),
+                "Unexpected failure message: {}",
+                result.message
+            );
+        }
+    }
+
+    #[test]
+    fn test_extract_clippy_errors_with_errors() {
+        let stderr = r#"error: unused variable: `x`
+  --> src/main.rs:10:5
+   |
+10 |     let x = 5;
+   |         ^ help: if this is intentional, prefix it with an underscore: `_x`
+   |
+   = note: `#[deny(unused_variables)]` on by default
+
+warning: function `foo` is never used
+  --> src/main.rs:5:4
+   |
+5  | fn foo() {}
+   |    ^^^
+"#;
+        let result = QualityGateChecker::extract_clippy_errors(stderr);
+
+        assert!(result.contains("error"));
+        assert!(result.contains("warning"));
+        assert!(result.contains("unused variable"));
+    }
+
+    #[test]
+    fn test_extract_clippy_errors_empty() {
+        let stderr = "";
+        let result = QualityGateChecker::extract_clippy_errors(stderr);
+        assert!(result.is_empty());
+    }
+
+    // Format gate tests
+
+    #[test]
+    fn test_check_format_disabled() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+        let result = checker.check_format();
+
+        assert!(result.passed);
+        assert_eq!(result.gate_name, "format");
+        assert!(result.message.contains("Skipped"));
+        assert!(result.message.contains("not enabled"));
+    }
+
+    #[test]
+    fn test_check_format_enabled() {
+        // This test runs against a real project directory if available
+        let profile = create_test_profile(0, false, true, false);
+        // Use the actual Ralph project directory for testing
+        let project_root = std::env::current_dir().unwrap_or_else(|_| "/tmp/test".into());
+        let checker = QualityGateChecker::new(profile, &project_root);
+        let result = checker.check_format();
+
+        assert_eq!(result.gate_name, "format");
+        // Result depends on whether files need formatting
+        if result.passed {
+            assert!(result.message.contains("properly formatted"));
+        } else {
+            assert!(
+                result.message.contains("need formatting") || result.message.contains("Failed"),
+                "Unexpected failure message: {}",
+                result.message
+            );
+        }
+    }
+
+    #[test]
+    fn test_extract_format_errors_with_diffs() {
+        let stdout = "Diff in /src/main.rs at line 1:\nDiff in /src/lib.rs at line 5:\n";
+        let stderr = "";
+        let result = QualityGateChecker::extract_format_errors(stdout, stderr);
+
+        assert!(result.contains("2 file(s) need formatting"));
+        assert!(result.contains("cargo fmt"));
+    }
+
+    #[test]
+    fn test_extract_format_errors_empty() {
+        let stdout = "";
+        let stderr = "";
+        let result = QualityGateChecker::extract_format_errors(stdout, stderr);
+        assert!(result.contains("Formatting check failed"));
+    }
+
+    #[test]
+    fn test_extract_format_errors_with_stderr() {
+        let stdout = "";
+        let stderr = "error: couldn't parse file";
+        let result = QualityGateChecker::extract_format_errors(stdout, stderr);
+        assert!(result.contains("couldn't parse"));
     }
 }
