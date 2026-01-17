@@ -80,7 +80,9 @@ fn get_ralph_home() -> Result<PathBuf> {
 
     // Try to find based on executable location
     let exe_path = env::current_exe().context("Failed to get executable path")?;
-    let exe_dir = exe_path.parent().context("Failed to get executable directory")?;
+    let exe_dir = exe_path
+        .parent()
+        .context("Failed to get executable directory")?;
 
     // Check if prompt.md exists relative to exe
     // Structure: ralph_home/bin/ralph or ralph_home/target/release/ralph
@@ -107,7 +109,11 @@ fn init_project(work_dir: &Path, ralph_home: &Path) -> Result<()> {
     let example_file = ralph_home.join("prd.json.example");
 
     if prd_file.exists() {
-        println!("{} prd.json already exists in {}", "Warning:".yellow(), work_dir.display());
+        println!(
+            "{} prd.json already exists in {}",
+            "Warning:".yellow(),
+            work_dir.display()
+        );
         print!("Overwrite? [y/N] ");
         std::io::stdout().flush()?;
 
@@ -156,7 +162,9 @@ fn init_project(work_dir: &Path, ralph_home: &Path) -> Result<()> {
 fn archive_previous_run(work_dir: &Path, _current_branch: &str, last_branch: &str) -> Result<()> {
     let date = Local::now().format("%Y-%m-%d").to_string();
     let folder_name = last_branch.strip_prefix("ralph/").unwrap_or(last_branch);
-    let archive_dir = work_dir.join("archive").join(format!("{}-{}", date, folder_name));
+    let archive_dir = work_dir
+        .join("archive")
+        .join(format!("{}-{}", date, folder_name));
 
     println!("{} {}", "Archiving previous run:".blue(), last_branch);
     fs::create_dir_all(&archive_dir)?;
@@ -183,8 +191,10 @@ fn archive_previous_run(work_dir: &Path, _current_branch: &str, last_branch: &st
 }
 
 fn run_iteration(prompt_file: &Path, work_dir: &Path) -> Result<(bool, String)> {
-    let prompt_content = fs::read_to_string(prompt_file)
-        .context(format!("Failed to read prompt file: {}", prompt_file.display()))?;
+    let prompt_content = fs::read_to_string(prompt_file).context(format!(
+        "Failed to read prompt file: {}",
+        prompt_file.display()
+    ))?;
 
     let mut child = Command::new("claude")
         .args(["--dangerously-skip-permissions", "--print"])
@@ -230,12 +240,15 @@ fn run_iteration(prompt_file: &Path, work_dir: &Path) -> Result<(bool, String)> 
 fn run_ralph(cli: &Cli) -> Result<()> {
     let ralph_home = get_ralph_home()?;
 
-    let work_dir = cli.dir.clone()
+    let work_dir = cli
+        .dir
+        .clone()
         .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    let work_dir = work_dir.canonicalize()
-        .unwrap_or(work_dir);
+    let work_dir = work_dir.canonicalize().unwrap_or(work_dir);
 
-    let prompt_file = cli.prompt.clone()
+    let prompt_file = cli
+        .prompt
+        .clone()
         .unwrap_or_else(|| ralph_home.join("prompt.md"));
 
     let max_iterations = cli.max_iterations.unwrap_or(cli.iterations);
@@ -254,19 +267,25 @@ fn run_ralph(cli: &Cli) -> Result<()> {
 
     // Check for prd.json
     if !prd_file.exists() {
-        println!("{} No prd.json found in {}", "Error:".red(), work_dir.display());
+        println!(
+            "{} No prd.json found in {}",
+            "Error:".red(),
+            work_dir.display()
+        );
         println!();
         println!("To get started:");
         println!("  ralph init    Create a prd.json template");
         println!();
-        println!("Or create prd.json manually. See: {}", ralph_home.join("prd.json.example").display());
+        println!(
+            "Or create prd.json manually. See: {}",
+            ralph_home.join("prd.json.example").display()
+        );
         return Ok(());
     }
 
     // Read PRD
     let prd_content = fs::read_to_string(&prd_file)?;
-    let prd: Prd = serde_json::from_str(&prd_content)
-        .context("Failed to parse prd.json")?;
+    let prd: Prd = serde_json::from_str(&prd_content).context("Failed to parse prd.json")?;
     let current_branch = &prd.branch_name;
 
     // Check for branch change and archive if needed
@@ -290,10 +309,25 @@ fn run_ralph(cli: &Cli) -> Result<()> {
 
     // Header
     println!();
-    println!("{}", "╔═══════════════════════════════════════════════════════╗".green());
-    println!("{}                    {}                       {}", "║".green(), format!("Ralph v{}", VERSION).blue(), "║".green());
-    println!("{}          Autonomous AI Agent Loop                    {}", "║".green(), "║".green());
-    println!("{}", "╚═══════════════════════════════════════════════════════╝".green());
+    println!(
+        "{}",
+        "╔═══════════════════════════════════════════════════════╗".green()
+    );
+    println!(
+        "{}                    {}                       {}",
+        "║".green(),
+        format!("Ralph v{}", VERSION).blue(),
+        "║".green()
+    );
+    println!(
+        "{}          Autonomous AI Agent Loop                    {}",
+        "║".green(),
+        "║".green()
+    );
+    println!(
+        "{}",
+        "╚═══════════════════════════════════════════════════════╝".green()
+    );
     println!();
     println!("  {}   {}", "Directory:".blue(), work_dir.display());
     println!("  {}  {} max", "Iterations:".blue(), max_iterations);
@@ -303,9 +337,15 @@ fn run_ralph(cli: &Cli) -> Result<()> {
     // Main loop
     for i in 1..=max_iterations {
         println!();
-        println!("{}", "═══════════════════════════════════════════════════════".yellow());
+        println!(
+            "{}",
+            "═══════════════════════════════════════════════════════".yellow()
+        );
         println!("  {} {} of {}", "Iteration".yellow(), i, max_iterations);
-        println!("{}", "═══════════════════════════════════════════════════════".yellow());
+        println!(
+            "{}",
+            "═══════════════════════════════════════════════════════".yellow()
+        );
 
         let (complete, _output) = run_iteration(&prompt_file, &work_dir)?;
 
@@ -322,7 +362,14 @@ fn run_ralph(cli: &Cli) -> Result<()> {
     }
 
     println!();
-    println!("{}", format!("Ralph reached max iterations ({}) without completing all tasks.", max_iterations).yellow());
+    println!(
+        "{}",
+        format!(
+            "Ralph reached max iterations ({}) without completing all tasks.",
+            max_iterations
+        )
+        .yellow()
+    );
     println!("Check {} for status.", progress_file.display());
 
     Ok(())
@@ -334,7 +381,9 @@ fn main() -> Result<()> {
     match &cli.command {
         Some(Commands::Init) => {
             let ralph_home = get_ralph_home()?;
-            let work_dir = cli.dir.clone()
+            let work_dir = cli
+                .dir
+                .clone()
                 .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
             init_project(&work_dir, &ralph_home)?;
         }

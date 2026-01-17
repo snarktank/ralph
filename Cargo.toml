@@ -1,10 +1,30 @@
+[workspace]
+members = [".", "cli"]
+resolver = "2"
+
 [package]
-name = "ralph"
+name = "ralphmacchio"
 version = "0.1.0"
 edition = "2021"
-description = "Enterprise-ready autonomous AI agent framework"
+rust-version = "1.75"
+description = "Enterprise-ready autonomous AI agent framework with MCP server, quality gates, and rich terminal UI"
 license = "MIT"
 repository = "https://github.com/kcirtapfromspace/ralph"
+homepage = "https://github.com/kcirtapfromspace/ralph"
+documentation = "https://docs.rs/ralphmacchio"
+readme = "README.md"
+authors = ["kcirtapfromspace"]
+keywords = ["ai", "agent", "mcp", "automation", "cli"]
+categories = ["command-line-utilities", "development-tools", "asynchronous"]
+exclude = [
+    "flowchart/",
+    "docs/",
+    "*.png",
+    "*.webp",
+    ".github/",
+    "tasks/",
+    "cli/",
+]
 
 [dependencies]
 async-trait = "0.1"
