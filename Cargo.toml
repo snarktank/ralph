@@ -1,0 +1,24 @@
+[package]
+name = "ralph"
+version = "0.1.0"
+edition = "2021"
+description = "Enterprise-ready autonomous AI agent framework"
+license = "MIT"
+repository = "https://github.com/your-org/ralph"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[[bin]]
+name = "ralph"
+path = "src/main.rs"

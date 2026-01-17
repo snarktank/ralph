@@ -6,5 +6,8 @@ progress.txt
 # Archive is optional to commit
 # archive/
 
+# Rust build artifacts
+/target/
+
 # OS files
 .DS_Store
