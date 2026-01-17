@@ -59,10 +59,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             // Start the MCP server using stdio transport
-            let service = server
-                .serve(stdio())
-                .await
-                .inspect_err(|e| tracing::error!("Error starting MCP server: {}", e))?;
+            let service = server.serve(stdio()).await.map_err(|e| {
+                tracing::error!("Error starting MCP server: {}", e);
+                e
+            })?;
 
             // Wait for the service to complete
             service.waiting().await?;
