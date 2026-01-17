@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+use crate::mcp::tools::get_status::{GetStatusRequest, GetStatusResponse};
 use crate::mcp::tools::list_stories::{load_stories, ListStoriesRequest, ListStoriesResponse};
 use crate::quality::QualityConfig;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -284,6 +285,44 @@ impl RalphMcpServer {
                 .to_string(),
         }
     }
+
+    /// Get the current execution status of Ralph.
+    ///
+    /// This tool returns the current state of story execution, including:
+    /// - Whether Ralph is idle, running, completed, or failed
+    /// - For running state: story ID, start time, iteration progress
+    /// - For completed state: story ID and commit hash
+    /// - For failed state: story ID and error message
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `state`: Current state ("idle", "running", "completed", "failed")
+    /// - `story_id`: ID of the story being processed (if applicable)
+    /// - `started_at`: Unix timestamp when execution started (for running state)
+    /// - `iteration`: Current iteration number (for running state)
+    /// - `max_iterations`: Maximum iterations allowed (for running state)
+    /// - `progress_percent`: Progress percentage (for running state)
+    /// - `commit_hash`: Git commit hash (for completed state)
+    /// - `error`: Error message (for failed state)
+    #[tool(
+        name = "get_status",
+        description = "Get the current execution status of Ralph. Returns state (idle, running, completed, failed) along with progress info for running tasks and results for completed/failed tasks."
+    )]
+    pub async fn get_status(&self, Parameters(_req): Parameters<GetStatusRequest>) -> String {
+        // Get the execution state from server state
+        let execution_state = {
+            let state = self.state.read().await;
+            state.execution_state.clone()
+        };
+
+        // Convert ExecutionState to GetStatusResponse
+        let response = GetStatusResponse::from_execution_state(&execution_state);
+
+        // Serialize to JSON
+        serde_json::to_string_pretty(&response)
+            .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))
+    }
 }
 
 /// Implementation of the MCP ServerHandler trait for RalphMcpServer.
@@ -510,5 +549,96 @@ mod tests {
 
         // Check resources capability is enabled
         assert!(info.capabilities.resources.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_status_idle() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+        let result = server.get_status(Parameters(GetStatusRequest {})).await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["state"], "idle");
+        assert!(json.get("story_id").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_status_running() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set the state to running
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Running {
+                story_id: "US-001".to_string(),
+                started_at: 1234567890,
+                iteration: 5,
+                max_iterations: 10,
+            };
+        }
+
+        let result = server.get_status(Parameters(GetStatusRequest {})).await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["state"], "running");
+        assert_eq!(json["story_id"], "US-001");
+        assert_eq!(json["started_at"], 1234567890);
+        assert_eq!(json["iteration"], 5);
+        assert_eq!(json["max_iterations"], 10);
+        assert_eq!(json["progress_percent"], 50);
+    }
+
+    #[tokio::test]
+    async fn test_get_status_completed() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set the state to completed
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Completed {
+                story_id: "US-001".to_string(),
+                commit_hash: Some("abc123def456".to_string()),
+            };
+        }
+
+        let result = server.get_status(Parameters(GetStatusRequest {})).await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["state"], "completed");
+        assert_eq!(json["story_id"], "US-001");
+        assert_eq!(json["commit_hash"], "abc123def456");
+        assert_eq!(json["progress_percent"], 100);
+    }
+
+    #[tokio::test]
+    async fn test_get_status_failed() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Set the state to failed
+        {
+            let mut state = server.state_mut().await;
+            state.execution_state = ExecutionState::Failed {
+                story_id: "US-001".to_string(),
+                error: "Build failed: syntax error".to_string(),
+            };
+        }
+
+        let result = server.get_status(Parameters(GetStatusRequest {})).await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["state"], "failed");
+        assert_eq!(json["story_id"], "US-001");
+        assert_eq!(json["error"], "Build failed: syntax error");
     }
 }
