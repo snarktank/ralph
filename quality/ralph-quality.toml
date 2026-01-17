@@ -1,0 +1,85 @@
+# Ralph Quality Profiles Configuration
+#
+# This file defines quality profiles that can be selected when running Ralph.
+# Each profile specifies requirements for documentation, testing, CI, security, and blog generation.
+
+[profiles.minimal]
+description = "Minimal quality gates for rapid prototyping and initial development"
+
+[profiles.minimal.documentation]
+required = false
+readme = false
+inline_comments = false
+
+[profiles.minimal.testing]
+unit_tests = true
+integration_tests = false
+coverage_threshold = 0
+
+[profiles.minimal.ci]
+required = false
+format_check = false
+lint_check = false
+
+[profiles.minimal.security]
+cargo_audit = false
+cargo_deny = false
+sast = false
+
+[profiles.minimal.blog]
+generate = false
+
+
+[profiles.standard]
+description = "Standard quality gates for production-ready features"
+
+[profiles.standard.documentation]
+required = true
+readme = true
+inline_comments = false
+
+[profiles.standard.testing]
+unit_tests = true
+integration_tests = true
+coverage_threshold = 70
+
+[profiles.standard.ci]
+required = true
+format_check = true
+lint_check = true
+
+[profiles.standard.security]
+cargo_audit = true
+cargo_deny = false
+sast = false
+
+[profiles.standard.blog]
+generate = false
+
+
+[profiles.comprehensive]
+description = "Comprehensive quality gates for critical features with full documentation and security"
+
+[profiles.comprehensive.documentation]
+required = true
+readme = true
+inline_comments = true
+
+[profiles.comprehensive.testing]
+unit_tests = true
+integration_tests = true
+coverage_threshold = 90
+
+[profiles.comprehensive.ci]
+required = true
+format_check = true
+lint_check = true
+
+[profiles.comprehensive.security]
+cargo_audit = true
+cargo_deny = true
+sast = true
+
+[profiles.comprehensive.blog]
+generate = true
+template = "feature-release"

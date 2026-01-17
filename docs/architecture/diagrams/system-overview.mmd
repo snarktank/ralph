@@ -1,0 +1,99 @@
+graph TB
+    subgraph CLI["CLI Layer"]
+        CLI_MAIN["ralph CLI"]
+        CLI_QUALITY["quality subcommand"]
+        CLI_MCP["mcp-server subcommand"]
+    end
+
+    subgraph ENGINE["Agent Engine"]
+        PRD_LOADER["PRD Loader"]
+        STORY_EXECUTOR["Story Executor"]
+        PROGRESS_TRACKER["Progress Tracker"]
+    end
+
+    subgraph MCP["MCP Server"]
+        MCP_SERVER["RalphMcpServer"]
+        MCP_TOOLS["Tools"]
+        MCP_RESOURCES["Resources"]
+
+        subgraph TOOLS["MCP Tools"]
+            T_LIST["list_stories"]
+            T_STATUS["get_status"]
+            T_LOAD["load_prd"]
+            T_RUN["run_story"]
+            T_STOP["stop_execution"]
+        end
+
+        subgraph RESOURCES["MCP Resources"]
+            R_PRD["ralph://prd/current"]
+            R_STATUS["ralph://status"]
+        end
+    end
+
+    subgraph QUALITY["Quality Framework"]
+        Q_CONFIG["QualityConfig"]
+        Q_PROFILES["Quality Profiles"]
+        Q_GATES["Quality Gates"]
+        Q_BLOG["Blog Generator"]
+
+        subgraph GATES["Quality Gates"]
+            G_COVERAGE["Coverage Gate"]
+            G_LINT["Lint Gate"]
+            G_FORMAT["Format Gate"]
+            G_SECURITY["Security Gate"]
+        end
+    end
+
+    subgraph INTEGRATIONS["Integrations"]
+        REGISTRY["Provider Registry"]
+        SYNC["Sync Engine"]
+        WEBHOOKS["Webhook Server"]
+
+        subgraph PROVIDERS["Project Trackers"]
+            P_GITHUB["GitHub Projects"]
+            P_LINEAR["Linear"]
+        end
+    end
+
+    %% CLI connections
+    CLI_MAIN --> CLI_QUALITY
+    CLI_MAIN --> CLI_MCP
+    CLI_QUALITY --> Q_GATES
+    CLI_MCP --> MCP_SERVER
+
+    %% MCP Server connections
+    MCP_SERVER --> MCP_TOOLS
+    MCP_SERVER --> MCP_RESOURCES
+    MCP_TOOLS --> T_LIST
+    MCP_TOOLS --> T_STATUS
+    MCP_TOOLS --> T_LOAD
+    MCP_TOOLS --> T_RUN
+    MCP_TOOLS --> T_STOP
+    MCP_RESOURCES --> R_PRD
+    MCP_RESOURCES --> R_STATUS
+
+    %% Engine connections
+    MCP_SERVER --> ENGINE
+    PRD_LOADER --> STORY_EXECUTOR
+    STORY_EXECUTOR --> PROGRESS_TRACKER
+    STORY_EXECUTOR --> Q_GATES
+
+    %% Quality connections
+    Q_CONFIG --> Q_PROFILES
+    Q_PROFILES --> Q_GATES
+    Q_GATES --> G_COVERAGE
+    Q_GATES --> G_LINT
+    Q_GATES --> G_FORMAT
+    Q_GATES --> G_SECURITY
+    STORY_EXECUTOR --> Q_BLOG
+
+    %% Integration connections
+    REGISTRY --> P_GITHUB
+    REGISTRY --> P_LINEAR
+    SYNC --> REGISTRY
+    WEBHOOKS --> SYNC
+    STORY_EXECUTOR --> SYNC
+
+    %% External connections
+    P_GITHUB -.-> EXT_GH["GitHub API"]
+    P_LINEAR -.-> EXT_LIN["Linear API"]

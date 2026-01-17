@@ -1,0 +1,85 @@
+# Test Quality Profiles Configuration
+#
+# This is a test fixture for integration testing.
+# It defines simplified quality profiles for testing purposes.
+
+[profiles.test_minimal]
+description = "Test minimal profile for fast test execution"
+
+[profiles.test_minimal.documentation]
+required = false
+readme = false
+inline_comments = false
+
+[profiles.test_minimal.testing]
+unit_tests = true
+integration_tests = false
+coverage_threshold = 0
+
+[profiles.test_minimal.ci]
+required = false
+format_check = false
+lint_check = false
+
+[profiles.test_minimal.security]
+cargo_audit = false
+cargo_deny = false
+sast = false
+
+[profiles.test_minimal.blog]
+generate = false
+
+
+[profiles.test_standard]
+description = "Test standard profile with moderate requirements"
+
+[profiles.test_standard.documentation]
+required = true
+readme = true
+inline_comments = false
+
+[profiles.test_standard.testing]
+unit_tests = true
+integration_tests = true
+coverage_threshold = 50
+
+[profiles.test_standard.ci]
+required = true
+format_check = true
+lint_check = true
+
+[profiles.test_standard.security]
+cargo_audit = true
+cargo_deny = false
+sast = false
+
+[profiles.test_standard.blog]
+generate = false
+
+
+[profiles.test_comprehensive]
+description = "Test comprehensive profile with all features enabled"
+
+[profiles.test_comprehensive.documentation]
+required = true
+readme = true
+inline_comments = true
+
+[profiles.test_comprehensive.testing]
+unit_tests = true
+integration_tests = true
+coverage_threshold = 80
+
+[profiles.test_comprehensive.ci]
+required = true
+format_check = true
+lint_check = true
+
+[profiles.test_comprehensive.security]
+cargo_audit = true
+cargo_deny = true
+sast = true
+
+[profiles.test_comprehensive.blog]
+generate = true
+template = "feature-release"
