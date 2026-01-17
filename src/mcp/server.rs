@@ -7,6 +7,7 @@ use crate::mcp::resources::{
     list_ralph_resources, read_prd_resource, read_status_resource, ResourceError, PRD_RESOURCE_URI,
     STATUS_RESOURCE_URI,
 };
+use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::get_status::{GetStatusRequest, GetStatusResponse};
 use crate::mcp::tools::list_stories::{load_stories, ListStoriesRequest, ListStoriesResponse};
 use crate::mcp::tools::load_prd::{
@@ -596,16 +597,118 @@ impl RalphMcpServer {
             };
         }
 
-        // Create started response
-        // Note: In a real implementation, this would spawn an async task to do the actual work.
-        // For now, we just return that execution has started.
-        // The actual execution logic would involve:
-        // 1. Checking out the correct branch
-        // 2. Running the agent to implement the story
-        // 3. Running quality checks
-        // 4. Committing changes
-        // 5. Updating the PRD
-        // The client can poll get_status to check progress.
+        // Detect available agent
+        let agent_command = match detect_agent() {
+            Some(agent) => agent,
+            None => {
+                // Reset state to idle since we can't run
+                {
+                    let mut state = self.state.write().await;
+                    state.execution_state = ExecutionState::Idle;
+                }
+                let response = create_run_error_response(&RunStoryError::ExecutionError(
+                    "No agent CLI found. Install Claude Code CLI (claude) or Amp CLI (amp)."
+                        .to_string(),
+                ));
+                return serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                });
+            }
+        };
+
+        // Get project root from PRD path
+        let project_root = prd_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+        // Progress file path (in same directory as PRD)
+        let progress_path = project_root.join("progress.txt");
+
+        // Create executor config
+        let executor_config = ExecutorConfig {
+            prd_path: prd_path.clone(),
+            project_root: project_root.clone(),
+            progress_path,
+            quality_profile: self
+                .config
+                .as_ref()
+                .as_ref()
+                .map(|c| c.profiles.get("standard").cloned().unwrap_or_default()),
+            agent_command,
+            max_iterations,
+        };
+
+        // Clone necessary data for the spawned task
+        let story_id = req.story_id.clone();
+        let state = self.state.clone();
+        let cancel_receiver = self.cancel_receiver();
+        let display = self.display.clone();
+
+        // Spawn async task to execute the story
+        tokio::spawn(async move {
+            let executor = StoryExecutor::new(executor_config);
+
+            // Iteration callback to update state
+            let state_for_callback = state.clone();
+            let on_iteration = move |iteration: u32, _max: u32| {
+                let state_clone = state_for_callback.clone();
+                tokio::spawn(async move {
+                    let mut server_state = state_clone.write().await;
+                    if let ExecutionState::Running {
+                        iteration: iter, ..
+                    } = &mut server_state.execution_state
+                    {
+                        *iter = iteration;
+                    }
+                });
+            };
+
+            // Execute the story
+            match executor
+                .execute_story(&story_id, cancel_receiver, on_iteration)
+                .await
+            {
+                Ok(result) => {
+                    // Update state to Completed
+                    let mut server_state = state.write().await;
+                    server_state.execution_state = ExecutionState::Completed {
+                        story_id: story_id.clone(),
+                        commit_hash: result.commit_hash,
+                    };
+
+                    // Update display
+                    drop(server_state);
+                    if let Ok(mut disp) = display.try_write() {
+                        let completed_state = ExecutionState::Completed {
+                            story_id: story_id.clone(),
+                            commit_hash: None,
+                        };
+                        disp.update_from_state(&completed_state, None);
+                    }
+                }
+                Err(e) => {
+                    // Update state to Failed
+                    let mut server_state = state.write().await;
+                    server_state.execution_state = ExecutionState::Failed {
+                        story_id: story_id.clone(),
+                        error: e.to_string(),
+                    };
+
+                    // Update display
+                    drop(server_state);
+                    if let Ok(mut disp) = display.try_write() {
+                        let failed_state = ExecutionState::Failed {
+                            story_id: story_id.clone(),
+                            error: e.to_string(),
+                        };
+                        disp.update_from_state(&failed_state, None);
+                    }
+                }
+            }
+        });
+
+        // Return started response immediately (execution continues in background)
         let response = create_started_response(&story, max_iterations);
         serde_json::to_string_pretty(&response)
             .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))

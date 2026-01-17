@@ -29,6 +29,7 @@ exclude = [
 [dependencies]
 async-trait = "0.1"
 axum = "0.8"
+chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 config = { version = "0.14", default-features = false, features = ["toml"] }
 graphql_client = { version = "0.14", features = ["reqwest"] }
