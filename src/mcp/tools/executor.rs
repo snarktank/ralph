@@ -148,7 +148,7 @@ impl StoryExecutor {
 
         let mut iterations_used = 0;
         let mut last_error: Option<String> = None;
-        let mut files_changed: Vec<String>;
+        let mut files_changed: Vec<String> = Vec::new();
 
         // Iteration loop
         for iteration in 1..=self.config.max_iterations {
@@ -283,12 +283,8 @@ impl StoryExecutor {
             (agent_cmd.as_str(), vec![prompt])
         };
 
-        // Check if the agent is available
-        let check = Command::new("which").arg(program).output().map_err(|e| {
-            ExecutorError::AgentError(format!("Failed to check for {}: {}", program, e))
-        })?;
-
-        if !check.status.success() {
+        // Check if the agent is available (cross-platform)
+        if !is_program_in_path(program) {
             return Err(ExecutorError::AgentError(format!(
                 "Agent '{}' not found in PATH. Install Claude Code CLI or Amp CLI.",
                 program
@@ -476,13 +472,25 @@ impl StoryExecutor {
     }
 }
 
+/// Check if a program exists in PATH (cross-platform)
+fn is_program_in_path(program: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    let check_cmd = "where";
+    #[cfg(not(target_os = "windows"))]
+    let check_cmd = "which";
+
+    Command::new(check_cmd)
+        .arg(program)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 /// Check if a specific agent CLI is available
 pub fn is_agent_available(agent: &str) -> bool {
-    Command::new("which")
-        .arg(agent)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    is_program_in_path(agent)
 }
 
 /// Detect the best available agent CLI
