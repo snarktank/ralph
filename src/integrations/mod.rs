@@ -5,9 +5,11 @@
 
 #![allow(unused_imports)]
 
+pub mod github;
 pub mod registry;
 pub mod traits;
 
+pub use github::{GitHubConfig, GitHubProjectsProvider};
 pub use registry::ProviderRegistry;
 pub use traits::{
     CreateItemRequest, FailureIssueRequest, ItemInfo, ItemStatus, ProjectTracker, TrackerError,
