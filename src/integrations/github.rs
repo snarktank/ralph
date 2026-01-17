@@ -194,6 +194,217 @@ impl GitHubProjectsProvider {
         )))
     }
 
+    /// Fetch the status field information from the project
+    ///
+    /// Returns the field ID and available status options
+    async fn fetch_status_field(&self, project_id: &str) -> TrackerResult<ProjectFieldInfo> {
+        let query = format!(
+            r#"query {{
+                node(id: "{project_id}") {{
+                    ... on ProjectV2 {{
+                        fields(first: 20) {{
+                            nodes {{
+                                ... on ProjectV2SingleSelectField {{
+                                    id
+                                    name
+                                    options {{
+                                        id
+                                        name
+                                    }}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }}"#,
+            project_id = project_id
+        );
+
+        let response: serde_json::Value = self
+            .client
+            .graphql(&serde_json::json!({ "query": query }))
+            .await
+            .map_err(|e| TrackerError::ApiError(format!("GraphQL query failed: {}", e)))?;
+
+        // Check for errors
+        if let Some(errors) = response.get("errors") {
+            let error_msg = errors
+                .as_array()
+                .and_then(|arr| arr.first())
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown GraphQL error");
+            return Err(TrackerError::ApiError(error_msg.to_string()));
+        }
+
+        // Find the Status field
+        let fields = response
+            .get("data")
+            .and_then(|d| d.get("node"))
+            .and_then(|n| n.get("fields"))
+            .and_then(|f| f.get("nodes"))
+            .and_then(|n| n.as_array())
+            .ok_or_else(|| TrackerError::ApiError("Failed to get project fields".to_string()))?;
+
+        for field in fields {
+            let field_name = field.get("name").and_then(|n| n.as_str()).unwrap_or("");
+
+            // Look for a field named "Status" (case-insensitive)
+            if field_name.eq_ignore_ascii_case("status") {
+                let field_id = field
+                    .get("id")
+                    .and_then(|i| i.as_str())
+                    .ok_or_else(|| TrackerError::ApiError("Status field missing ID".to_string()))?;
+
+                let options = field
+                    .get("options")
+                    .and_then(|o| o.as_array())
+                    .map(|opts| {
+                        opts.iter()
+                            .filter_map(|opt| {
+                                let id = opt.get("id").and_then(|i| i.as_str())?;
+                                let name = opt.get("name").and_then(|n| n.as_str())?;
+                                Some(FieldOption {
+                                    id: id.to_string(),
+                                    name: name.to_string(),
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                return Ok(ProjectFieldInfo {
+                    id: field_id.to_string(),
+                    name: field_name.to_string(),
+                    options,
+                });
+            }
+        }
+
+        Err(TrackerError::ItemNotFound(
+            "Status field not found in project".to_string(),
+        ))
+    }
+
+    /// Map ItemStatus to GitHub Project status option name
+    fn map_status_to_github(&self, status: ItemStatus) -> &'static str {
+        match status {
+            ItemStatus::Todo => "Todo",
+            ItemStatus::InProgress => "In Progress",
+            ItemStatus::InReview => "In Review",
+            ItemStatus::Done => "Done",
+            ItemStatus::Blocked => "Blocked",
+            ItemStatus::Cancelled => "Cancelled",
+        }
+    }
+
+    /// Find the option ID for a given status in the field info
+    fn find_status_option(
+        &self,
+        field_info: &ProjectFieldInfo,
+        status: ItemStatus,
+    ) -> TrackerResult<String> {
+        let github_status = self.map_status_to_github(status);
+
+        // Try exact match first
+        if let Some(option) = field_info.options.iter().find(|o| o.name == github_status) {
+            return Ok(option.id.clone());
+        }
+
+        // Try case-insensitive match
+        let github_status_lower = github_status.to_lowercase();
+        if let Some(option) = field_info
+            .options
+            .iter()
+            .find(|o| o.name.to_lowercase() == github_status_lower)
+        {
+            return Ok(option.id.clone());
+        }
+
+        // Try matching without spaces (e.g., "InProgress" vs "In Progress")
+        let github_status_no_spaces = github_status_lower.replace(' ', "");
+        if let Some(option) = field_info
+            .options
+            .iter()
+            .find(|o| o.name.to_lowercase().replace(' ', "") == github_status_no_spaces)
+        {
+            return Ok(option.id.clone());
+        }
+
+        Err(TrackerError::InvalidInput(format!(
+            "Status option '{}' not found in project. Available options: {}",
+            github_status,
+            field_info
+                .options
+                .iter()
+                .map(|o| o.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )))
+    }
+
+    /// Update a project item's field value using GraphQL mutation
+    async fn update_item_field_value(
+        &self,
+        project_id: &str,
+        item_id: &str,
+        field_id: &str,
+        option_id: &str,
+    ) -> TrackerResult<()> {
+        let mutation = format!(
+            r#"mutation {{
+                updateProjectV2ItemFieldValue(input: {{
+                    projectId: "{project_id}",
+                    itemId: "{item_id}",
+                    fieldId: "{field_id}",
+                    value: {{
+                        singleSelectOptionId: "{option_id}"
+                    }}
+                }}) {{
+                    projectV2Item {{
+                        id
+                    }}
+                }}
+            }}"#,
+            project_id = project_id,
+            item_id = item_id,
+            field_id = field_id,
+            option_id = option_id
+        );
+
+        let response: serde_json::Value = self
+            .client
+            .graphql(&serde_json::json!({ "query": mutation }))
+            .await
+            .map_err(|e| TrackerError::ApiError(format!("GraphQL mutation failed: {}", e)))?;
+
+        // Check for errors
+        if let Some(errors) = response.get("errors") {
+            let error_msg = errors
+                .as_array()
+                .and_then(|arr| arr.first())
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown GraphQL error");
+            return Err(TrackerError::ApiError(error_msg.to_string()));
+        }
+
+        // Verify the update was successful
+        if response
+            .get("data")
+            .and_then(|d| d.get("updateProjectV2ItemFieldValue"))
+            .and_then(|u| u.get("projectV2Item"))
+            .and_then(|p| p.get("id"))
+            .is_none()
+        {
+            return Err(TrackerError::ApiError(
+                "Failed to verify field update".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Add a draft item to the project using GraphQL addProjectV2DraftIssue mutation
     async fn add_draft_item(
         &self,
@@ -260,6 +471,26 @@ struct AddDraftItemResponse {
     item_id: String,
 }
 
+/// Information about a project field
+#[derive(Debug, Clone)]
+struct ProjectFieldInfo {
+    /// Field ID
+    id: String,
+    /// Field name
+    name: String,
+    /// Field options (for single select fields)
+    options: Vec<FieldOption>,
+}
+
+/// A single select field option
+#[derive(Debug, Clone)]
+struct FieldOption {
+    /// Option ID
+    id: String,
+    /// Option name
+    name: String,
+}
+
 /// Escape special characters for GraphQL string values
 fn escape_graphql_string(s: &str) -> String {
     s.replace('\\', "\\\\")
@@ -316,11 +547,25 @@ impl ProjectTracker for GitHubProjectsProvider {
         ))
     }
 
-    async fn update_status(&self, _item_id: &str, _status: ItemStatus) -> TrackerResult<ItemInfo> {
-        // Will be implemented in US-029
-        Err(TrackerError::ApiError(
-            "update_status not yet implemented".to_string(),
-        ))
+    async fn update_status(&self, item_id: &str, status: ItemStatus) -> TrackerResult<ItemInfo> {
+        // Fetch project ID
+        let project_id = self.fetch_project_id().await?;
+
+        // Fetch status field information
+        let status_field = self.fetch_status_field(&project_id).await?;
+
+        // Find the option ID for the requested status
+        let option_id = self.find_status_option(&status_field, status)?;
+
+        // Update the field value
+        self.update_item_field_value(&project_id, item_id, &status_field.id, &option_id)
+            .await?;
+
+        Ok(ItemInfo {
+            id: item_id.to_string(),
+            title: format!("Status updated to {}", self.map_status_to_github(status)),
+            url: None,
+        })
     }
 }
 
@@ -517,7 +762,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_status_not_implemented() {
+    async fn test_map_status_to_github() {
         let config = GitHubConfig::new(
             "test_token".to_string(),
             "owner".to_string(),
@@ -526,10 +771,180 @@ mod tests {
         );
         let provider = GitHubProjectsProvider::new(config).unwrap();
 
-        let result = provider.update_status("item-123", ItemStatus::Done).await;
+        assert_eq!(provider.map_status_to_github(ItemStatus::Todo), "Todo");
+        assert_eq!(
+            provider.map_status_to_github(ItemStatus::InProgress),
+            "In Progress"
+        );
+        assert_eq!(
+            provider.map_status_to_github(ItemStatus::InReview),
+            "In Review"
+        );
+        assert_eq!(provider.map_status_to_github(ItemStatus::Done), "Done");
+        assert_eq!(
+            provider.map_status_to_github(ItemStatus::Blocked),
+            "Blocked"
+        );
+        assert_eq!(
+            provider.map_status_to_github(ItemStatus::Cancelled),
+            "Cancelled"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_find_status_option_exact_match() {
+        let config = GitHubConfig::new(
+            "test_token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+            1,
+        );
+        let provider = GitHubProjectsProvider::new(config).unwrap();
+
+        let field_info = ProjectFieldInfo {
+            id: "PVTSSF_test".to_string(),
+            name: "Status".to_string(),
+            options: vec![
+                FieldOption {
+                    id: "opt_1".to_string(),
+                    name: "Todo".to_string(),
+                },
+                FieldOption {
+                    id: "opt_2".to_string(),
+                    name: "In Progress".to_string(),
+                },
+                FieldOption {
+                    id: "opt_3".to_string(),
+                    name: "Done".to_string(),
+                },
+            ],
+        };
+
+        let result = provider.find_status_option(&field_info, ItemStatus::Todo);
+        assert_eq!(result.unwrap(), "opt_1");
+
+        let result = provider.find_status_option(&field_info, ItemStatus::InProgress);
+        assert_eq!(result.unwrap(), "opt_2");
+
+        let result = provider.find_status_option(&field_info, ItemStatus::Done);
+        assert_eq!(result.unwrap(), "opt_3");
+    }
+
+    #[tokio::test]
+    async fn test_find_status_option_case_insensitive() {
+        let config = GitHubConfig::new(
+            "test_token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+            1,
+        );
+        let provider = GitHubProjectsProvider::new(config).unwrap();
+
+        let field_info = ProjectFieldInfo {
+            id: "PVTSSF_test".to_string(),
+            name: "Status".to_string(),
+            options: vec![
+                FieldOption {
+                    id: "opt_1".to_string(),
+                    name: "TODO".to_string(), // uppercase
+                },
+                FieldOption {
+                    id: "opt_2".to_string(),
+                    name: "in progress".to_string(), // lowercase
+                },
+            ],
+        };
+
+        let result = provider.find_status_option(&field_info, ItemStatus::Todo);
+        assert_eq!(result.unwrap(), "opt_1");
+
+        let result = provider.find_status_option(&field_info, ItemStatus::InProgress);
+        assert_eq!(result.unwrap(), "opt_2");
+    }
+
+    #[tokio::test]
+    async fn test_find_status_option_no_spaces() {
+        let config = GitHubConfig::new(
+            "test_token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+            1,
+        );
+        let provider = GitHubProjectsProvider::new(config).unwrap();
+
+        let field_info = ProjectFieldInfo {
+            id: "PVTSSF_test".to_string(),
+            name: "Status".to_string(),
+            options: vec![FieldOption {
+                id: "opt_1".to_string(),
+                name: "InProgress".to_string(), // no space
+            }],
+        };
+
+        let result = provider.find_status_option(&field_info, ItemStatus::InProgress);
+        assert_eq!(result.unwrap(), "opt_1");
+    }
+
+    #[tokio::test]
+    async fn test_find_status_option_not_found() {
+        let config = GitHubConfig::new(
+            "test_token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+            1,
+        );
+        let provider = GitHubProjectsProvider::new(config).unwrap();
+
+        let field_info = ProjectFieldInfo {
+            id: "PVTSSF_test".to_string(),
+            name: "Status".to_string(),
+            options: vec![FieldOption {
+                id: "opt_1".to_string(),
+                name: "Todo".to_string(),
+            }],
+        };
+
+        let result = provider.find_status_option(&field_info, ItemStatus::Done);
         assert!(result.is_err());
-        if let Err(TrackerError::ApiError(msg)) = result {
-            assert!(msg.contains("not yet implemented"));
+        if let Err(TrackerError::InvalidInput(msg)) = result {
+            assert!(msg.contains("Done"));
+            assert!(msg.contains("not found"));
+            assert!(msg.contains("Todo")); // Available options
         }
+    }
+
+    #[test]
+    fn test_project_field_info_construction() {
+        let field_info = ProjectFieldInfo {
+            id: "PVTSSF_abc123".to_string(),
+            name: "Status".to_string(),
+            options: vec![
+                FieldOption {
+                    id: "opt_1".to_string(),
+                    name: "Todo".to_string(),
+                },
+                FieldOption {
+                    id: "opt_2".to_string(),
+                    name: "Done".to_string(),
+                },
+            ],
+        };
+
+        assert_eq!(field_info.id, "PVTSSF_abc123");
+        assert_eq!(field_info.name, "Status");
+        assert_eq!(field_info.options.len(), 2);
+        assert_eq!(field_info.options[0].name, "Todo");
+        assert_eq!(field_info.options[1].name, "Done");
+    }
+
+    #[test]
+    fn test_field_option_construction() {
+        let option = FieldOption {
+            id: "opt_test".to_string(),
+            name: "In Progress".to_string(),
+        };
+
+        assert_eq!(option.id, "opt_test");
+        assert_eq!(option.name, "In Progress");
     }
 }
