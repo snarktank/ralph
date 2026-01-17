@@ -5,6 +5,7 @@ use std::path::PathBuf;
 mod integrations;
 mod mcp;
 mod quality;
+mod ui;
 
 use mcp::RalphMcpServer;
 

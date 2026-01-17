@@ -50,6 +50,12 @@ tower-http = { version = "0.6", features = ["trace", "cors"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Terminal UI dependencies
+console = "0.15"
+crossterm = "0.27"
+indicatif = "0.17"
+owo-colors = "4"
+
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"
