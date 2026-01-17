@@ -14,9 +14,22 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
-## Setup
+## Installation
 
-### Global Installation (Recommended)
+### Homebrew (macOS/Linux)
+
+```bash
+# Install directly from the repo
+brew install --HEAD kcirtapfromspace/ralph/ralph
+
+# Or tap first, then install
+brew tap kcirtapfromspace/ralph
+brew install ralph
+```
+
+Note: To set up the tap, create a repo named `homebrew-ralph` with the formula from `Formula/ralph.rb`.
+
+### Manual Installation
 
 Clone the repo and run the installer:
 
