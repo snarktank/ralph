@@ -1,0 +1,146 @@
+# Ralph Integration Configuration
+# ================================
+# Copy this file to `ralph-integrations.toml` and customize for your project.
+#
+# Environment Variable Syntax:
+#   Use ${VAR_NAME} to reference environment variables for sensitive values.
+#   Example: token = "${GITHUB_TOKEN}"
+#   This keeps secrets out of configuration files and version control.
+
+# -----------------------------------------------------------
+# GitHub Projects V2 Integration
+# -----------------------------------------------------------
+# Sync user stories with GitHub Projects for visual project management.
+# Requires a GitHub personal access token with these scopes:
+#   - repo (for issue creation)
+#   - project (read:project and write:project for Projects V2)
+#
+# Create a token at: https://github.com/settings/tokens
+# For fine-grained tokens, select: Repository access + Projects
+
+[github]
+# Personal access token (classic or fine-grained)
+# Use environment variable for security: token = "${GITHUB_TOKEN}"
+token = "${GITHUB_TOKEN}"
+
+# Repository owner (user or organization name)
+owner = "your-username"
+
+# Repository name
+repo = "your-repo"
+
+# Project number (found in the project URL: github.com/users/<user>/projects/<number>)
+# Set to 0 or omit to disable GitHub Projects sync
+project_number = 1
+
+# Optional: Create failure issues in the repository when stories fail
+# Default: true
+create_failure_issues = true
+
+# Optional: Label to apply to failure issues
+# Default: "ralph-failure"
+failure_issue_label = "ralph-failure"
+
+
+# -----------------------------------------------------------
+# Linear Integration
+# -----------------------------------------------------------
+# Sync user stories with Linear for issue tracking.
+# Requires a Linear API key from: Settings > API > Personal API keys
+#
+# Linear API documentation: https://developers.linear.app/docs/graphql/working-with-the-graphql-api
+
+[linear]
+# Linear API key
+# Use environment variable for security: api_key = "${LINEAR_API_KEY}"
+api_key = "${LINEAR_API_KEY}"
+
+# Team ID (found in team settings or via Linear API)
+# Run this GraphQL query to find your team ID:
+#   query { teams { nodes { id name } } }
+team_id = "your-team-id"
+
+# Optional: Default state for new issues (Linear state name)
+# If not specified, issues will be created in the team's default state
+# default_state = "Backlog"
+
+# Optional: Label to apply to Ralph-created issues
+# label_name = "ralph"
+
+
+# -----------------------------------------------------------
+# Sync Configuration
+# -----------------------------------------------------------
+# Control how Ralph synchronizes stories with external providers.
+
+[sync]
+# Enable bidirectional sync (external changes update PRD)
+# When true: Changes in GitHub/Linear are pulled back to the PRD
+# When false: PRD is the source of truth, external changes are overwritten
+# Default: false
+bidirectional = false
+
+# Conflict resolution strategy when bidirectional sync is enabled
+# Options:
+#   - "prd_wins": PRD changes overwrite external changes
+#   - "external_wins": External changes overwrite PRD changes
+#   - "manual": Conflicts are flagged for manual resolution
+#   - "newest_wins": Most recently modified version wins
+# Default: "manual"
+conflict_strategy = "manual"
+
+# Sync on story completion (automatically update external systems)
+# Default: true
+sync_on_completion = true
+
+# Create items for new stories automatically
+# Default: true
+auto_create_items = true
+
+# Update status when story passes/fails
+# Default: true
+sync_status = true
+
+
+# -----------------------------------------------------------
+# Webhook Configuration (Optional)
+# -----------------------------------------------------------
+# Configure webhooks to receive real-time updates from external providers.
+# This enables bidirectional sync without polling.
+
+[webhooks]
+# Enable webhook server
+# Default: false
+enabled = false
+
+# Port for webhook server to listen on
+# Default: 3000
+port = 3000
+
+# Bind address for webhook server
+# Default: "127.0.0.1"
+bind_address = "127.0.0.1"
+
+# GitHub webhook secret for signature verification
+# Use environment variable: secret = "${GITHUB_WEBHOOK_SECRET}"
+# Create a webhook at: https://github.com/<owner>/<repo>/settings/hooks
+github_secret = "${GITHUB_WEBHOOK_SECRET}"
+
+# Linear webhook signing secret for signature verification
+# Use environment variable: secret = "${LINEAR_WEBHOOK_SECRET}"
+# Create a webhook at: Settings > API > Webhooks
+linear_secret = "${LINEAR_WEBHOOK_SECRET}"
+
+
+# -----------------------------------------------------------
+# Provider Selection
+# -----------------------------------------------------------
+# Specify which provider to use as the primary sync target.
+
+[providers]
+# Active provider for syncing (github, linear, or none)
+# Default: "none"
+active = "none"
+
+# Fallback provider if primary fails
+# fallback = "linear"
