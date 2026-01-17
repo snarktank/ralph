@@ -7,9 +7,12 @@ license = "MIT"
 repository = "https://github.com/your-org/ralph"
 
 [dependencies]
+async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
 config = { version = "0.14", default-features = false, features = ["toml"] }
 regex = "1"
+rmcp = { version = "0.8", features = ["server", "transport-io", "macros"] }
+schemars = "1.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
