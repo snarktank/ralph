@@ -8,6 +8,7 @@
 mod colors;
 mod display;
 mod ghostty;
+mod help;
 mod interrupt;
 mod quality_gates;
 mod spinner;
@@ -20,6 +21,7 @@ pub use ghostty::{
     file_hyperlink, file_hyperlink_with_line, hyperlink, GhosttyFeatures, SyncGuard,
     TerminalCapabilities, TitleStatus,
 };
+pub use help::{BuildInfo, CommandInfo, HelpRenderer, COMMANDS, GLOBAL_OPTIONS, RALPH_BANNER};
 pub use interrupt::{
     is_globally_interrupted, render_interrupt_panel, reset_global_interrupt, InterruptHandler,
 };

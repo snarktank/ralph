@@ -26,7 +26,12 @@ pub struct StoryResult {
 
 impl StoryResult {
     /// Create a new story result.
-    pub fn new(id: impl Into<String>, title: impl Into<String>, passed: bool, iterations: u32) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        passed: bool,
+        iterations: u32,
+    ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
@@ -61,7 +66,12 @@ pub struct GateStatistics {
 
 impl GateStatistics {
     /// Create new gate statistics.
-    pub fn new(total_runs: u32, total_passes: u32, total_failures: u32, total_skipped: u32) -> Self {
+    pub fn new(
+        total_runs: u32,
+        total_passes: u32,
+        total_failures: u32,
+        total_skipped: u32,
+    ) -> Self {
         Self {
             total_runs,
             total_passes,
@@ -209,19 +219,21 @@ impl SummaryRenderer {
 
         // Banner content
         let (icon, message, color) = if summary.all_passed() {
-            ("✓", "All Stories Completed!".to_string(), self.theme.success)
+            (
+                "✓",
+                "All Stories Completed!".to_string(),
+                self.theme.success,
+            )
         } else {
             let failed = summary.stories_total() - summary.stories_passed();
-            (
-                "✗",
-                format!("{} Stories Failed", failed),
-                self.theme.error,
-            )
+            ("✗", format!("{} Stories Failed", failed), self.theme.error)
         };
 
         let banner_text = format!(" {} {} ", icon, message);
         let banner_padding = (inner_width.saturating_sub(banner_text.len())) / 2;
-        let banner_remainder = inner_width.saturating_sub(banner_text.len()).saturating_sub(banner_padding);
+        let banner_remainder = inner_width
+            .saturating_sub(banner_text.len())
+            .saturating_sub(banner_padding);
 
         output.push_str(&format!(
             "│{}{}{}│\n",
@@ -237,7 +249,9 @@ impl SummaryRenderer {
             summary.stories_total()
         );
         let subtitle_padding = (inner_width.saturating_sub(subtitle.len())) / 2;
-        let subtitle_remainder = inner_width.saturating_sub(subtitle.len()).saturating_sub(subtitle_padding);
+        let subtitle_remainder = inner_width
+            .saturating_sub(subtitle.len())
+            .saturating_sub(subtitle_padding);
 
         output.push_str(&format!(
             "│{}{}{}│\n",
@@ -274,16 +288,16 @@ impl SummaryRenderer {
 
         let header = format!(
             " {:<id_w$} {:<title_w$} {:>iter_w$} {:>status_w$} ",
-            "ID", "Title", "Iters", "Status",
+            "ID",
+            "Title",
+            "Iters",
+            "Status",
             id_w = id_col,
             title_w = title_col,
             iter_w = iter_col,
             status_w = status_col
         );
-        output.push_str(&format!(
-            "│{}│\n",
-            header.color(self.theme.muted)
-        ));
+        output.push_str(&format!("│{}│\n", header.color(self.theme.muted)));
         output.push_str(&format!("├{}┤\n", "─".repeat(inner_width)));
 
         // Story rows
@@ -357,7 +371,8 @@ impl SummaryRenderer {
         // Passes row
         let passes_label = "Passed:";
         let passes_value = format!("{}", stats.total_passes);
-        let passes_padding = inner_width.saturating_sub(passes_label.len() + passes_value.len() + 4);
+        let passes_padding =
+            inner_width.saturating_sub(passes_label.len() + passes_value.len() + 4);
         output.push_str(&format!(
             "│ {}{}{} │\n",
             passes_label.color(self.theme.muted),
@@ -368,7 +383,8 @@ impl SummaryRenderer {
         // Failures row
         let failures_label = "Failed:";
         let failures_value = format!("{}", stats.total_failures);
-        let failures_padding = inner_width.saturating_sub(failures_label.len() + failures_value.len() + 4);
+        let failures_padding =
+            inner_width.saturating_sub(failures_label.len() + failures_value.len() + 4);
         let failures_color = if stats.total_failures > 0 {
             self.theme.error
         } else {
@@ -384,7 +400,8 @@ impl SummaryRenderer {
         // Skipped row
         let skipped_label = "Skipped:";
         let skipped_value = format!("{}", stats.total_skipped);
-        let skipped_padding = inner_width.saturating_sub(skipped_label.len() + skipped_value.len() + 4);
+        let skipped_padding =
+            inner_width.saturating_sub(skipped_label.len() + skipped_value.len() + 4);
         output.push_str(&format!(
             "│ {}{}{} │\n",
             skipped_label.color(self.theme.muted),
@@ -428,7 +445,8 @@ impl SummaryRenderer {
         // Duration row
         let duration_label = "Total Duration:";
         let duration_value = Self::format_duration(summary.duration);
-        let duration_padding = inner_width.saturating_sub(duration_label.len() + duration_value.len() + 4);
+        let duration_padding =
+            inner_width.saturating_sub(duration_label.len() + duration_value.len() + 4);
         output.push_str(&format!(
             "│ {}{}{} │\n",
             duration_label.color(self.theme.muted),
@@ -450,7 +468,8 @@ impl SummaryRenderer {
         // Commits row
         let commits_label = "Commits Created:";
         let commits_value = format!("{}", summary.commit_count);
-        let commits_padding = inner_width.saturating_sub(commits_label.len() + commits_value.len() + 4);
+        let commits_padding =
+            inner_width.saturating_sub(commits_label.len() + commits_value.len() + 4);
         output.push_str(&format!(
             "│ {}{}{} │\n",
             commits_label.color(self.theme.muted),
@@ -596,32 +615,50 @@ mod tests {
 
     #[test]
     fn test_format_duration_seconds() {
-        assert_eq!(SummaryRenderer::format_duration(Duration::from_secs(45)), "45s");
+        assert_eq!(
+            SummaryRenderer::format_duration(Duration::from_secs(45)),
+            "45s"
+        );
     }
 
     #[test]
     fn test_format_duration_minutes() {
-        assert_eq!(SummaryRenderer::format_duration(Duration::from_secs(330)), "5m 30s");
+        assert_eq!(
+            SummaryRenderer::format_duration(Duration::from_secs(330)),
+            "5m 30s"
+        );
     }
 
     #[test]
     fn test_format_duration_hours() {
-        assert_eq!(SummaryRenderer::format_duration(Duration::from_secs(5025)), "1h 23m 45s");
+        assert_eq!(
+            SummaryRenderer::format_duration(Duration::from_secs(5025)),
+            "1h 23m 45s"
+        );
     }
 
     #[test]
     fn test_format_duration_zero() {
-        assert_eq!(SummaryRenderer::format_duration(Duration::from_secs(0)), "< 1s");
+        assert_eq!(
+            SummaryRenderer::format_duration(Duration::from_secs(0)),
+            "< 1s"
+        );
     }
 
     #[test]
     fn test_format_duration_exact_hour() {
-        assert_eq!(SummaryRenderer::format_duration(Duration::from_secs(3600)), "1h");
+        assert_eq!(
+            SummaryRenderer::format_duration(Duration::from_secs(3600)),
+            "1h"
+        );
     }
 
     #[test]
     fn test_format_duration_exact_minute() {
-        assert_eq!(SummaryRenderer::format_duration(Duration::from_secs(60)), "1m");
+        assert_eq!(
+            SummaryRenderer::format_duration(Duration::from_secs(60)),
+            "1m"
+        );
     }
 
     #[test]

@@ -8,7 +8,7 @@ mod quality;
 mod ui;
 
 use mcp::RalphMcpServer;
-use ui::{DisplayOptions, UiMode};
+use ui::{DisplayOptions, HelpRenderer, UiMode};
 
 /// UI mode for terminal display
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
@@ -36,6 +36,8 @@ impl From<CliUiMode> for UiMode {
 #[command(name = "ralph")]
 #[command(version)]
 #[command(about = "Enterprise-ready autonomous AI agent framework")]
+#[command(disable_help_flag = true)]
+#[command(disable_version_flag = true)]
 struct Cli {
     /// UI mode: auto (default), enabled, or disabled
     #[arg(long, default_value = "auto", value_enum)]
@@ -49,19 +51,36 @@ struct Cli {
     #[arg(long, short)]
     quiet: bool,
 
+    /// Print help information with styled output
+    #[arg(long, short)]
+    help: bool,
+
+    /// Print version information with build details
+    #[arg(long, short = 'V')]
+    version: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(clap::Subcommand, Debug)]
+#[command(subcommand_negates_reqs = true)]
 enum Commands {
     /// Run quality checks
-    Quality,
+    Quality {
+        /// Print help information
+        #[arg(long, short)]
+        help: bool,
+    },
     /// Start MCP server mode for integration with AI assistants
     McpServer {
         /// Path to PRD file to preload (optional)
         #[arg(long)]
         prd: Option<PathBuf>,
+
+        /// Print help information
+        #[arg(long, short)]
+        help: bool,
     },
 }
 
@@ -80,15 +99,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build display options from CLI flags
     let display_options = build_display_options(&cli);
 
+    // Create help renderer with color settings
+    let help_renderer =
+        HelpRenderer::new().with_color(!cli.no_color && std::env::var("NO_COLOR").is_err());
+
+    // Handle --help flag with styled output
+    if cli.help {
+        print!("{}", help_renderer.render_help());
+        return Ok(());
+    }
+
+    // Handle --version flag with styled output
+    if cli.version {
+        print!("{}", help_renderer.render_version());
+        return Ok(());
+    }
+
     match cli.command {
-        Some(Commands::Quality) => {
+        Some(Commands::Quality { help: true }) => {
+            println!("Run quality checks (typecheck, lint, test)");
+            println!();
+            println!("Usage: ralph quality");
+            println!();
+            println!("Options:");
+            println!("  -h, --help  Print help information");
+            return Ok(());
+        }
+        Some(Commands::Quality { help: false }) => {
             // Initialize logging to stdout for quality checks (unless quiet)
             if !cli.quiet {
                 tracing_subscriber::fmt::init();
                 println!("Running quality checks...");
             }
         }
-        Some(Commands::McpServer { prd }) => {
+        Some(Commands::McpServer { help: true, .. }) => {
+            println!("Start MCP server mode for integration with AI assistants");
+            println!();
+            println!("Usage: ralph mcp-server [OPTIONS]");
+            println!();
+            println!("Options:");
+            println!("  --prd <FILE>  Path to PRD file to preload (optional)");
+            println!("  -h, --help    Print help information");
+            return Ok(());
+        }
+        Some(Commands::McpServer { prd, help: false }) => {
             // Configure logging to stderr only for MCP server mode
             // (stdout is reserved for MCP protocol communication)
             if !cli.quiet {

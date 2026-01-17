@@ -574,14 +574,33 @@ impl RalphDisplay {
     fn detect_transition(&self, new_state: &ExecutionState) -> StateTransition {
         match (&self.last_state, new_state) {
             // Transition to Running
-            (None | Some(ExecutionState::Idle), ExecutionState::Running { story_id, max_iterations, .. })
-            | (Some(ExecutionState::Completed { .. }), ExecutionState::Running { story_id, max_iterations, .. })
-            | (Some(ExecutionState::Failed { .. }), ExecutionState::Running { story_id, max_iterations, .. }) => {
-                StateTransition::ToRunning {
-                    story_id: story_id.clone(),
-                    max_iterations: *max_iterations,
-                }
-            }
+            (
+                None | Some(ExecutionState::Idle),
+                ExecutionState::Running {
+                    story_id,
+                    max_iterations,
+                    ..
+                },
+            )
+            | (
+                Some(ExecutionState::Completed { .. }),
+                ExecutionState::Running {
+                    story_id,
+                    max_iterations,
+                    ..
+                },
+            )
+            | (
+                Some(ExecutionState::Failed { .. }),
+                ExecutionState::Running {
+                    story_id,
+                    max_iterations,
+                    ..
+                },
+            ) => StateTransition::ToRunning {
+                story_id: story_id.clone(),
+                max_iterations: *max_iterations,
+            },
             // Iteration update (still running)
             (
                 Some(ExecutionState::Running {
@@ -598,12 +617,16 @@ impl RalphDisplay {
                 max: *max_iterations,
             },
             // Transition to Completed
-            (Some(ExecutionState::Running { .. }), ExecutionState::Completed { story_id, commit_hash }) => {
-                StateTransition::ToCompleted {
-                    story_id: story_id.clone(),
-                    commit_hash: commit_hash.clone(),
-                }
-            }
+            (
+                Some(ExecutionState::Running { .. }),
+                ExecutionState::Completed {
+                    story_id,
+                    commit_hash,
+                },
+            ) => StateTransition::ToCompleted {
+                story_id: story_id.clone(),
+                commit_hash: commit_hash.clone(),
+            },
             // Transition to Failed
             (Some(ExecutionState::Running { .. }), ExecutionState::Failed { story_id, error }) => {
                 StateTransition::ToFailed {
@@ -640,7 +663,9 @@ impl RalphDisplay {
 
         // Display the story panel if info is available
         if let Some(info) = story_info {
-            let panel = self.story_view.render_current_story(info, StoryViewState::InProgress);
+            let panel = self
+                .story_view
+                .render_current_story(info, StoryViewState::InProgress);
             println!("{}", panel);
         }
 
@@ -685,7 +710,8 @@ impl RalphDisplay {
         // Record the story result
         let iterations = self.current_iteration() as u32;
         let title = story_info.map(|i| i.title.clone()).unwrap_or_default();
-        self.story_results.push(StoryResult::passed(story_id, title, iterations));
+        self.story_results
+            .push(StoryResult::passed(story_id, title, iterations));
 
         // Increment commit count if we have a commit
         if commit_hash.is_some() {
@@ -694,28 +720,23 @@ impl RalphDisplay {
 
         // Display completed story panel
         if let Some(info) = story_info {
-            let panel = self.story_view.render_current_story(info, StoryViewState::Completed);
+            let panel = self
+                .story_view
+                .render_current_story(info, StoryViewState::Completed);
             println!("{}", panel);
         }
 
         // Update terminal title
-        let _ = self.ghostty.update_title(
-            Some(story_id),
-            None,
-            TitleStatus::Success,
-        );
+        let _ = self
+            .ghostty
+            .update_title(Some(story_id), None, TitleStatus::Success);
 
         // Clear the current story
         self.clear_current_story();
     }
 
     /// Handle transition to Failed state.
-    fn handle_failed(
-        &mut self,
-        story_id: &str,
-        error: &str,
-        story_info: Option<&StoryInfo>,
-    ) {
+    fn handle_failed(&mut self, story_id: &str, error: &str, story_info: Option<&StoryInfo>) {
         // Stop the spinner with error
         self.stop_spinner_with_error(format!("Story {} failed: {}", story_id, error));
 
@@ -725,20 +746,21 @@ impl RalphDisplay {
         // Record the story result
         let iterations = self.current_iteration() as u32;
         let title = story_info.map(|i| i.title.clone()).unwrap_or_default();
-        self.story_results.push(StoryResult::failed(story_id, title, iterations));
+        self.story_results
+            .push(StoryResult::failed(story_id, title, iterations));
 
         // Display failed story panel
         if let Some(info) = story_info {
-            let panel = self.story_view.render_current_story(info, StoryViewState::Failed);
+            let panel = self
+                .story_view
+                .render_current_story(info, StoryViewState::Failed);
             println!("{}", panel);
         }
 
         // Update terminal title
-        let _ = self.ghostty.update_title(
-            Some(story_id),
-            None,
-            TitleStatus::Failed,
-        );
+        let _ = self
+            .ghostty
+            .update_title(Some(story_id), None, TitleStatus::Failed);
 
         // Clear the current story
         self.clear_current_story();
@@ -816,7 +838,8 @@ impl RalphDisplay {
     /// Shows comprehensive results including story outcomes,
     /// quality gate statistics, and execution metrics.
     pub fn display_summary(&self) {
-        let duration = self.execution_start
+        let duration = self
+            .execution_start
             .map(|start| start.elapsed())
             .unwrap_or(Duration::ZERO);
 
@@ -840,7 +863,11 @@ impl RalphDisplay {
     pub fn trigger_completion_summary(&self) {
         // Update terminal title to show completion
         let all_passed = self.story_results.iter().all(|s| s.passed);
-        let status = if all_passed { TitleStatus::Success } else { TitleStatus::Failed };
+        let status = if all_passed {
+            TitleStatus::Success
+        } else {
+            TitleStatus::Failed
+        };
         let _ = self.ghostty.update_title(None, None, status);
 
         // Display the summary
@@ -904,20 +931,14 @@ enum StateTransition {
         max_iterations: u32,
     },
     /// Iteration count updated while running
-    IterationUpdate {
-        iteration: u32,
-        max: u32,
-    },
+    IterationUpdate { iteration: u32, max: u32 },
     /// Transitioning to Completed state
     ToCompleted {
         story_id: String,
         commit_hash: Option<String>,
     },
     /// Transitioning to Failed state
-    ToFailed {
-        story_id: String,
-        error: String,
-    },
+    ToFailed { story_id: String, error: String },
     /// Transitioning to Idle state
     ToIdle,
     /// No transition (same state)
