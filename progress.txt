@@ -10,9 +10,9 @@ Branch: ralph/terminal-ux-enhancement
 - Use `cargo clippy -- -D warnings` for linting
 - Use `cargo fmt` for formatting
 - Alphabetical ordering for imports and module declarations
-- The Ralph code lives at `/Users/thinkstudio/ralph`, task management at `/Users/thinkstudio/ralphmacchio`
 - Ralph uses `main.rs` as the root module (no lib.rs) - declare new modules in main.rs
-- Working branch: `ralph/terminal-ux-enhancement-v2` (branched from `ralph/enterprise-expansion`)
+- Implementation branch: `ralph/terminal-ux-enhancement-v2` (actual code, branched from `ralph/enterprise-expansion`)
+- Tracking branch: `ralph/terminal-ux-enhancement` (PRD and progress docs)
 
 ### MCP Tool Registration Pattern
 Requires 3 components:

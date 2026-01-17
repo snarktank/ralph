@@ -64,7 +64,7 @@ This section documents the `ralph/terminal-ux-enhancement` branch for creating a
 ### Directory Structure
 
 ```
-/Users/thinkstudio/ralph/          # Rust source code
+<project-root>/                    # Rust source code
 ├── src/
 │   ├── main.rs                    # CLI entry point
 │   ├── mcp/                       # MCP server implementation
@@ -84,12 +84,10 @@ This section documents the `ralph/terminal-ux-enhancement` branch for creating a
 │       ├── ghostty.rs
 │       └── help.rs
 ├── Cargo.toml
-└── tests/
-
-/Users/thinkstudio/ralphmacchio/   # Task management
-├── prd.json                       # User stories for this branch
+├── prd.json                       # User stories
 ├── progress.txt                   # Implementation log
-└── AGENTS.md                      # This file
+├── AGENTS.md                      # This file
+└── tests/
 ```
 
 ### Coding Standards
