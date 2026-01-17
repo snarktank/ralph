@@ -3,9 +3,12 @@
 
 #![allow(dead_code)]
 
+use crate::mcp::tools::list_stories::{load_stories, ListStoriesRequest, ListStoriesResponse};
 use crate::quality::QualityConfig;
+use rmcp::handler::server::router::tool::ToolRouter;
+use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
-use rmcp::ServerHandler;
+use rmcp::{tool, tool_handler, tool_router, ServerHandler};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
@@ -89,6 +92,8 @@ pub struct RalphMcpServer {
     cancel_sender: Arc<watch::Sender<bool>>,
     /// Cancellation signal receiver - tools check this to know if cancelled
     cancel_receiver: watch::Receiver<bool>,
+    /// Tool router for MCP tools
+    tool_router: ToolRouter<Self>,
 }
 
 impl RalphMcpServer {
@@ -108,6 +113,7 @@ impl RalphMcpServer {
             config: Arc::new(None),
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
+            tool_router: Self::tool_router(),
         }
     }
 
@@ -135,6 +141,7 @@ impl RalphMcpServer {
             config: Arc::new(None),
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
+            tool_router: Self::tool_router(),
         }
     }
 
@@ -160,6 +167,7 @@ impl RalphMcpServer {
             config: Arc::new(Some(config)),
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
+            tool_router: Self::tool_router(),
         }
     }
 
@@ -219,10 +227,70 @@ impl Default for RalphMcpServer {
     }
 }
 
+/// MCP tool implementations for RalphMcpServer.
+///
+/// This impl block contains all the MCP tools exposed by the server.
+/// Tools are registered using the `#[tool]` attribute macro from rmcp.
+#[tool_router]
+impl RalphMcpServer {
+    /// List stories from the loaded PRD.
+    ///
+    /// This tool returns a list of user stories from the currently loaded PRD file.
+    /// Stories can be filtered by their pass/fail status using the optional status_filter parameter.
+    ///
+    /// # Parameters
+    ///
+    /// * `status_filter` - Optional filter: "passing" for stories where passes=true,
+    ///   "failing" for stories where passes=false, or omit for all stories.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `stories`: Array of {id, title, passes} objects
+    /// - `count`: Total number of stories returned
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if:
+    /// - No PRD is loaded
+    /// - The PRD file cannot be read
+    /// - The PRD JSON is invalid
+    #[tool(
+        name = "list_stories",
+        description = "List user stories from the loaded PRD. Returns an array of story objects with id, title, and passes status. Optionally filter by 'passing' or 'failing' status."
+    )]
+    pub async fn list_stories(&self, Parameters(req): Parameters<ListStoriesRequest>) -> String {
+        // Get the PRD path from state
+        let prd_path = {
+            let state = self.state.read().await;
+            state.prd_path.clone()
+        };
+
+        match prd_path {
+            Some(path) => {
+                match load_stories(&path, req.status_filter.as_deref()) {
+                    Ok(response) => {
+                        // Serialize the response to JSON
+                        serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                        })
+                    }
+                    Err(e) => {
+                        format!("{{\"error\": \"{}\"}}", e)
+                    }
+                }
+            }
+            None => r#"{"error": "No PRD loaded. Use load_prd tool to load a PRD file first."}"#
+                .to_string(),
+        }
+    }
+}
+
 /// Implementation of the MCP ServerHandler trait for RalphMcpServer.
 ///
 /// This implementation provides the server information including name, version,
 /// and enabled capabilities (tools and resources).
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for RalphMcpServer {
     /// Returns server information for MCP initialization.
     ///
