@@ -8,3 +8,7 @@ progress.txt
 
 # OS files
 .DS_Store
+
+# Rust build artifacts
+cli/target/
+bin/ralph

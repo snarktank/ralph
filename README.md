@@ -11,7 +11,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 ## Prerequisites
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
+- [Rust](https://rustup.rs) (for building from source)
 - A git repository for your project
 
 ## Installation
@@ -22,21 +22,27 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 brew install --HEAD https://raw.githubusercontent.com/kcirtapfromspace/ralph/main/Formula/ralph.rb
 ```
 
-### Manual Installation
+### Build from Source
 
-Clone the repo and run the installer:
+Requires [Rust](https://rustup.rs) to be installed.
 
 ```bash
-git clone https://github.com/kcirtapfromspace/ralph.git
-cd ralph
+git clone https://github.com/kcirtapfromspace/ralph.git ~/.ralph
+cd ~/.ralph
 ./install.sh
 ```
 
-This creates a symlink in `/usr/local/bin`. For a different location:
+This builds the Rust binary and installs it to `/usr/local/bin`. For a different location:
 
 ```bash
 ./install.sh ~/bin        # Install to ~/bin
 sudo ./install.sh         # If you need sudo for /usr/local/bin
+```
+
+Then add to your shell config (`~/.bashrc`, `~/.zshrc`):
+
+```bash
+export RALPH_HOME="$HOME/.ralph"
 ```
 
 To uninstall:
@@ -44,35 +50,28 @@ To uninstall:
 ./uninstall.sh
 ```
 
-### Alternative: Copy to project
-
-If you prefer to keep ralph in your project:
-
-```bash
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
-chmod +x scripts/ralph/ralph.sh
-```
-
 ## Usage
 
 ```bash
-ralph [OPTIONS] [max_iterations]
+ralph [OPTIONS] [MAX_ITERATIONS]
+ralph <COMMAND>
+
+Commands:
+  init    Initialize project with prd.json template
+  home    Show Ralph installation directory
 
 Options:
-  -d, --dir <path>       Working directory (default: current directory)
-  -p, --prompt <file>    Custom prompt file
-  -n, --iterations <n>   Max iterations (default: 10)
-  -i, --init             Initialize project with prd.json template
+  -d, --dir <PATH>       Working directory (default: current directory)
+  -p, --prompt <FILE>    Custom prompt file
+  -n, --iterations <N>   Max iterations (default: 10)
   -h, --help             Show help
-  -v, --version          Show version
+  -V, --version          Show version
 
 Examples:
   ralph                  Run in current directory with defaults
   ralph 20               Run with 20 max iterations
   ralph -d ./my-project  Run in specified directory
-  ralph --init           Create prd.json template
+  ralph init             Create prd.json template
 ```
 
 ## Workflow
