@@ -1,0 +1,687 @@
+{
+  "project": "Ralph",
+  "branchName": "ralph/enterprise-expansion",
+  "description": "Expand Ralph into an enterprise-ready autonomous AI agent framework with MCP server, project management integration, configurable quality profiles, and blog generation",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create expanded directory structure",
+      "description": "As a developer, I need the new directory structure for the expanded features.",
+      "acceptanceCriteria": [
+        "Create src/mcp/ directory",
+        "Create src/integrations/ directory",
+        "Create src/quality/ directory",
+        "Create docs/architecture/diagrams/ directory",
+        "Create docs/architecture/adr/ directory",
+        "Create docs/blog/templates/ directory",
+        "Create docs/blog/posts/ directory",
+        "Create docs/guides/ directory",
+        "Create quality/ directory",
+        "Create tests/unit/ directory",
+        "Create tests/integration/ directory",
+        "Create tests/fixtures/ directory",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create CI workflow for linting and formatting",
+      "description": "As a developer, I want automated format and lint checks on every PR.",
+      "acceptanceCriteria": [
+        "Create .github/workflows/ci.yml",
+        "Add job for cargo fmt --check",
+        "Add job for cargo clippy with -D warnings",
+        "Workflow triggers on push and pull_request",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Add CI jobs for testing and building",
+      "description": "As a developer, I want automated tests and builds in CI.",
+      "acceptanceCriteria": [
+        "Add test job running cargo test",
+        "Add build job running cargo build --release",
+        "Run on ubuntu-latest, macos-latest, windows-latest matrix",
+        "Add CI badge to README.md",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create ADR template and first ADR",
+      "description": "As a developer, I want a template for architecture decision records.",
+      "acceptanceCriteria": [
+        "Create docs/architecture/adr/template.md with Status, Date, Context, Decision, Consequences sections",
+        "Create docs/architecture/adr/0001-record-architecture-decisions.md",
+        "ADR 0001 explains why we use ADRs",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create system overview Mermaid diagram",
+      "description": "As a developer, I want a visual overview of the Ralph architecture.",
+      "acceptanceCriteria": [
+        "Create docs/architecture/diagrams/system-overview.mmd",
+        "Diagram shows: CLI, Agent Engine, MCP Server, Quality Framework, Integrations",
+        "Use Mermaid graph TB syntax",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Create quality profiles TOML configuration",
+      "description": "As a developer, I need a configuration file defining quality profiles.",
+      "acceptanceCriteria": [
+        "Create quality/ralph-quality.toml",
+        "Define minimal profile: coverage=0, no security, unit tests only",
+        "Define standard profile: coverage=70, cargo-audit, unit+integration tests",
+        "Define comprehensive profile: coverage=90, full SAST, all tests, blog generation",
+        "Each profile has documentation, testing, ci, security, blog sections",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create quality module with profile structs",
+      "description": "As a developer, I need Rust structs to represent quality profiles.",
+      "acceptanceCriteria": [
+        "Create src/quality/mod.rs exporting profiles module",
+        "Create src/quality/profiles.rs with QualityConfig, Profile, ProfileLevel structs",
+        "Add serde Deserialize derives for TOML parsing",
+        "ProfileLevel enum: Minimal, Standard, Comprehensive",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Implement quality config loading",
+      "description": "As a developer, I need to load quality config from file.",
+      "acceptanceCriteria": [
+        "Add config crate dependency",
+        "Implement QualityConfig::load(path) function",
+        "Support environment variable overrides with RALPH_ prefix",
+        "Return Result with descriptive errors",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Create quality gate checker module",
+      "description": "As a developer, I need code to run individual quality gates.",
+      "acceptanceCriteria": [
+        "Create src/quality/gates.rs",
+        "Define GateResult struct with: gate_name, passed, message, details",
+        "Define QualityGateChecker struct",
+        "Implement run_all() method that returns Vec<GateResult>",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Implement coverage gate",
+      "description": "As a developer, I need a gate that checks code coverage threshold.",
+      "acceptanceCriteria": [
+        "Add check_coverage() method to QualityGateChecker",
+        "Run cargo llvm-cov or cargo tarpaulin",
+        "Compare result against profile threshold",
+        "Return GateResult with pass/fail and coverage percentage",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Implement lint and format gates",
+      "description": "As a developer, I need gates for linting and formatting.",
+      "acceptanceCriteria": [
+        "Add check_lint() method running cargo clippy",
+        "Add check_format() method running cargo fmt --check",
+        "Both return GateResult with pass/fail",
+        "Capture stderr for error details",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Implement security audit gate",
+      "description": "As a developer, I need a gate that runs security audits.",
+      "acceptanceCriteria": [
+        "Add check_security_audit() method",
+        "Run cargo audit command",
+        "Parse output for vulnerabilities",
+        "Return GateResult indicating if vulnerabilities found",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Add MCP dependencies to Cargo.toml",
+      "description": "As a developer, I need MCP SDK and related crates added.",
+      "acceptanceCriteria": [
+        "Add rmcp = { version = \"0.8\", features = [\"server\", \"transport-io\", \"macros\"] }",
+        "Add schemars = \"1.0\"",
+        "Add async-trait = \"0.1\"",
+        "Ensure tokio has full features",
+        "cargo build succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Create MCP server module structure",
+      "description": "As a developer, I need the MCP module scaffolding.",
+      "acceptanceCriteria": [
+        "Create src/mcp/mod.rs exporting server, tools, resources modules",
+        "Create src/mcp/server.rs with placeholder RalphMcpServer struct",
+        "Create src/mcp/tools/mod.rs",
+        "Create src/mcp/resources/mod.rs",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Implement RalphMcpServer struct with state",
+      "description": "As a developer, I need the MCP server struct with shared state.",
+      "acceptanceCriteria": [
+        "RalphMcpServer has fields: prd_path, execution_state, config, cancel_handle",
+        "Use Arc<RwLock<_>> for shared state",
+        "Define ExecutionState enum: Idle, Running, Completed, Failed",
+        "Implement new() constructor",
+        "Typecheck passes"
+      ],
+      "priority": 15,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Implement ServerHandler trait for RalphMcpServer",
+      "description": "As a developer, I need to implement the rmcp ServerHandler trait.",
+      "acceptanceCriteria": [
+        "Implement ServerHandler trait for RalphMcpServer",
+        "get_info() returns ServerInfo with name='ralph', version from Cargo.toml",
+        "Enable tools and resources capabilities",
+        "Typecheck passes"
+      ],
+      "priority": 16,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Implement list_stories MCP tool",
+      "description": "As a user, I want to list PRD stories via MCP.",
+      "acceptanceCriteria": [
+        "Create src/mcp/tools/list_stories.rs",
+        "Tool accepts optional status_filter parameter",
+        "Returns JSON array of {id, title, passes} objects",
+        "Register tool with #[tool] macro",
+        "Typecheck passes"
+      ],
+      "priority": 17,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Implement get_status MCP tool",
+      "description": "As a user, I want to check Ralph execution status via MCP.",
+      "acceptanceCriteria": [
+        "Create src/mcp/tools/get_status.rs",
+        "Returns current ExecutionState as JSON",
+        "Include timestamp and progress info for Running state",
+        "Register tool with #[tool] macro",
+        "Typecheck passes"
+      ],
+      "priority": 18,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Implement load_prd MCP tool",
+      "description": "As a user, I want to load a PRD file via MCP.",
+      "acceptanceCriteria": [
+        "Create src/mcp/tools/load_prd.rs",
+        "Tool accepts path parameter",
+        "Validates PRD JSON structure",
+        "Returns story count on success, error message on failure",
+        "Updates server prd_path state",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Implement run_story MCP tool",
+      "description": "As a user, I want to execute a story via MCP.",
+      "acceptanceCriteria": [
+        "Create src/mcp/tools/run_story.rs",
+        "Tool accepts story_id and optional max_iterations",
+        "Prevents concurrent execution (return error if already running)",
+        "Updates execution_state during run",
+        "Returns result with commit hash on success",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Implement stop_execution MCP tool",
+      "description": "As a user, I want to cancel execution via MCP.",
+      "acceptanceCriteria": [
+        "Create src/mcp/tools/stop_execution.rs",
+        "Uses cancel_handle to signal cancellation",
+        "Returns confirmation message",
+        "Returns appropriate message if nothing is running",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Implement MCP resources",
+      "description": "As a user, I want to read Ralph state via MCP resources.",
+      "acceptanceCriteria": [
+        "Implement list_resources() returning available resources",
+        "Implement read_resource() for ralph://prd/current",
+        "Implement read_resource() for ralph://status",
+        "Resources return proper MIME types",
+        "Typecheck passes"
+      ],
+      "priority": 22,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "Add mcp-server CLI subcommand",
+      "description": "As a user, I want to start Ralph in MCP server mode.",
+      "acceptanceCriteria": [
+        "Add McpServer variant to CLI Commands enum",
+        "Accept optional --prd flag to preload PRD",
+        "Start server using stdio transport",
+        "Configure logging to stderr only",
+        "Typecheck passes"
+      ],
+      "priority": 23,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Create Claude Desktop setup guide",
+      "description": "As a user, I want documentation for Claude Desktop integration.",
+      "acceptanceCriteria": [
+        "Create docs/guides/claude-desktop-setup.md",
+        "Include example claude_desktop_config.json snippet",
+        "Document environment variables",
+        "Add troubleshooting section",
+        "Typecheck passes"
+      ],
+      "priority": 24,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-025",
+      "title": "Create ProjectTracker trait",
+      "description": "As a developer, I need an abstraction for project management providers.",
+      "acceptanceCriteria": [
+        "Create src/integrations/mod.rs",
+        "Create src/integrations/traits.rs",
+        "Define ProjectTracker trait with async methods",
+        "Methods: create_item, update_item, create_failure_issue, add_comment, update_status",
+        "Define ItemStatus enum",
+        "Typecheck passes"
+      ],
+      "priority": 25,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Create provider registry",
+      "description": "As a developer, I need to manage multiple providers.",
+      "acceptanceCriteria": [
+        "Create src/integrations/registry.rs",
+        "ProviderRegistry struct with HashMap of providers",
+        "register() method to add provider",
+        "set_active() and get_active() methods",
+        "Typecheck passes"
+      ],
+      "priority": 26,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-027",
+      "title": "Add GitHub API dependencies",
+      "description": "As a developer, I need GitHub API crate added.",
+      "acceptanceCriteria": [
+        "Add octocrab crate for GitHub REST/GraphQL",
+        "Add graphql_client for custom queries",
+        "cargo build succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 27,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-028",
+      "title": "Implement GitHub provider - create item",
+      "description": "As a developer, I need to create GitHub Project items.",
+      "acceptanceCriteria": [
+        "Create src/integrations/github.rs",
+        "GitHubProjectsProvider struct with Octocrab client",
+        "Implement create_item() using GraphQL addProjectV2DraftIssue",
+        "Return item ID on success",
+        "Typecheck passes"
+      ],
+      "priority": 28,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-029",
+      "title": "Implement GitHub provider - update status",
+      "description": "As a developer, I need to update GitHub Project item status.",
+      "acceptanceCriteria": [
+        "Implement update_status() using updateProjectV2ItemFieldValue",
+        "Map ItemStatus enum to GitHub status field options",
+        "Handle status field ID lookup",
+        "Typecheck passes"
+      ],
+      "priority": 29,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-030",
+      "title": "Implement GitHub provider - failure issue",
+      "description": "As a developer, I need to create issues for failed stories.",
+      "acceptanceCriteria": [
+        "Implement create_failure_issue() using REST API",
+        "Issue title: [Ralph Failure] {story title}",
+        "Issue body includes error details and story context",
+        "Add ralph-failure label",
+        "Typecheck passes"
+      ],
+      "priority": 30,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-031",
+      "title": "Add Linear API dependencies",
+      "description": "As a developer, I need Linear API crates added.",
+      "acceptanceCriteria": [
+        "Add reqwest for HTTP requests",
+        "Configure for Linear GraphQL endpoint",
+        "cargo build succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 31,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-032",
+      "title": "Implement Linear provider - create issue",
+      "description": "As a developer, I need to create Linear issues.",
+      "acceptanceCriteria": [
+        "Create src/integrations/linear.rs",
+        "LinearProvider struct with reqwest client",
+        "Implement create_item() using issueCreate mutation",
+        "Return issue ID on success",
+        "Typecheck passes"
+      ],
+      "priority": 32,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-033",
+      "title": "Implement Linear provider - update and comments",
+      "description": "As a developer, I need to update Linear issues and add comments.",
+      "acceptanceCriteria": [
+        "Implement update_status() using issueUpdate mutation",
+        "Map ItemStatus to Linear state IDs",
+        "Implement add_comment() using commentCreate mutation",
+        "Typecheck passes"
+      ],
+      "priority": 33,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-034",
+      "title": "Create integration configuration file",
+      "description": "As a user, I need a config file for provider settings.",
+      "acceptanceCriteria": [
+        "Create ralph-integrations.toml.example",
+        "Document github section: token, owner, repo, project_number",
+        "Document linear section: api_key, team_id",
+        "Document sync section: bidirectional, conflict_strategy",
+        "Environment variable syntax for secrets",
+        "Typecheck passes"
+      ],
+      "priority": 34,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-035",
+      "title": "Implement sync engine",
+      "description": "As a developer, I need an engine to coordinate syncing.",
+      "acceptanceCriteria": [
+        "Create src/integrations/sync_engine.rs",
+        "SyncEngine struct with registry and config",
+        "initial_sync() pushes all stories to provider",
+        "sync_story_update() syncs single story change",
+        "Typecheck passes"
+      ],
+      "priority": 35,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-036",
+      "title": "Add webhook server dependencies",
+      "description": "As a developer, I need Axum web framework added.",
+      "acceptanceCriteria": [
+        "Add axum crate",
+        "Add tower and tower-http crates",
+        "Add hmac and sha2 for signature verification",
+        "cargo build succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 36,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-037",
+      "title": "Implement webhook server routes",
+      "description": "As a developer, I need webhook endpoints.",
+      "acceptanceCriteria": [
+        "Create src/integrations/webhooks/server.rs",
+        "POST /webhooks/github endpoint",
+        "POST /webhooks/linear endpoint",
+        "GET /health endpoint",
+        "Typecheck passes"
+      ],
+      "priority": 37,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-038",
+      "title": "Implement webhook signature verification",
+      "description": "As a developer, I need secure webhook handling.",
+      "acceptanceCriteria": [
+        "Create src/integrations/webhooks/github.rs with GitHubWebhookHandler",
+        "Create src/integrations/webhooks/linear.rs with LinearWebhookHandler",
+        "verify_signature() methods using HMAC-SHA256",
+        "Return 401 on invalid signature",
+        "Typecheck passes"
+      ],
+      "priority": 38,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-039",
+      "title": "Create blog post templates",
+      "description": "As a developer, I need templates for generated blog posts.",
+      "acceptanceCriteria": [
+        "Create docs/blog/templates/feature-release.md",
+        "Template includes: title, date, summary, problem, solution, challenges, wins sections",
+        "Use {{ placeholder }} syntax for dynamic content",
+        "Typecheck passes"
+      ],
+      "priority": 39,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-040",
+      "title": "Implement blog generator module",
+      "description": "As a developer, I need code to generate blog posts.",
+      "acceptanceCriteria": [
+        "Create src/quality/blog_generator.rs",
+        "BlogContext struct with title, problem, solution, challenges, wins, lessons",
+        "BlogGenerator::generate() renders template with context",
+        "BlogGenerator::save() writes to docs/blog/posts/",
+        "Typecheck passes"
+      ],
+      "priority": 40,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-041",
+      "title": "Create cargo-deny configuration",
+      "description": "As a developer, I need dependency security policy.",
+      "acceptanceCriteria": [
+        "Create deny.toml",
+        "Configure advisories: deny vulnerabilities",
+        "Configure licenses: allow MIT, Apache-2.0, BSD, ISC",
+        "cargo deny check passes",
+        "Typecheck passes"
+      ],
+      "priority": 41,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-042",
+      "title": "Create security scanning workflow",
+      "description": "As a developer, I want automated security scans.",
+      "acceptanceCriteria": [
+        "Create .github/workflows/security.yml",
+        "Run cargo-audit job",
+        "Run cargo-deny job",
+        "Trigger on push, PR, and daily schedule",
+        "Typecheck passes"
+      ],
+      "priority": 42,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-043",
+      "title": "Create release workflow",
+      "description": "As a developer, I want automated releases.",
+      "acceptanceCriteria": [
+        "Create .github/workflows/release.yml",
+        "Trigger on v* tags",
+        "Build matrix: linux-x86_64, linux-aarch64, macos-x86_64, macos-aarch64, windows-x86_64",
+        "Create GitHub release with binaries",
+        "Typecheck passes"
+      ],
+      "priority": 43,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-044",
+      "title": "Create CLI integration tests",
+      "description": "As a developer, I need CLI integration tests.",
+      "acceptanceCriteria": [
+        "Add assert_cmd and predicates dev dependencies",
+        "Create tests/integration/cli_tests.rs",
+        "Test --version and --help flags",
+        "Test quality check command",
+        "Typecheck passes"
+      ],
+      "priority": 44,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-045",
+      "title": "Create test fixtures",
+      "description": "As a developer, I need test data for integration tests.",
+      "acceptanceCriteria": [
+        "Create tests/fixtures/test_prd.json with 2-3 stories",
+        "Create tests/fixtures/test_quality_config.toml",
+        "Fixtures are valid and parseable",
+        "Typecheck passes"
+      ],
+      "priority": 45,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

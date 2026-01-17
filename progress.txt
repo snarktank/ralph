@@ -1,0 +1,1013 @@
+# Ralph Progress Log
+Started: Fri Jan 16 23:31:27 MST 2026
+---
+
+## Codebase Patterns
+- This is a Rust project - use `cargo check` for typechecking, `cargo clippy -- -D warnings` for linting, `cargo fmt` for formatting
+- Use `git switch` instead of `git checkout` for branch operations (Safety Net requirement)
+- Module files go in `src/{module}/mod.rs` with the module declaration in main.rs
+- Use `.gitkeep` files to preserve empty directories in git
+- The Ralph code lives at `/Users/thinkstudio/ralph`, the task management (PRD/progress) is at `/Users/thinkstudio/ralphmacchio`
+- **MCP Tool Registration Pattern:** Requires 3 components: (1) `tool_router: ToolRouter<Self>` field, (2) `#[tool_router]` impl block with `#[tool]` methods, (3) `#[tool_handler(router = self.tool_router)]` on ServerHandler impl
+- MCP tool methods must be async and use `Parameters<T>` wrapper for input parameters
+
+---
+
+## 2026-01-16 23:33 MST - US-001
+- **What was implemented:** Created expanded directory structure for enterprise Ralph expansion
+- **Files changed:**
+  - Created directories: src/mcp/, src/integrations/, src/quality/, docs/architecture/diagrams/, docs/architecture/adr/, docs/blog/templates/, docs/blog/posts/, docs/guides/, quality/, tests/unit/, tests/integration/, tests/fixtures/
+  - Created Cargo.toml with initial Rust project configuration
+  - Created src/main.rs with CLI scaffolding and module declarations
+  - Created src/mcp/mod.rs, src/integrations/mod.rs, src/quality/mod.rs as module placeholders
+  - Updated .gitignore to exclude /target/
+  - Added .gitkeep files to all new directories
+- **Learnings for future iterations:**
+  - The Ralph project was originally shell-based (ralph.sh), now being expanded to Rust
+  - Cargo.toml includes tokio, serde, clap, tracing, toml as base dependencies
+  - Run `cargo fmt` after creating Rust files - alphabetical ordering of mod declarations matters
+  - The project supports subcommands: `ralph quality` and `ralph mcp-server`
+---
+
+## 2026-01-17 00:15 MST - US-002
+- **What was implemented:** Created GitHub Actions CI workflow for linting and formatting
+- **Files changed:**
+  - Created .github/workflows/ci.yml with two jobs: format and lint
+- **Details:**
+  - `format` job: Runs `cargo fmt --check` to verify code formatting
+  - `lint` job: Runs `cargo clippy -- -D warnings` with cargo caching for faster builds
+  - Triggers on push to main and ralph/** branches, and on all PRs to main
+  - Uses dtolnay/rust-toolchain@stable for consistent Rust setup
+- **Learnings for future iterations:**
+  - Use `dtolnay/rust-toolchain@stable` action for setting up Rust in GitHub Actions (cleaner than rustup)
+  - Add cargo caching with `actions/cache@v4` to speed up CI runs
+  - The workflow triggers include `ralph/**` branches to support the feature branch workflow
+---
+
+## 2026-01-17 00:35 MST - US-003
+- **What was implemented:** Added test and build jobs with multi-platform matrix to CI workflow
+- **Files changed:**
+  - Modified .github/workflows/ci.yml to add `test` and `build` jobs
+  - Modified README.md to add CI badge at the top
+- **Details:**
+  - `test` job: Runs `cargo test --all-features` on ubuntu-latest, macos-latest, windows-latest
+  - `build` job: Runs `cargo build --release` on ubuntu-latest, macos-latest, windows-latest
+  - Both jobs use `fail-fast: false` so all platforms are tested even if one fails
+  - Added CI badge linking to GitHub Actions workflow
+- **Learnings for future iterations:**
+  - Use `fail-fast: false` in matrix strategies to ensure all platforms are tested
+  - GitHub Actions badge format: `[![CI](https://github.com/{owner}/{repo}/actions/workflows/{workflow}.yml/badge.svg)](link)`
+  - Use separate cache keys for test vs build jobs to avoid cache conflicts
+---
+
+## 2026-01-17 00:50 MST - US-004
+- **What was implemented:** Created ADR template and first Architecture Decision Record
+- **Files changed:**
+  - Created docs/architecture/adr/template.md - reusable template with Status, Date, Context, Decision, Consequences sections
+  - Created docs/architecture/adr/0001-record-architecture-decisions.md - explains why we use ADRs
+- **Details:**
+  - Template includes Positive, Negative, and Neutral subsections under Consequences
+  - ADR-0001 follows Michael Nygard's ADR format and references his original blog post
+  - Commits: a0908dd
+- **Learnings for future iterations:**
+  - ADRs are numbered sequentially (0001, 0002, etc.)
+  - ADRs are immutable once accepted; superseded by new ADRs if decisions change
+  - The docs/architecture/adr/ directory was created in US-001 with .gitkeep
+---
+
+## 2026-01-17 01:15 MST - US-005
+- **What was implemented:** Created Mermaid diagram showing Ralph's system architecture
+- **Files changed:**
+  - Created docs/architecture/diagrams/system-overview.mmd
+- **Details:**
+  - Diagram uses `graph TB` (top-to-bottom) syntax
+  - Shows all major components: CLI Layer, Agent Engine, MCP Server, Quality Framework, Integrations
+  - MCP Server section includes tools (list_stories, get_status, load_prd, run_story, stop_execution) and resources (ralph://prd/current, ralph://status)
+  - Quality Framework shows four gates: Coverage, Lint, Format, Security
+  - Integrations layer shows GitHub Projects and Linear providers with external API connections
+  - Commits: a09f8c2
+- **Learnings for future iterations:**
+  - Mermaid files use `.mmd` extension
+  - Use subgraphs to group related components
+  - Dotted arrows (`-.->`) useful for showing external API connections
+  - The docs/architecture/diagrams/ directory was created in US-001 with .gitkeep
+---
+
+## 2026-01-17 02:00 MST - US-006
+- **What was implemented:** Created quality profiles TOML configuration file
+- **Files changed:**
+  - Created quality/ralph-quality.toml with three quality profiles
+- **Details:**
+  - **minimal profile**: coverage_threshold=0, no security scanning, unit tests only, no CI requirements, no blog generation
+  - **standard profile**: coverage_threshold=70, cargo-audit enabled, unit+integration tests, format+lint checks, no blog
+  - **comprehensive profile**: coverage_threshold=90, full security (cargo-audit, cargo-deny, SAST), all tests, blog generation enabled
+  - Each profile has 5 sections: documentation, testing, ci, security, blog
+  - Commits: 3fde05b
+- **Learnings for future iterations:**
+  - TOML supports nested tables with `[profiles.minimal.section]` syntax
+  - Quality profiles are designed to be parsed by src/quality/profiles.rs (to be implemented in US-007)
+  - The blog section includes a `template` field to specify which template to use
+---
+
+## 2026-01-17 02:30 MST - US-007
+- **What was implemented:** Created Rust structs for quality profile parsing
+- **Files changed:**
+  - Created src/quality/profiles.rs with all quality profile structs
+  - Updated src/quality/mod.rs to export the profiles module and re-export types
+- **Details:**
+  - `QualityConfig`: Root struct with `profiles: HashMap<String, Profile>`
+  - `Profile`: Contains description + all config sections (documentation, testing, ci, security, blog)
+  - `ProfileLevel` enum: Minimal, Standard, Comprehensive
+  - Config section structs: `DocumentationConfig`, `TestingConfig`, `CiConfig`, `SecurityConfig`, `BlogConfig`
+  - All structs have `#[derive(Deserialize)]` for TOML parsing
+  - Helper methods: `get_profile()`, `get_profile_by_name()`, `profile_names()`
+  - Unit tests for deserialization
+  - Commit: d73d117
+- **Learnings for future iterations:**
+  - Use `#![allow(dead_code)]` at module level for structs that will be used in future stories
+  - Use `#[serde(default)]` on fields to handle optional config values gracefully
+  - Clippy with `-D warnings` treats dead_code as errors - need explicit allow for scaffolding code
+  - HashMap<String, Profile> allows flexible profile names beyond the predefined enum
+---
+
+## 2026-01-17 03:00 MST - US-008
+- **What was implemented:** Added config loading capability to QualityConfig
+- **Files changed:**
+  - Modified Cargo.toml to add `config` crate dependency (v0.14 with toml feature)
+  - Modified Cargo.lock with new dependencies (config, nom, pathdiff, minimal-lexical)
+  - Modified src/quality/profiles.rs to add `load()` function and error types
+  - Modified src/quality/mod.rs to re-export `QualityConfigError`
+- **Details:**
+  - `QualityConfigError` enum with variants: `FileNotFound`, `ParseError`, `InvalidPath`
+  - `QualityConfig::load(path)` loads TOML config files with environment variable override support
+  - Environment variables use `RALPH_` prefix with `__` as separator for nested keys
+  - Example: `RALPH_PROFILES__MINIMAL__TESTING__COVERAGE_THRESHOLD=50`
+  - Added 4 new unit tests for load functionality
+  - Commit: 2e2287b
+- **Learnings for future iterations:**
+  - Use `config` crate for configuration loading with multiple sources (file + env vars)
+  - Environment override format: `Environment::with_prefix("RALPH").separator("__").try_parsing(true)`
+  - Config crate needs `.toml` extension or explicit format specification
+  - Check file existence manually before loading for better error messages
+---
+
+## 2026-01-17 04:00 MST - US-009
+- **What was implemented:** Created quality gate checker module with GateResult and QualityGateChecker structs
+- **Files changed:**
+  - Created src/quality/gates.rs with full gate checking infrastructure
+  - Modified src/quality/mod.rs to export the gates module and re-export types
+- **Details:**
+  - `GateResult` struct with: gate_name (String), passed (bool), message (String), details (Option<String>)
+  - Helper methods: `pass()`, `fail()`, `skipped()` for creating GateResult instances
+  - `QualityGateChecker` struct with profile and project_root fields
+  - `run_all()` method returns `Vec<GateResult>` for all configured gates
+  - Static methods: `all_passed()` and `summary()` for result analysis
+  - Current gate implementations return "skipped" results - actual implementations in US-010 through US-012
+  - Added 10 unit tests for gates functionality
+  - Commit: af4c2af
+- **Learnings for future iterations:**
+  - Use `#![allow(dead_code)]` at module level consistently for scaffolding code
+  - GateResult uses Serialize/Deserialize for JSON output compatibility
+  - The skipped() helper sets passed=true so skipped gates don't fail the overall check
+  - Gates are configured via Profile struct from profiles.rs
+---
+
+## 2026-01-17 05:00 MST - US-010
+- **What was implemented:** Coverage gate that runs cargo-llvm-cov or cargo-tarpaulin
+- **Files changed:**
+  - Modified Cargo.toml to add `regex` crate dependency
+  - Modified Cargo.lock with new dependency
+  - Modified src/quality/gates.rs with check_coverage() implementation
+- **Details:**
+  - `check_coverage()` method that tries cargo-llvm-cov first, falls back to cargo-tarpaulin
+  - Supports JSON output parsing from llvm-cov (`data[0].totals.lines.percent`)
+  - Supports text output parsing via regex patterns for both tools
+  - Helper methods: `run_llvm_cov()`, `run_tarpaulin()`, `parse_coverage_percentage()`, `parse_llvm_cov_json()`, `evaluate_coverage()`
+  - Returns GateResult with pass/fail status and coverage percentage in message
+  - Skips check if threshold is 0 (minimal profile)
+  - Returns helpful error if no coverage tools are installed
+  - Added 13 new unit tests for coverage gate functionality
+  - Commit: 6ca6783
+- **Learnings for future iterations:**
+  - Use `std::process::Command` for running external tools
+  - Check tool availability by running `cargo <tool> --version` first
+  - Parse tool output with multiple regex patterns to handle different output formats
+  - Prefer JSON output for structured data (easier to parse reliably)
+  - Tests for external tool integration should handle "tool not installed" gracefully
+---
+
+## 2026-01-16 - US-011
+- **What was implemented:** Lint and format quality gates for QualityGateChecker
+- **Files changed:**
+  - Modified src/quality/gates.rs to add check_lint() and check_format() methods
+- **Details:**
+  - `check_lint()` runs `cargo clippy -- -D warnings` to detect linting issues
+  - `check_format()` runs `cargo fmt --check` to verify code formatting
+  - `extract_clippy_errors()` helper filters clippy stderr for relevant error/warning lines
+  - `extract_format_errors()` helper summarizes files needing formatting
+  - Both gates return GateResult with pass/fail and capture stderr for error details
+  - Gates can be disabled via profile.ci.lint_check and profile.ci.format_check
+  - Updated `run_all()` to use real implementations instead of skipped placeholders
+  - Added 10 unit tests for lint and format gates
+  - Commit: 043b0bc
+- **Learnings for future iterations:**
+  - cargo clippy output goes to stderr (not stdout)
+  - cargo fmt --check outputs "Diff in <file>" lines for each unformatted file
+  - Use `take(50)` or similar limits when filtering output to avoid huge error details
+  - Gate implementations should check profile config first and return skipped if disabled
+---
+
+## 2026-01-17 06:30 MST - US-012
+- **What was implemented:** Security audit gate that runs cargo-audit to check for vulnerabilities
+- **Files changed:**
+  - Modified src/quality/gates.rs to add check_security_audit() method and supporting functions
+- **Details:**
+  - `check_security_audit()` method that runs `cargo audit` command
+  - Checks if cargo-audit is installed first, returns helpful error if not
+  - `run_cargo_audit()` runs the audit with JSON output for easier parsing
+  - `parse_audit_json()` parses JSON output and extracts vulnerability count and details
+  - `format_vulnerabilities_from_json()` formats vulnerability details (ID, title, package, version, severity)
+  - `extract_audit_vulnerabilities()` fallback for parsing text output (RUSTSEC IDs, warnings, errors)
+  - Returns GateResult with pass/fail status and detailed vulnerability information
+  - Gate can be disabled via profile.security.cargo_audit
+  - Updated `run_all()` to use vec![] macro (clippy suggestion) and include security_audit gate
+  - Added 11 new unit tests for security audit gate functionality
+  - Commit: e8ea124
+- **Learnings for future iterations:**
+  - cargo audit supports `--json` flag for structured output
+  - JSON format: `{ "vulnerabilities": { "count": N, "list": [...] } }`
+  - Each vulnerability in list has `advisory` (id, title, severity) and `package` (name, version)
+  - RUSTSEC IDs follow pattern RUSTSEC-YYYY-NNNN
+  - Use `vec![]` macro instead of `Vec::new()` followed by push calls (clippy::vec_init_then_push)
+  - cargo fmt automatically reformats code - multiline format strings get reformatted to cleaner style
+---
+
+## 2026-01-17 07:30 MST - US-013
+- **What was implemented:** Added MCP SDK and related crate dependencies to Cargo.toml
+- **Files changed:**
+  - Modified Cargo.toml to add three new dependencies
+  - Modified Cargo.lock with 51 new transitive dependencies
+- **Details:**
+  - Added `rmcp = { version = "0.8", features = ["server", "transport-io", "macros"] }` for MCP server SDK
+  - Added `schemars = "1.0"` for JSON Schema generation (used by MCP for tool/resource schemas)
+  - Added `async-trait = "0.1"` for async trait support (needed for implementing ServerHandler trait)
+  - Tokio already had `features = ["full"]` from initial setup
+  - All quality checks pass: cargo build, cargo check, cargo clippy, cargo fmt
+  - Commit: 336e7b0
+- **Learnings for future iterations:**
+  - rmcp 0.8 is the version specified in PRD; newer versions (0.13+) exist but we're using the specified version
+  - rmcp brings in many dependencies including futures, chrono, tokio-util, and schemars
+  - The "server" feature enables MCP server functionality, "transport-io" for stdio transport, "macros" for #[tool] attribute
+  - schemars v1.0+ is required (schemars_derive v1.2.0 was pulled in)
+---
+
+## 2026-01-17 08:00 MST - US-014
+- **What was implemented:** Created MCP server module structure with proper scaffolding
+- **Files changed:**
+  - Modified src/mcp/mod.rs to export server, tools, resources modules and re-export RalphMcpServer
+  - Created src/mcp/server.rs with placeholder RalphMcpServer struct
+  - Created src/mcp/tools/mod.rs with placeholder for tool implementations
+  - Created src/mcp/resources/mod.rs with placeholder for resource implementations
+- **Details:**
+  - RalphMcpServer struct is empty for now (fields added in US-015)
+  - Added `new()` constructor and Default impl for RalphMcpServer
+  - Used `#![allow(dead_code)]` and `#![allow(unused_imports)]` to suppress warnings for scaffolding code
+  - Commit: 1717542
+- **Learnings for future iterations:**
+  - MCP module structure follows pattern: mod.rs exports submodules, server.rs contains main struct
+  - tools/ and resources/ are subdirectories with their own mod.rs files
+  - Use `#![allow(unused_imports)]` in mod.rs for re-exports that aren't used yet
+  - The rmcp crate uses #[tool] and #[resource] macros for registration (to be used in subsequent stories)
+---
+
+## 2026-01-17 09:00 MST - US-015
+- **What was implemented:** Implemented RalphMcpServer struct with shared state management
+- **Files changed:**
+  - Modified src/mcp/server.rs with full server implementation
+  - Modified src/mcp/mod.rs to export new types
+- **Details:**
+  - `ExecutionState` enum with variants: Idle, Running (with story_id, started_at, iteration, max_iterations), Completed (with story_id, commit_hash), Failed (with story_id, error)
+  - `ServerState` struct with prd_path (Option<PathBuf>) and execution_state fields
+  - `RalphMcpServer` struct with Arc<RwLock<ServerState>> for thread-safe state access
+  - Uses `tokio::sync::watch` channel for cancellation signaling (cancel_sender, cancel_receiver)
+  - Constructors: `new()`, `with_prd()`, `with_config()`
+  - State access: `state()` returns RwLockReadGuard, `state_mut()` returns RwLockWriteGuard
+  - Cancellation: `cancel()`, `reset_cancel()`, `is_cancelled()`, `cancel_receiver()`
+  - Server implements Clone for sharing across async contexts
+  - Added 12 new unit tests including async tests with #[tokio::test]
+  - Commit: fde92af
+- **Learnings for future iterations:**
+  - Use `tokio::sync::watch` for cancellation patterns - allows multiple receivers to check the signal
+  - `Arc<RwLock<_>>` pattern allows shared mutable state across async tasks
+  - Separate ServerState struct makes it easier to access prd_path and execution_state together
+  - The Running variant of ExecutionState includes iteration tracking for progress monitoring
+  - `watch::Receiver::borrow()` provides a reference to the current value without marking as seen
+---
+
+## 2026-01-17 10:00 MST - US-016
+- **What was implemented:** ServerHandler trait implementation for RalphMcpServer
+- **Files changed:**
+  - Modified src/mcp/server.rs to implement rmcp::ServerHandler trait
+- **Details:**
+  - Added imports for `rmcp::model::{Implementation, ServerCapabilities, ServerInfo}` and `rmcp::ServerHandler`
+  - Implemented `get_info()` method returning ServerInfo with:
+    - Server name: "ralph"
+    - Version: from CARGO_PKG_VERSION env var
+    - Title: "Ralph Autonomous Agent"
+    - Capabilities: tools and resources enabled via builder pattern
+    - Instructions: description of Ralph's purpose
+  - Added 2 new unit tests:
+    - `test_server_handler_get_info`: verifies server name, version, title, instructions
+    - `test_server_handler_capabilities`: verifies tools and resources capabilities are enabled
+  - All 56 tests pass
+  - Commit: 6629c1a
+- **Learnings for future iterations:**
+  - rmcp ServerHandler trait has many default methods; only override what you need (get_info() for basic server setup)
+  - ServerCapabilities uses a builder pattern: `ServerCapabilities::builder().enable_tools().enable_resources().build()`
+  - ServerInfo is an alias for InitializeResult - contains protocol_version, capabilities, server_info, instructions
+  - Implementation struct fields: name (required), version (required), title (optional), icons (optional), website_url (optional)
+  - Use `env!("CARGO_PKG_VERSION")` to get version from Cargo.toml at compile time
+  - rmcp crate source at ~/.cargo/registry/src/index.crates.io-*/rmcp-*/src/ is useful for understanding trait definitions
+---
+
+## 2026-01-17 11:30 MST - US-017
+- **What was implemented:** list_stories MCP tool for listing PRD stories
+- **Files changed:**
+  - Created src/mcp/tools/list_stories.rs with ListStoriesRequest, ListStoriesResponse, StoryInfo structs
+  - Modified src/mcp/tools/mod.rs to export list_stories module
+  - Modified src/mcp/server.rs to add ToolRouter, #[tool_router] impl with list_stories tool, #[tool_handler] on ServerHandler
+  - Modified Cargo.toml to add tempfile dev dependency for tests
+- **Details:**
+  - Tool accepts optional status_filter parameter: "passing", "failing", or omit for all stories
+  - Returns JSON object with `stories` array and `count` field
+  - Each story has `id`, `title`, `passes` fields
+  - Tool requires PRD to be loaded first (returns error if no PRD loaded)
+  - Uses load_stories() helper function to parse PRD JSON and filter stories
+  - 7 new unit tests for list_stories functionality
+  - All 63 tests pass
+  - Commit: 9f2d52e
+- **Learnings for future iterations:**
+  - rmcp tool registration requires three components:
+    1. `tool_router: ToolRouter<Self>` field in the server struct
+    2. `#[tool_router]` impl block with `#[tool]` methods
+    3. `#[tool_handler(router = self.tool_router)]` on the ServerHandler impl
+  - Tool methods must be async and take `Parameters<T>` wrapper for input params
+  - Tool methods can return String, and rmcp will wrap it as text content
+  - Use `schemars::JsonSchema` derive on request structs for schema generation
+  - The #[tool] macro generates `_tool_attr` helper functions for each tool
+  - Tool names should use snake_case (list_stories not list-stories) for consistency with Rust conventions
+---
+
+## 2026-01-17 12:30 MST - US-018
+- **What was implemented:** get_status MCP tool for checking Ralph execution status
+- **Files changed:**
+  - Created src/mcp/tools/get_status.rs with GetStatusRequest, GetStatusResponse structs
+  - Modified src/mcp/tools/mod.rs to export get_status module
+  - Modified src/mcp/server.rs to add get_status tool to #[tool_router] block
+- **Details:**
+  - Tool takes no parameters (GetStatusRequest is empty)
+  - Returns JSON object with state ("idle", "running", "completed", "failed")
+  - For running state: includes story_id, started_at, iteration, max_iterations, progress_percent
+  - For completed state: includes story_id, commit_hash (optional), progress_percent=100
+  - For failed state: includes story_id, error message
+  - Uses `#[serde(skip_serializing_if = "Option::is_none")]` to omit None fields from JSON
+  - `from_execution_state()` converter cleanly maps ExecutionState enum to response
+  - 13 new unit tests: 9 in get_status.rs, 4 in server.rs for tool integration
+  - All 75 tests pass
+  - Commit: 9bbdded
+- **Learnings for future iterations:**
+  - Empty request structs are valid for MCP tools that take no parameters
+  - Use `#[serde(skip_serializing_if = "Option::is_none")]` to produce cleaner JSON output
+  - Progress percentage can be calculated from iteration/max_iterations for running state
+  - Tool methods need Parameters<T> wrapper even for empty request types
+---
+
+## 2026-01-17 13:30 MST - US-019
+- **What was implemented:** load_prd MCP tool for loading and validating PRD files
+- **Files changed:**
+  - Created src/mcp/tools/load_prd.rs with LoadPrdRequest, LoadPrdResponse, PrdFile, PrdUserStory structs
+  - Modified src/mcp/tools/mod.rs to export load_prd module
+  - Modified src/mcp/server.rs to add load_prd tool to #[tool_router] block
+- **Details:**
+  - Tool accepts `path` parameter (absolute or relative path to PRD JSON file)
+  - `validate_prd()` function validates file exists, parses JSON, and validates PRD structure
+  - Validates: project name not empty, branch name not empty, at least one user story, story IDs and titles not empty
+  - `PrdValidationError` enum with variants: FileNotFound, ReadError, ParseError, StructureError
+  - Creates success response with story_count, project, branch_name, and success message
+  - Creates error response with descriptive error message on failure
+  - Updates server prd_path state on successful load (makes PRD available for list_stories and run_story tools)
+  - 13 new unit tests in load_prd.rs, 5 new integration tests in server.rs
+  - All 93 tests pass
+  - Commit: 6927833
+- **Learnings for future iterations:**
+  - PRD validation should check required fields (project, branchName, userStories) and validate each story has id and title
+  - Use separate PrdFile and PrdUserStory structs for parsing (different from list_stories.rs Prd/PrdStory) to have full validation
+  - Canonicalize relative paths by joining with current working directory
+  - Error enums with Display impl provide descriptive error messages for users
+---
+
+## 2026-01-17 14:00 MST - US-020
+- **What was implemented:** run_story MCP tool for executing user stories
+- **Files changed:**
+  - Created src/mcp/tools/run_story.rs with request/response structs and helper functions
+  - Modified src/mcp/tools/mod.rs to export run_story module
+  - Modified src/mcp/server.rs to add run_story tool to tool_router block
+- **Details:**
+  - `RunStoryRequest` accepts story_id and optional max_iterations (default: 10)
+  - `RunStoryResponse` with success, story_id, story_title, commit_hash, message fields
+  - `RunStoryError` enum with variants: NoPrdLoaded, StoryNotFound, AlreadyRunning, PrdReadError, PrdParseError, ExecutionError
+  - Helper functions: `find_story()`, `check_already_running()`, `current_timestamp()`, `create_success_response()`, `create_error_response()`, `create_started_response()`
+  - Tool prevents concurrent execution by checking ExecutionState before starting
+  - Updates execution_state to Running with story_id, started_at timestamp, iteration, max_iterations
+  - Resets cancellation signal before starting execution
+  - 22 new unit tests in run_story.rs, 7 new integration tests in server.rs
+  - All 119 tests pass
+  - Commit: afca5fc
+- **Learnings for future iterations:**
+  - For MCP tools that need to prevent concurrent operations, check the state first then update atomically
+  - Use tokio::sync::watch for cancellation signaling - can be reset and checked without blocking
+  - Tool response should indicate "started" rather than "completed" for async operations
+  - current_timestamp() using SystemTime::now() + UNIX_EPOCH for Unix timestamps
+---
+
+## 2026-01-17 15:00 MST - US-021
+- **What was implemented:** stop_execution MCP tool for cancelling running story execution
+- **Files changed:**
+  - Created src/mcp/tools/stop_execution.rs with StopExecutionRequest, StopExecutionResponse structs
+  - Modified src/mcp/tools/mod.rs to export stop_execution module
+  - Modified src/mcp/server.rs to add stop_execution tool to #[tool_router] block
+- **Details:**
+  - Tool takes no parameters (StopExecutionRequest is empty)
+  - Returns JSON object with: success, was_running, story_id (if running), message
+  - Helper functions: `create_cancelled_response()`, `create_not_running_response()`, `get_running_story_id()`, `state_description()`
+  - When running: sends cancellation signal via server.cancel() and returns confirmation
+  - When not running: returns success=true, was_running=false with current state description
+  - Cancellation is cooperative - execution stops at next safe point (between iterations)
+  - 17 new unit tests in stop_execution.rs, 5 new integration tests in server.rs
+  - All 140 tests pass
+  - Commit: 4963d2a
+- **Learnings for future iterations:**
+  - Empty request structs are valid for MCP tools that take no parameters (similar to get_status)
+  - For cancellation responses, include both `success` (operation succeeded) and `was_running` (was there something to cancel)
+  - The cancel() method sends a signal via tokio::sync::watch channel; actual execution checks is_cancelled() periodically
+  - Use `state_description()` helper to convert ExecutionState enum to human-readable string for messages
+---
+
+## 2026-01-17 16:00 MST - US-022
+- **What was implemented:** MCP resources for reading Ralph state via resources/read method
+- **Files changed:**
+  - Modified src/mcp/resources/mod.rs - Full resource implementation with list_ralph_resources(), read_prd_resource(), read_status_resource() functions
+  - Modified src/mcp/server.rs - Added list_resources() and read_resource() methods to ServerHandler impl
+- **Details:**
+  - Two resources available: `ralph://prd/current` and `ralph://status`
+  - `ralph://prd/current` returns the contents of the currently loaded PRD file as JSON
+  - `ralph://status` returns the current execution status (idle, running, completed, failed) as JSON
+  - StatusResource struct for JSON serialization with serde skip_serializing_if for optional fields
+  - ResourceError enum with UnknownResource, NoPrdLoaded, PrdReadError variants
+  - Both resources return `application/json` MIME type
+  - 17 new tests: 11 in resources/mod.rs, 5 in server.rs
+  - All 156 tests pass
+  - Commit: 8cfe036
+- **Learnings for future iterations:**
+  - rmcp ErrorData uses `None` (not `None::<()>`) for the optional data parameter - it infers `Option<Value>`
+  - rmcp's RequestContext uses private types (Extensions, etc.) - cannot construct in tests, test helper functions directly instead
+  - Use `Annotated<RawResource>` (aliased as `Resource`) for MCP resource responses
+  - ResourceContents::TextResourceContents requires uri, mime_type, text, and meta fields
+  - ListResourcesResult has resources Vec and optional next_cursor for pagination
+---
+
+## 2026-01-17 17:00 MST - US-023
+- **What was implemented:** Added mcp-server CLI subcommand for running Ralph as an MCP server
+- **Files changed:**
+  - Modified src/main.rs to add MCP server mode with --prd flag and stdio transport
+- **Details:**
+  - Added `--prd` optional flag to McpServer command to preload a PRD file
+  - Implemented server startup using `rmcp::transport::stdio` for stdin/stdout communication
+  - Configured tracing/logging to write to stderr only (stdout reserved for MCP protocol)
+  - Uses `RalphMcpServer::with_prd()` or `::new()` based on --prd flag presence
+  - Server runs until client disconnects via `service.waiting().await`
+  - Commit: 0b29daf
+- **Learnings for future iterations:**
+  - Use `rmcp::transport::stdio()` to get `(stdin, stdout)` tuple for MCP stdio transport
+  - Call `server.serve(stdio()).await` to start the MCP server
+  - Call `service.waiting().await` to keep the server running until client disconnects
+  - Configure logging with `.with_writer(std::io::stderr)` to keep stdout clean for MCP protocol
+  - The `ServiceExt` trait provides the `serve()` method for MCP servers
+---
+
+## 2026-01-17 18:00 MST - US-024
+- **What was implemented:** Claude Desktop setup guide for MCP integration
+- **Files changed:**
+  - Created docs/guides/claude-desktop-setup.md
+- **Details:**
+  - Comprehensive guide for setting up Ralph as an MCP server with Claude Desktop
+  - Includes overview, prerequisites, and installation instructions
+  - Multiple `claude_desktop_config.json` examples (basic, with PRD, full)
+  - Environment variables documentation: RUST_LOG, RALPH_ prefix overrides, integration tokens
+  - Available MCP tools and resources tables
+  - Usage examples showing typical workflow
+  - Extensive troubleshooting section covering: server not starting, PRD not loading, permissions, timeouts
+  - Common error messages table with causes and solutions
+  - Commit: 9998eeb
+- **Learnings for future iterations:**
+  - Claude Desktop config location varies by OS (macOS: ~/Library/Application Support/Claude/)
+  - MCP servers need stderr for logging, stdout reserved for protocol
+  - Documentation should include both simple and comprehensive config examples
+  - Troubleshooting sections should cover common error messages with solutions
+---
+
+## 2026-01-17 19:00 MST - US-025
+- **What was implemented:** Created ProjectTracker trait and ItemStatus enum for project management integrations
+- **Files changed:**
+  - Modified src/integrations/mod.rs to export traits module and re-export types
+  - Created src/integrations/traits.rs with full trait definition
+- **Details:**
+  - `ItemStatus` enum with variants: Todo, InProgress, InReview, Done, Blocked, Cancelled
+  - `TrackerError` enum with: AuthenticationError, ItemNotFound, ApiError, ConfigError, RateLimitError, InvalidInput
+  - `TrackerResult<T>` type alias for Result<T, TrackerError>
+  - Request structs: `CreateItemRequest`, `UpdateItemRequest`, `FailureIssueRequest`
+  - Response struct: `ItemInfo` with id, title, url fields
+  - `ProjectTracker` async trait with methods:
+    - `name()` - returns provider name
+    - `create_item()` - creates new item in project management system
+    - `update_item()` - updates existing item
+    - `create_failure_issue()` - creates issue for failed story execution
+    - `add_comment()` - adds comment to existing item
+    - `update_status()` - convenience method to update just the status
+  - 8 new unit tests for enum serialization, error display, and struct construction
+  - All 164 tests pass
+  - Commit: 11657cf
+- **Learnings for future iterations:**
+  - Use `async_trait` crate for async trait methods
+  - `#[serde(rename_all = "snake_case")]` on enums provides consistent JSON serialization
+  - Request structs don't need Serialize, response structs need both Serialize and Deserialize
+  - TrackerError implements both std::error::Error and Display for ergonomic error handling
+  - Use `#![allow(unused_imports)]` in mod.rs for re-exports not yet used by consuming code
+---
+
+## 2026-01-17 20:00 MST - US-026
+- **What was implemented:** Created ProviderRegistry for managing multiple project management providers
+- **Files changed:**
+  - Created src/integrations/registry.rs with full registry implementation
+  - Modified src/integrations/mod.rs to export registry module and ProviderRegistry
+- **Details:**
+  - `ProviderRegistry` struct with `HashMap<String, Arc<dyn ProjectTracker>>` for thread-safe provider storage
+  - `register()` method to add providers (uses provider's name() as the key)
+  - `get()` method to retrieve provider by name
+  - `set_active()` and `get_active()` methods for setting/getting the active provider
+  - Additional helper methods: `active_name()`, `clear_active()`, `has()`, `remove()`, `provider_names()`, `len()`, `is_empty()`
+  - Comprehensive error handling with `TrackerError::ConfigError` for nonexistent provider
+  - 11 new unit tests including async test for provider operations
+  - All 175 tests pass
+  - Commit: 261c9e5
+- **Learnings for future iterations:**
+  - Use `Arc<dyn Trait>` for storing trait objects in collections to allow cloning and sharing
+  - HashMap key can be derived from the registered object's own method (provider.name())
+  - set_active() should validate the provider exists before setting to avoid invalid state
+  - MockProvider pattern useful for testing trait-based registries without real implementations
+  - Use `#[tokio::test]` for async test methods that need async trait operations
+---
+
+## 2026-01-17 21:00 MST - US-027
+- **What was implemented:** Added GitHub API dependencies to Cargo.toml
+- **Files changed:**
+  - Modified Cargo.toml to add octocrab and graphql_client crates
+  - Modified Cargo.lock with 141 new transitive dependencies
+- **Details:**
+  - Added `octocrab = "0.42"` for GitHub REST and GraphQL API operations
+  - Added `graphql_client = { version = "0.14", features = ["reqwest"] }` for custom GraphQL queries
+  - octocrab provides high-level GitHub API client with support for Projects V2, issues, PRs, etc.
+  - graphql_client enables type-safe GraphQL queries with codegen support
+  - All quality checks pass: cargo build, cargo check, cargo clippy, cargo test (175 tests)
+  - Commit: 828df7e
+- **Learnings for future iterations:**
+  - octocrab v0.42 is the version locked for this project (latest is 0.49+)
+  - graphql_client v0.14 includes reqwest feature for HTTP requests
+  - These dependencies bring in many transitive deps including hyper, reqwest, rustls, and native-tls
+  - octocrab will be used in US-028 through US-030 for GitHub Projects integration
+---
+
+## 2026-01-17 22:00 MST - US-028
+- **What was implemented:** Created GitHub Projects V2 provider for creating project items
+- **Files changed:**
+  - Created src/integrations/github.rs with GitHubProjectsProvider struct
+  - Modified src/integrations/mod.rs to export github module and types
+- **Details:**
+  - `GitHubConfig` struct with token, owner, repo, project_number fields
+  - `GitHubConfig::from_env()` loads config from environment variables (GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, GITHUB_PROJECT_NUMBER)
+  - `GitHubConfig::new()` constructor for explicit values
+  - `GitHubProjectsProvider` struct with Octocrab client for GitHub API
+  - `fetch_project_id()` method retrieves Project V2 ID using GraphQL (tries user first, then organization)
+  - `add_draft_item()` method uses `addProjectV2DraftIssue` GraphQL mutation to create draft items
+  - `escape_graphql_string()` helper escapes special characters for GraphQL string values
+  - Implemented `create_item()` from ProjectTracker trait using the draft item mutation
+  - Placeholder implementations for `update_item()`, `create_failure_issue()`, `add_comment()`, `update_status()` (to be implemented in US-029, US-030)
+  - 14 new unit tests for GitHub provider functionality
+  - All 187 tests pass
+  - Commit: a2328f1
+- **Learnings for future iterations:**
+  - GitHub Projects V2 uses GraphQL API (not REST) for project items
+  - Project IDs need to be fetched first - try user node, then organization node
+  - Draft items created with `addProjectV2DraftIssue` are added to the project without being linked to an issue
+  - Tests that manipulate environment variables should not rely on specific env var values due to parallel test execution
+  - Use `escape_graphql_string()` to escape quotes, newlines, and backslashes in GraphQL string values
+  - octocrab's `.graphql()` method accepts a JSON value and returns serde_json::Value
+---
+
+## 2026-01-17 23:00 MST - US-029
+- **What was implemented:** update_status() method for GitHubProjectsProvider using GraphQL
+- **Files changed:**
+  - Modified src/integrations/github.rs to add update_status implementation and supporting methods
+- **Details:**
+  - `fetch_status_field()` method queries project for Status field ID and available options
+  - `map_status_to_github()` maps ItemStatus enum to GitHub status names (Todo, In Progress, In Review, Done, Blocked, Cancelled)
+  - `find_status_option()` finds matching option ID with flexible matching: exact, case-insensitive, and no-spaces
+  - `update_item_field_value()` calls `updateProjectV2ItemFieldValue` GraphQL mutation
+  - `update_status()` trait method now fully implemented using the new helper methods
+  - Added `ProjectFieldInfo` and `FieldOption` structs for status field representation
+  - 8 new unit tests: test_map_status_to_github, test_find_status_option_exact_match, test_find_status_option_case_insensitive, test_find_status_option_no_spaces, test_find_status_option_not_found, test_project_field_info_construction, test_field_option_construction
+  - All 193 tests pass
+  - Commit: cf0eec9
+- **Learnings for future iterations:**
+  - GitHub Projects V2 Status field is a SingleSelectField with options that have IDs
+  - Use `node(id: "{project_id}") { ... on ProjectV2 { fields { nodes { ... on ProjectV2SingleSelectField } } } }` to query fields
+  - Status field options may have different capitalization or spacing - implement flexible matching
+  - Tests that create GitHubProjectsProvider need `#[tokio::test]` because Octocrab requires a Tokio runtime
+  - updateProjectV2ItemFieldValue mutation takes projectId, itemId, fieldId, and value.singleSelectOptionId
+---
+
+## 2026-01-17 - US-030
+- **What was implemented:** create_failure_issue() method for GitHubProjectsProvider using REST API
+- **Files changed:**
+  - Modified src/integrations/github.rs to implement create_failure_issue and add format_failure_issue_body helper
+- **Details:**
+  - `create_failure_issue()` creates GitHub issues for failed story executions using REST API
+  - Issue title format: `[Ralph Failure] {story title}`
+  - Issue body includes sections: Story Information (ID and title), Error Details (in code block), Additional Context (collapsible details)
+  - `format_failure_issue_body()` helper generates well-formatted markdown body
+  - Adds `ralph-failure` label to created issues for easy filtering
+  - Returns ItemInfo with issue number, title, and HTML URL for navigation
+  - Uses octocrab's issues API: `.issues().create().body().labels().send().await`
+  - 4 new unit tests: test_format_failure_issue_body_basic, test_format_failure_issue_body_with_context, test_failure_issue_title_format, test_format_failure_issue_body_special_characters
+  - All 196 tests pass
+  - Commit: 0bef53c
+- **Learnings for future iterations:**
+  - GitHub Issues are created via REST API (octocrab `.issues()`) not GraphQL
+  - Use collapsible `<details>` HTML element for long context sections in markdown
+  - octocrab Issue response has `number` (i64), `title`, `html_url` fields
+  - Labels are passed as `Vec<String>` to the `.labels()` builder method
+  - For failure issues, include all context in a structured format to aid debugging
+---
+
+## 2026-01-17 - US-031
+- **What was implemented:** Added reqwest crate for Linear API HTTP requests
+- **Files changed:**
+  - Modified Cargo.toml to add `reqwest = { version = "0.12", features = ["json"] }`
+  - Modified Cargo.lock with new transitive dependencies (h2, hyper-tls, etc.)
+- **Details:**
+  - reqwest v0.12 with "json" feature enables JSON request/response handling
+  - This dependency will be used by the LinearProvider in subsequent stories (US-032, US-033)
+  - Linear API endpoint is https://api.linear.app/graphql (GraphQL)
+  - All quality checks pass: cargo build, cargo check, cargo clippy, cargo test (196 tests)
+  - Commit: 54c09e0
+- **Learnings for future iterations:**
+  - reqwest is already a transitive dependency of graphql_client, but adding it directly gives us version control and access to its API
+  - The "json" feature enables `.json()` method on requests and responses
+  - Linear uses GraphQL API at https://api.linear.app/graphql with Bearer token auth
+  - Alphabetical ordering of dependencies in Cargo.toml is the project convention
+---
+
+## 2026-01-17 - US-032
+- **What was implemented:** Created Linear provider for creating issues via GraphQL API
+- **Files changed:**
+  - Created src/integrations/linear.rs with LinearProvider struct and create_item() implementation
+  - Modified src/integrations/mod.rs to export linear module and types (LinearConfig, LinearProvider)
+- **Details:**
+  - `LinearConfig` struct with api_key and team_id fields
+  - `LinearConfig::from_env()` loads config from LINEAR_API_KEY and LINEAR_TEAM_ID environment variables
+  - `LinearProvider` struct with reqwest Client for HTTP requests
+  - `execute_graphql<T>()` generic method for executing GraphQL queries with proper error handling
+  - `create_issue()` private method uses `issueCreate` mutation to create issues
+  - `create_item()` trait method implemented - returns ItemInfo with issue ID, title, and URL
+  - `LinearIssue` struct captures id, identifier (human-readable like "ENG-42"), title, and url
+  - Proper HTTP error handling: 401 -> AuthenticationError, 429 -> RateLimitError
+  - GraphQL error handling: parses errors array from response
+  - Placeholder implementations for update_item(), create_failure_issue(), add_comment(), update_status() (US-033)
+  - 14 unit tests for Linear provider functionality
+  - All 210 tests pass
+  - Commit: 517074e
+- **Learnings for future iterations:**
+  - Linear API uses `Authorization` header directly (not "Bearer" prefix needed for API keys)
+  - Linear GraphQL response structure: `{ data: { issueCreate: { success, issue } }, errors: [...] }`
+  - LinearIssue has both `id` (UUID) and `identifier` (human-readable like "ENG-42")
+  - Reuse escape_graphql_string() pattern from GitHub provider for string escaping
+  - Use `#[serde(rename_all = "camelCase")]` for Linear response structs (issueCreate -> issue_create)
+---
+
+## 2026-01-17 - US-033
+- **What was implemented:** Linear provider update_status and add_comment methods
+- **Files changed:**
+  - Modified src/integrations/linear.rs to implement all ProjectTracker trait methods
+- **Details:**
+  - `update_issue()` method uses `issueUpdate` GraphQL mutation with support for title, description, and stateId fields
+  - `fetch_workflow_states()` queries team's workflow states using `team(id) { states { nodes } }` query
+  - `find_state_id_for_status()` maps ItemStatus to Linear state IDs with flexible matching:
+    - First tries name matching (case-insensitive, contains)
+    - Falls back to type matching (unstarted, started, completed, canceled)
+  - `create_comment()` uses `commentCreate` GraphQL mutation
+  - `update_status()` now implemented: fetches state ID and calls update_issue with new stateId
+  - `add_comment()` now implemented: calls create_comment and returns Ok(())
+  - `update_item()` now implemented: supports title, description, and status updates
+  - `create_failure_issue()` now implemented: creates issue with formatted failure body
+  - `format_failure_issue_body()` helper creates markdown body with story info, error details, and optional context
+  - Added new structs: IssueUpdateData, IssueUpdateResult, TeamStatesData, TeamData, StatesConnection, WorkflowState, CommentCreateData, CommentCreateResult, LinearComment
+  - Replaced 4 "not yet implemented" tests with 11 new unit tests for the new functionality
+  - All 214 tests pass
+  - Commit: f09beba
+- **Learnings for future iterations:**
+  - Linear workflow states have `type` field with values: backlog, unstarted, started, completed, canceled
+  - Linear state types map to ItemStatus: Todo->unstarted, InProgress->started, Done->completed, Cancelled->canceled
+  - Linear GraphQL uses `stateId` (not `state`) to set issue status
+  - Use `#[serde(rename = "type")]` to handle reserved word `type` in Rust
+  - State name matching should be flexible: "In Progress", "in progress", "InProgress" should all match
+  - Linear commentCreate mutation returns comment with id, body, and url fields
+---
+
+## 2026-01-17 - US-034
+- **What was implemented:** Created example integration configuration file for provider settings
+- **Files changed:**
+  - Created ralph-integrations.toml.example with complete documentation
+- **Details:**
+  - GitHub section: token, owner, repo, project_number, create_failure_issues, failure_issue_label
+  - Linear section: api_key, team_id, optional default_state and label_name
+  - Sync section: bidirectional, conflict_strategy (prd_wins/external_wins/manual/newest_wins), sync_on_completion, auto_create_items, sync_status
+  - Webhooks section: enabled, port, bind_address, github_secret, linear_secret
+  - Providers section: active provider selection, optional fallback
+  - Environment variable syntax documented: `${VAR_NAME}` for secrets
+  - Comprehensive inline documentation explaining each option
+  - Commit: 4ca5d63
+- **Learnings for future iterations:**
+  - Use `${VAR_NAME}` syntax for environment variables in TOML config (not OS-native `$VAR` or `%VAR%`)
+  - Include helpful links in comments (e.g., token creation URLs, API docs)
+  - Document GraphQL queries users might need to find IDs (e.g., team ID)
+  - Example config files should use obvious placeholder values like "your-username"
+---
+
+## 2026-01-17 - US-035
+- **What was implemented:** Created SyncEngine for coordinating story synchronization with external providers
+- **Files changed:**
+  - Created src/integrations/sync_engine.rs with full sync engine implementation
+  - Modified src/integrations/mod.rs to export sync_engine module and types
+- **Details:**
+  - `ConflictStrategy` enum with variants: PrdWins, ExternalWins, Manual, NewestWins
+  - `SyncConfig` struct with bidirectional, conflict_strategy, sync_on_completion, auto_create_items, sync_status fields
+  - `Story` struct for representing PRD stories with id, title, description, passes, priority
+  - `SyncResult` and `SyncSummary` structs for tracking sync operation results
+  - `SyncAction` enum: Created, Updated, Skipped, Failed
+  - `SyncEngine` struct with:
+    - `registry` (ProviderRegistry) for accessing providers
+    - `config` (SyncConfig) for sync settings
+    - `story_item_map` (HashMap) for tracking story-to-item mappings
+  - Methods:
+    - `initial_sync()` - pushes all stories to provider, creating items for new stories
+    - `sync_story_update()` - syncs single story change (creates or updates)
+    - `sync_story_completion()` - convenience method for syncing pass/fail status
+    - `load_stories_from_prd()` - helper to parse stories from PRD file
+    - `set_item_mapping()`, `get_item_id()`, `clear_mappings()` for item tracking
+  - 19 new unit tests including async tests for sync operations
+  - All 233 tests pass
+  - Commit: 00c983c
+- **Learnings for future iterations:**
+  - Use `story_item_map` HashMap to track which provider items correspond to which stories
+  - SyncResult tracks both success/failure and the action taken (created, updated, skipped, failed)
+  - SyncSummary aggregates results for batch operations with counts by action type
+  - `auto_create_items` config controls whether new items are created or skipped
+  - `sync_on_completion` and `sync_status` configs control when/what to sync
+---
+
+## 2026-01-17 - US-036
+- **What was implemented:** Added Axum web framework and related crates for webhook server
+- **Files changed:**
+  - Modified Cargo.toml to add axum, tower, tower-http, hmac, sha2 dependencies
+  - Modified Cargo.lock with 12 new transitive dependencies
+- **Details:**
+  - Added `axum = "0.8"` for HTTP routing and handlers
+  - Added `tower = "0.5"` for middleware and service composition
+  - Added `tower-http = { version = "0.6", features = ["trace", "cors"] }` for HTTP-specific middleware
+  - Added `hmac = "0.12"` for HMAC signature computation
+  - Added `sha2 = "0.10"` for SHA-256 hashing (used with HMAC for webhook signature verification)
+  - All quality checks pass: cargo build, cargo check, cargo clippy, cargo test (233 tests)
+  - Commit: 875af01
+- **Learnings for future iterations:**
+  - axum v0.8 is the version locked for this project (supports modern async patterns)
+  - tower-http "trace" feature enables request tracing middleware, "cors" for CORS handling
+  - hmac + sha2 combination is used for GitHub/Linear webhook signature verification (HMAC-SHA256)
+  - These dependencies will be used in US-037 (server routes) and US-038 (signature verification)
+---
+
+## 2026-01-17 - US-037
+- **What was implemented:** Webhook server routes using Axum web framework
+- **Files changed:**
+  - Created src/integrations/webhooks/mod.rs - module exports
+  - Created src/integrations/webhooks/server.rs - full webhook server implementation
+  - Modified src/integrations/mod.rs - added webhooks module and exports
+- **Details:**
+  - `WebhookConfig` struct for server configuration (port, bind_address, secrets)
+  - `AppState` struct with config and health status (using Arc<RwLock<bool>>)
+  - `WebhookError` enum with variants: InvalidSignature, ParseError, InternalError, UnsupportedEvent
+  - `create_webhook_router()` function creates Axum Router with all endpoints
+  - GET /health endpoint returns service status, name, and version
+  - POST /webhooks/github endpoint receives and parses GitHub webhook payloads
+  - POST /webhooks/linear endpoint receives and parses Linear webhook payloads
+  - Response structs: HealthResponse, GitHubWebhookResponse, LinearWebhookResponse
+  - Payload structs: GitHubWebhookPayload (with sender, repository), LinearWebhookPayload
+  - 16 new unit tests using axum::test utilities
+  - All 249 tests pass
+  - Commit: 37722f3
+- **Learnings for future iterations:**
+  - Use `axum::body::Bytes` to receive raw body for signature verification (to be added in US-038)
+  - Use `axum::body::to_bytes()` in tests to read response body
+  - Response structs need Deserialize derive for test assertions (Serialize only for production)
+  - Use `tower::ServiceExt::oneshot()` for testing Axum routes
+  - GitHub event type comes from X-GitHub-Event header
+  - Linear webhook payload uses camelCase field names (use `#[serde(rename_all = "camelCase")]`)
+---
+
+## 2026-01-17 - US-038
+- **What was implemented:** Webhook signature verification using HMAC-SHA256
+- **Files changed:**
+  - Created src/integrations/webhooks/github.rs - GitHubWebhookHandler with verify_signature()
+  - Created src/integrations/webhooks/linear.rs - LinearWebhookHandler with verify_signature()
+  - Modified src/integrations/webhooks/mod.rs - export new modules and handlers
+  - Modified src/integrations/webhooks/server.rs - integrate verification into routes
+  - Modified Cargo.toml - add hex crate dependency
+- **Details:**
+  - `GitHubWebhookHandler` verifies X-Hub-Signature-256 header (format: sha256=<hex>)
+  - `LinearWebhookHandler` verifies Linear-Signature header (raw hex HMAC)
+  - Both use HMAC-SHA256 with constant-time comparison (hmac crate)
+  - `verify_github_signature()` and `verify_linear_signature()` helper functions
+  - Return 401 Unauthorized when signature is invalid or missing
+  - Skip verification when no secret is configured (development mode)
+  - `compute_signature()` methods for testing and debugging
+  - 50 new tests: 10 in github.rs, 10 in linear.rs, 30 in server.rs for integration
+  - All 283 tests pass
+  - Commit: b54bf1a
+- **Learnings for future iterations:**
+  - GitHub uses sha256= prefix on signature header, Linear uses raw hex
+  - Use hex crate for encoding/decoding hex strings (not included by default)
+  - hmac crate's `verify_slice()` provides constant-time comparison for security
+  - Webhook handlers should skip verification when no secret configured for dev environments
+  - axum HeaderMap can be passed to verification functions directly
+---
+
+## 2026-01-17 - US-039
+- **What was implemented:** Created blog post template for feature releases
+- **Files changed:**
+  - Created docs/blog/templates/feature-release.md
+- **Details:**
+  - Template uses `{{ placeholder }}` syntax for dynamic content substitution
+  - Includes all required sections: title, date, summary, problem, solution, challenges, wins
+  - Additional sections: author, lessons, next_steps, technical_details
+  - Template designed to be rendered by BlogGenerator (US-040)
+  - Auto-generated credit footer included
+  - Commit: 262c640
+- **Learnings for future iterations:**
+  - Blog templates use Mustache-style `{{ placeholder }}` syntax (not Jinja2 `{% %}` syntax)
+  - Template sections are separated by `---` horizontal rules for visual clarity
+  - The template will be read by BlogGenerator::generate() in src/quality/blog_generator.rs
+---
+
+## 2026-01-17 - US-040
+- **What was implemented:** Blog generator module for generating blog posts from templates
+- **Files changed:**
+  - Created src/quality/blog_generator.rs with BlogContext, BlogGenerator, and helper functions
+  - Modified src/quality/mod.rs to export blog_generator module and types
+- **Details:**
+  - `BlogContext` struct with fields: title, date, author, summary, problem, solution, challenges, wins, lessons, next_steps, technical_details
+  - Builder pattern methods (with_date, with_author, etc.) for fluent configuration
+  - `BlogGenerator` struct with template_path and output_dir fields
+  - `generate()` method reads template and replaces `{{ placeholder }}` syntax with context values
+  - `save()` method writes rendered content to output directory with .md extension
+  - `generate_and_save()` convenience method combines both operations
+  - `with_defaults()` constructor sets standard paths: docs/blog/templates/feature-release.md and docs/blog/posts/
+  - `slugify()` helper function converts titles to URL-friendly filenames
+  - `BlogGeneratorError` enum with variants: TemplateNotFound, TemplateReadError, WriteError, OutputDirNotFound, InvalidFileName
+  - 22 unit tests covering all functionality
+  - All 303 tests pass
+  - Commit: 488eb45
+- **Learnings for future iterations:**
+  - Use `#![allow(dead_code)]` at module level for scaffolding code not yet consumed by main.rs
+  - Builder pattern with `with_*` methods provides ergonomic API for optional fields
+  - Template rendering with simple string replacement is sufficient for basic use cases (no need for full templating engine)
+  - File validation (empty name, path separators) prevents directory traversal and invalid filenames
+  - The `render_template()` function is kept private since it's an implementation detail
+---
+
+## 2026-01-17 - US-041
+- **What was implemented:** Created cargo-deny configuration file for dependency security policy
+- **Files changed:**
+  - Created deny.toml at project root
+- **Details:**
+  - Configuration version: cargo-deny v0.19 compatible (uses version = 2 for advisories and licenses)
+  - Advisories section: Denies known vulnerabilities, ignores unmaintained warnings for transitive deps
+  - Ignored advisories: RUSTSEC-2024-0436 (paste via rmcp), RUSTSEC-2025-0134 (rustls-pemfile via graphql_client)
+  - Licenses allow-list: MIT, Apache-2.0, Apache-2.0 WITH LLVM-exception, BSD-2-Clause, BSD-3-Clause, ISC, Zlib, 0BSD, CC0-1.0, Unlicense, MPL-2.0, Unicode-DFS-2016, Unicode-3.0
+  - Includes clarification for ring crate license (MIT AND ISC AND OpenSSL)
+  - Bans section: Warns on multiple versions of same crate
+  - Sources section: Denies unknown registries, warns on unknown git sources
+  - Targets: x86_64-unknown-linux-gnu, x86_64-apple-darwin, aarch64-apple-darwin, x86_64-pc-windows-msvc
+  - Commit: 714be3b
+- **Learnings for future iterations:**
+  - cargo-deny v0.19 uses `version = 2` in [advisories] and [licenses] sections
+  - Old keys like `vulnerability`, `yanked`, `unmaintained`, `unsound` are no longer used in v0.19
+  - Old keys like `copyleft`, `allow-osi-fsf-free`, `unlicensed` have been removed in v0.19
+  - Use `ignore = ["RUSTSEC-YYYY-NNNN"]` to skip advisories for unmaintained transitive deps you can't update
+  - Unmaintained crate warnings (not vulnerabilities) can be safely ignored when they're transitive dependencies
+  - `cargo deny check` outputs "advisories ok, bans ok, licenses ok, sources ok" on success
+---
+
+## 2026-01-17 - US-042
+- **What was implemented:** Created GitHub Actions workflow for automated security scanning
+- **Files changed:**
+  - Created .github/workflows/security.yml
+- **Details:**
+  - Two jobs: `audit` (cargo-audit) and `deny` (cargo-deny)
+  - Both jobs install their respective tools with `--locked` flag
+  - Uses cargo registry caching for faster subsequent runs
+  - Triggers: push to main/ralph/** branches, PRs to main, daily schedule at 6 AM UTC
+  - Follows same patterns as ci.yml (dtolnay/rust-toolchain, actions/cache, etc.)
+  - Commit: b92910e
+- **Learnings for future iterations:**
+  - Use `cargo install <tool> --locked` to ensure reproducible tool versions
+  - Schedule trigger uses cron syntax: `'0 6 * * *'` for daily at 6 AM UTC
+  - Security workflows should run on schedule in addition to push/PR for catching newly disclosed vulnerabilities
+  - Separate jobs allow cargo-audit and cargo-deny to run in parallel
+---
+
+## 2026-01-17 - US-043
+- **What was implemented:** Created automated release workflow for multi-platform binary releases
+- **Files changed:**
+  - Created .github/workflows/release.yml
+- **Details:**
+  - Triggers on v* tags (e.g., v1.0.0, v0.2.0-beta)
+  - Build matrix covers all required platforms:
+    - linux-x86_64 (x86_64-unknown-linux-gnu on ubuntu-latest)
+    - linux-aarch64 (aarch64-unknown-linux-gnu on ubuntu-latest with cross-compilation)
+    - macos-x86_64 (x86_64-apple-darwin on macos-latest)
+    - macos-aarch64 (aarch64-apple-darwin on macos-latest)
+    - windows-x86_64 (x86_64-pc-windows-msvc on windows-latest)
+  - Uses `dtolnay/rust-toolchain@stable` with target-specific configuration
+  - Installs gcc-aarch64-linux-gnu for Linux ARM64 cross-compilation
+  - Uses `softprops/action-gh-release@v2` to create GitHub releases with all binaries
+  - Enables auto-generated release notes from commits
+  - Artifacts are named descriptively (ralph-linux-x86_64, ralph-macos-aarch64, etc.)
+  - Commit: aebec51
+- **Learnings for future iterations:**
+  - Use `targets:` in dtolnay/rust-toolchain to install cross-compilation targets
+  - For Linux aarch64 cross-compilation, need both: 1) `aarch64-unknown-linux-gnu` target and 2) `gcc-aarch64-linux-gnu` linker
+  - Set `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER` env var to specify the cross-linker
+  - Use `softprops/action-gh-release@v2` with `generate_release_notes: true` for auto-generated notes
+  - Workflow artifact names should be distinct per platform for easy identification
+  - The release job needs `permissions: contents: write` to create releases
+---
+
+## 2026-01-17 - US-044
+- **What was implemented:** Created CLI integration tests using assert_cmd and predicates
+- **Files changed:**
+  - Modified Cargo.toml to add `assert_cmd = "2"` and `predicates = "3"` dev dependencies
+  - Modified Cargo.lock with 10 new transitive dependencies
+  - Modified src/main.rs to add `#[command(version)]` attribute for --version flag support
+  - Created tests/cli_tests.rs with 12 integration tests
+- **Details:**
+  - Tests verify --version (short and long), --help (short and long), quality command, mcp-server help
+  - Tests verify default behavior (no args), invalid command handling, invalid flag handling
+  - Tests run the actual compiled binary using assert_cmd's cargo_bin() helper
+  - Uses predicates for stdout/stderr assertions
+  - All 315 tests pass (303 unit + 12 CLI integration)
+  - Commit: d50fc89
+- **Learnings for future iterations:**
+  - CLI tests should be placed in tests/ directory root for cargo test discovery
+  - Use `#[allow(deprecated)]` on cargo_bin() calls since it's deprecated but still functional
+  - Need to add `#[command(version)]` to enable --version flag in clap CLI
+  - assert_cmd's cargo_bin() automatically finds the binary in target/debug/
+  - Tests verify both success cases (expected output) and failure cases (invalid commands)
+---
+
+## 2026-01-17 - US-045
+- **What was implemented:** Created test fixtures for integration testing
+- **Files changed:**
+  - Created tests/fixtures/test_prd.json - Sample PRD with 3 user stories (1 passing, 2 failing)
+  - Created tests/fixtures/test_quality_config.toml - Quality config with 3 profiles (test_minimal, test_standard, test_comprehensive)
+  - Created tests/fixtures_tests.rs - 9 integration tests to validate fixtures
+- **Details:**
+  - test_prd.json contains: project "TestProject", branch "test/feature-branch", 3 stories with IDs TEST-001, TEST-002, TEST-003
+  - test_quality_config.toml matches the structure of quality/ralph-quality.toml but with test-specific profile names
+  - Fixture tests verify: existence, valid JSON/TOML parsing, correct structure, coverage threshold variation
+  - All 324 tests pass (303 unit + 12 CLI + 9 fixture)
+  - Commit: f184625
+- **Learnings for future iterations:**
+  - Test fixtures should be placed in tests/fixtures/ directory (created in US-001)
+  - Use separate test structs (#[derive(Deserialize)]) for parsing fixtures to avoid coupling with main code
+  - Fixture tests should verify both existence and parseability
+  - Include variety in test data (passing/failing stories, varying thresholds) for meaningful testing
+---
