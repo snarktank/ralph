@@ -405,6 +405,36 @@ impl GitHubProjectsProvider {
         Ok(())
     }
 
+    /// Format the body of a failure issue
+    fn format_failure_issue_body(&self, request: &FailureIssueRequest) -> String {
+        let mut body = String::new();
+
+        body.push_str("## Ralph Execution Failure\n\n");
+
+        body.push_str("### Story Information\n\n");
+        body.push_str(&format!("- **Story ID:** {}\n", request.story_id));
+        body.push_str(&format!("- **Story Title:** {}\n\n", request.story_title));
+
+        body.push_str("### Error Details\n\n");
+        body.push_str("```\n");
+        body.push_str(&request.error);
+        body.push_str("\n```\n\n");
+
+        if let Some(ref context) = request.context {
+            body.push_str("### Additional Context\n\n");
+            body.push_str("<details>\n<summary>Click to expand</summary>\n\n");
+            body.push_str("```\n");
+            body.push_str(context);
+            body.push_str("\n```\n\n");
+            body.push_str("</details>\n\n");
+        }
+
+        body.push_str("---\n");
+        body.push_str("*This issue was automatically created by Ralph autonomous agent.*\n");
+
+        body
+    }
+
     /// Add a draft item to the project using GraphQL addProjectV2DraftIssue mutation
     async fn add_draft_item(
         &self,
@@ -533,11 +563,29 @@ impl ProjectTracker for GitHubProjectsProvider {
         ))
     }
 
-    async fn create_failure_issue(&self, _request: FailureIssueRequest) -> TrackerResult<ItemInfo> {
-        // Will be implemented in US-030
-        Err(TrackerError::ApiError(
-            "create_failure_issue not yet implemented".to_string(),
-        ))
+    async fn create_failure_issue(&self, request: FailureIssueRequest) -> TrackerResult<ItemInfo> {
+        // Create issue using GitHub REST API
+        let title = format!("[Ralph Failure] {}", request.story_title);
+
+        // Build issue body with error details and context
+        let body = self.format_failure_issue_body(&request);
+
+        // Create the issue using octocrab's issues API
+        let issue = self
+            .client
+            .issues(&self.config.owner, &self.config.repo)
+            .create(&title)
+            .body(&body)
+            .labels(vec!["ralph-failure".to_string()])
+            .send()
+            .await
+            .map_err(|e| TrackerError::ApiError(format!("Failed to create issue: {}", e)))?;
+
+        Ok(ItemInfo {
+            id: issue.number.to_string(),
+            title: issue.title.clone(),
+            url: Some(issue.html_url.to_string()),
+        })
     }
 
     async fn add_comment(&self, _item_id: &str, _comment: &str) -> TrackerResult<()> {
@@ -722,7 +770,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_failure_issue_not_implemented() {
+    async fn test_format_failure_issue_body_basic() {
         let config = GitHubConfig::new(
             "test_token".to_string(),
             "owner".to_string(),
@@ -733,15 +781,82 @@ mod tests {
         let request = FailureIssueRequest {
             story_id: "US-001".to_string(),
             story_title: "Test story".to_string(),
-            error: "Test error".to_string(),
+            error: "Test error message".to_string(),
             context: None,
         };
 
-        let result = provider.create_failure_issue(request).await;
-        assert!(result.is_err());
-        if let Err(TrackerError::ApiError(msg)) = result {
-            assert!(msg.contains("not yet implemented"));
-        }
+        let body = provider.format_failure_issue_body(&request);
+
+        // Check that body contains expected sections
+        assert!(body.contains("## Ralph Execution Failure"));
+        assert!(body.contains("### Story Information"));
+        assert!(body.contains("**Story ID:** US-001"));
+        assert!(body.contains("**Story Title:** Test story"));
+        assert!(body.contains("### Error Details"));
+        assert!(body.contains("Test error message"));
+        assert!(body.contains("*This issue was automatically created by Ralph autonomous agent.*"));
+
+        // Should NOT contain context section when context is None
+        assert!(!body.contains("### Additional Context"));
+    }
+
+    #[tokio::test]
+    async fn test_format_failure_issue_body_with_context() {
+        let config = GitHubConfig::new(
+            "test_token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+            1,
+        );
+        let provider = GitHubProjectsProvider::new(config).unwrap();
+        let request = FailureIssueRequest {
+            story_id: "US-002".to_string(),
+            story_title: "Another story".to_string(),
+            error: "Compilation failed".to_string(),
+            context: Some("Stack trace:\n  at main.rs:42".to_string()),
+        };
+
+        let body = provider.format_failure_issue_body(&request);
+
+        // Check that body contains context section
+        assert!(body.contains("### Additional Context"));
+        assert!(body.contains("<details>"));
+        assert!(body.contains("<summary>Click to expand</summary>"));
+        assert!(body.contains("Stack trace:\n  at main.rs:42"));
+        assert!(body.contains("</details>"));
+    }
+
+    #[test]
+    fn test_failure_issue_title_format() {
+        // Test that title is formatted correctly
+        let story_title = "Create user authentication";
+        let expected_title = format!("[Ralph Failure] {}", story_title);
+        assert_eq!(expected_title, "[Ralph Failure] Create user authentication");
+    }
+
+    #[tokio::test]
+    async fn test_format_failure_issue_body_special_characters() {
+        let config = GitHubConfig::new(
+            "test_token".to_string(),
+            "owner".to_string(),
+            "repo".to_string(),
+            1,
+        );
+        let provider = GitHubProjectsProvider::new(config).unwrap();
+        let request = FailureIssueRequest {
+            story_id: "US-003".to_string(),
+            story_title: "Test with \"quotes\" and <html>".to_string(),
+            error: "Error with `backticks` and *asterisks*".to_string(),
+            context: None,
+        };
+
+        let body = provider.format_failure_issue_body(&request);
+
+        // Body should contain the special characters as-is (markdown rendering will handle them)
+        assert!(body.contains("\"quotes\""));
+        assert!(body.contains("<html>"));
+        assert!(body.contains("`backticks`"));
+        assert!(body.contains("*asterisks*"));
     }
 
     #[tokio::test]
