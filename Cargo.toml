@@ -53,6 +53,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Terminal UI dependencies
 console = "0.15"
 crossterm = "0.27"
+ctrlc = "3.4"
 indicatif = "0.17"
 owo-colors = "4"
 

@@ -4,7 +4,11 @@
 
 #![allow(dead_code)]
 
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
 use crate::ui::colors::Theme;
+use crate::ui::interrupt::InterruptHandler;
 use crate::ui::spinner::{IterationProgress, ProgressManager, RalphSpinner};
 
 /// Main display controller for Ralph's terminal output.
@@ -25,6 +29,10 @@ pub struct RalphDisplay {
     active_spinner: Option<RalphSpinner>,
     /// Current iteration progress bar (if any)
     iteration_progress: Option<IterationProgress>,
+    /// Interrupt handler for Ctrl+C handling
+    interrupt_handler: InterruptHandler,
+    /// Current story ID being processed (for interrupt display)
+    current_story_id: Option<String>,
 }
 
 impl Default for RalphDisplay {
@@ -44,6 +52,8 @@ impl RalphDisplay {
             progress_manager: ProgressManager::with_theme(theme),
             active_spinner: None,
             iteration_progress: None,
+            interrupt_handler: InterruptHandler::with_theme(theme),
+            current_story_id: None,
         }
     }
 
@@ -56,6 +66,8 @@ impl RalphDisplay {
             progress_manager: ProgressManager::with_theme(theme),
             active_spinner: None,
             iteration_progress: None,
+            interrupt_handler: InterruptHandler::with_theme(theme),
+            current_story_id: None,
         }
     }
 
@@ -243,5 +255,73 @@ impl RalphDisplay {
     /// Get the progress manager for advanced multi-progress use.
     pub fn progress_manager(&self) -> &ProgressManager {
         &self.progress_manager
+    }
+
+    // =========================================================================
+    // Interrupt Handling
+    // =========================================================================
+
+    /// Install the Ctrl+C signal handler.
+    ///
+    /// This should be called once at startup to enable graceful interruption.
+    pub fn install_interrupt_handler(&self) -> std::io::Result<()> {
+        self.interrupt_handler.install_handler()
+    }
+
+    /// Check if an interrupt has been requested.
+    pub fn is_interrupted(&self) -> bool {
+        self.interrupt_handler.is_interrupted()
+    }
+
+    /// Get the cancellation flag for cooperative cancellation.
+    ///
+    /// Pass this to long-running operations so they can check for cancellation.
+    pub fn cancel_flag(&self) -> Arc<AtomicBool> {
+        self.interrupt_handler.cancel_flag()
+    }
+
+    /// Set the current story ID for interrupt display.
+    pub fn set_current_story(&mut self, story_id: impl Into<String>) {
+        self.current_story_id = Some(story_id.into());
+    }
+
+    /// Clear the current story ID.
+    pub fn clear_current_story(&mut self) {
+        self.current_story_id = None;
+    }
+
+    /// Get the current story ID.
+    pub fn current_story_id(&self) -> Option<&str> {
+        self.current_story_id.as_deref()
+    }
+
+    /// Display the interruption panel with current story info.
+    ///
+    /// This should be called when an interrupt is detected to show
+    /// the user what story will be retried on the next run.
+    pub fn display_interrupt(&self) {
+        self.interrupt_handler
+            .display_interrupt(self.current_story_id.as_deref());
+    }
+
+    /// Render the interruption panel as a string.
+    pub fn render_interrupt_panel(&self) -> String {
+        self.interrupt_handler
+            .render_interrupt_panel(self.current_story_id.as_deref())
+    }
+
+    /// Display a cleanup progress step.
+    pub fn display_cleanup_step(&self, step: &str) {
+        self.interrupt_handler.display_cleanup_step(step);
+    }
+
+    /// Reset the interrupt state.
+    pub fn reset_interrupt(&self) {
+        self.interrupt_handler.reset();
+    }
+
+    /// Get the interrupt handler for direct access.
+    pub fn interrupt_handler(&self) -> &InterruptHandler {
+        &self.interrupt_handler
     }
 }
