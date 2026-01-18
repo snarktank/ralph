@@ -85,7 +85,7 @@
       "description": "As a maintainer, I want the CI workflow to leverage all caching optimizations for fastest possible builds.",
       "id": "US-005",
       "notes": "Workflow is at .github/workflows/docker.yml",
-      "passes": false,
+      "passes": true,
       "priority": 5,
       "title": "Update GitHub Actions workflow for optimized builds"
     },
