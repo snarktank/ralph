@@ -12,7 +12,8 @@ ARG VERSION=dev
 ARG COMMIT_SHA=unknown
 
 # Stage 1: Build the Rust binary
-FROM rust:1.85-slim-bookworm AS builder
+# Using latest Rust for newest dependency support
+FROM rust:slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
