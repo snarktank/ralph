@@ -11,7 +11,7 @@ use std::time::Duration;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use owo_colors::OwoColorize;
 
-use crate::ui::colors::Theme;
+use crate::ui::colors::{ansi, Theme};
 
 /// Custom spinner character sequences.
 pub mod spinner_chars {
@@ -29,6 +29,32 @@ pub mod spinner_chars {
 
     /// Block spinner pattern - block rotation
     pub const BLOCK: &[&str] = &["▖", "▘", "▝", "▗"];
+
+    /// Pulse spinner pattern - pulsing animation
+    pub const PULSE: &[&str] = &["●", "◉", "○", "◉"];
+
+    /// Arrow spinner pattern - rotating arrow
+    pub const ARROW: &[&str] = &["←", "↖", "↑", "↗", "→", "↘", "↓", "↙"];
+
+    /// Clock spinner pattern - clock hands
+    pub const CLOCK: &[&str] = &[
+        "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛",
+    ];
+}
+
+/// Blinking indicator styles.
+pub mod blink_chars {
+    /// Simple blink - alternating visibility
+    pub const SIMPLE: &[&str] = &["●", " "];
+
+    /// Pulse blink - size variation
+    pub const PULSE: &[&str] = &["●", "◉", "○", "◉"];
+
+    /// Signal blink - radio signal style
+    pub const SIGNAL: &[&str] = &["◯", "◔", "◑", "◕", "●"];
+
+    /// Heartbeat blink
+    pub const HEARTBEAT: &[&str] = &["♡", "♥", "♥", "♡"];
 }
 
 /// Progress bar characters for iteration visualization.
@@ -460,6 +486,279 @@ impl ProgressManager {
     /// Clear all progress bars.
     pub fn clear(&self) -> std::io::Result<()> {
         self.multi_progress.clear()
+    }
+
+    /// Create a blinking indicator attached to this manager.
+    pub fn add_blinking_indicator(&self, label: impl Into<String>) -> BlinkingIndicator {
+        BlinkingIndicator::with_multi(&self.multi_progress, label)
+    }
+}
+
+/// A blinking progress indicator for showing active processes.
+///
+/// Provides a visual pulsing/blinking animation to indicate
+/// that something is actively running.
+#[derive(Debug, Clone)]
+pub struct BlinkingIndicator {
+    /// The underlying progress bar
+    progress_bar: ProgressBar,
+    /// The label text
+    label: String,
+    /// Color theme
+    theme: Theme,
+    /// Blink style
+    blink_style: BlinkStyle,
+}
+
+/// Style of blinking animation.
+#[derive(Debug, Clone, Copy, Default)]
+pub enum BlinkStyle {
+    /// Simple on/off blink
+    #[default]
+    Simple,
+    /// Pulsing size change
+    Pulse,
+    /// Radio signal style
+    Signal,
+    /// Heartbeat style
+    Heartbeat,
+}
+
+impl BlinkingIndicator {
+    /// Create a new blinking indicator with the given label.
+    pub fn new(label: impl Into<String>) -> Self {
+        let label = label.into();
+        let theme = Theme::default();
+
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(Self::create_style(&theme, BlinkStyle::default()));
+        pb.set_message(label.clone());
+        pb.enable_steady_tick(Duration::from_millis(250)); // Slower tick for blink effect
+
+        Self {
+            progress_bar: pb,
+            label,
+            theme,
+            blink_style: BlinkStyle::default(),
+        }
+    }
+
+    /// Create a blinking indicator with a custom theme.
+    pub fn with_theme(label: impl Into<String>, theme: Theme) -> Self {
+        let label = label.into();
+
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(Self::create_style(&theme, BlinkStyle::default()));
+        pb.set_message(label.clone());
+        pb.enable_steady_tick(Duration::from_millis(250));
+
+        Self {
+            progress_bar: pb,
+            label,
+            theme,
+            blink_style: BlinkStyle::default(),
+        }
+    }
+
+    /// Create a blinking indicator attached to a MultiProgress.
+    pub fn with_multi(mp: &MultiProgress, label: impl Into<String>) -> Self {
+        let label = label.into();
+        let theme = Theme::default();
+
+        let pb = mp.add(ProgressBar::new_spinner());
+        pb.set_style(Self::create_style(&theme, BlinkStyle::default()));
+        pb.set_message(label.clone());
+        pb.enable_steady_tick(Duration::from_millis(250));
+
+        Self {
+            progress_bar: pb,
+            label,
+            theme,
+            blink_style: BlinkStyle::default(),
+        }
+    }
+
+    /// Set the blink style.
+    pub fn with_blink_style(mut self, style: BlinkStyle) -> Self {
+        self.blink_style = style;
+        self.progress_bar
+            .set_style(Self::create_style(&self.theme, style));
+        self
+    }
+
+    /// Create the progress style for blinking.
+    fn create_style(theme: &Theme, style: BlinkStyle) -> ProgressStyle {
+        let chars = match style {
+            BlinkStyle::Simple => blink_chars::SIMPLE,
+            BlinkStyle::Pulse => blink_chars::PULSE,
+            BlinkStyle::Signal => blink_chars::SIGNAL,
+            BlinkStyle::Heartbeat => blink_chars::HEARTBEAT,
+        };
+        let spinner_chars = chars.join("");
+        let active_rgb = theme.active;
+
+        // Format: blinking indicator followed by message
+        ProgressStyle::with_template(&format!(
+            "{{spinner:.color({},{},{})}} {{msg}}",
+            active_rgb.0, active_rgb.1, active_rgb.2
+        ))
+        .unwrap_or_else(|_| ProgressStyle::default_spinner())
+        .tick_strings(&[&spinner_chars, "●"])
+    }
+
+    /// Update the label.
+    pub fn set_label(&self, label: impl Into<String>) {
+        self.progress_bar.set_message(label.into());
+    }
+
+    /// Get the current label.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// Finish and clear the indicator.
+    pub fn finish_and_clear(&self) {
+        self.progress_bar.finish_and_clear();
+    }
+
+    /// Finish the indicator without clearing.
+    pub fn finish(&self) {
+        self.progress_bar.finish();
+    }
+
+    /// Finish with a success message.
+    pub fn finish_with_success(&self, message: impl Into<String>) {
+        let msg = message.into();
+        let styled_msg = format!("{} {}", "✓".color(self.theme.success), msg);
+        self.progress_bar.finish_with_message(styled_msg);
+    }
+
+    /// Finish with an error message.
+    pub fn finish_with_error(&self, message: impl Into<String>) {
+        let msg = message.into();
+        let styled_msg = format!("{} {}", "✗".color(self.theme.error), msg);
+        self.progress_bar.finish_with_message(styled_msg);
+    }
+}
+
+/// A live status indicator that shows real-time progress with blinking.
+///
+/// Combines a blinking indicator with status text that can be updated.
+#[derive(Debug)]
+pub struct LiveStatusIndicator {
+    /// Primary status text
+    status: String,
+    /// Secondary detail text
+    detail: Option<String>,
+    /// Progress counter (current/total)
+    progress: Option<(u64, u64)>,
+    /// Whether actively processing
+    active: bool,
+    /// Color theme
+    theme: Theme,
+    /// Frame counter for animation
+    frame: usize,
+}
+
+impl LiveStatusIndicator {
+    /// Create a new live status indicator.
+    pub fn new(status: impl Into<String>) -> Self {
+        Self {
+            status: status.into(),
+            detail: None,
+            progress: None,
+            active: true,
+            theme: Theme::default(),
+            frame: 0,
+        }
+    }
+
+    /// Set the detail text.
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    /// Set the progress counter.
+    pub fn with_progress(mut self, current: u64, total: u64) -> Self {
+        self.progress = Some((current, total));
+        self
+    }
+
+    /// Set whether the indicator is active.
+    pub fn set_active(&mut self, active: bool) {
+        self.active = active;
+    }
+
+    /// Update the status text.
+    pub fn set_status(&mut self, status: impl Into<String>) {
+        self.status = status.into();
+    }
+
+    /// Update the detail text.
+    pub fn set_detail(&mut self, detail: impl Into<String>) {
+        self.detail = Some(detail.into());
+    }
+
+    /// Clear the detail text.
+    pub fn clear_detail(&mut self) {
+        self.detail = None;
+    }
+
+    /// Update the progress.
+    pub fn set_progress(&mut self, current: u64, total: u64) {
+        self.progress = Some((current, total));
+    }
+
+    /// Advance the animation frame.
+    pub fn tick(&mut self) {
+        self.frame = (self.frame + 1) % 4;
+    }
+
+    /// Render the indicator as a string.
+    pub fn render(&self) -> String {
+        let mut output = String::new();
+
+        // Blinking indicator
+        if self.active {
+            let blink_chars = blink_chars::PULSE;
+            let blink = blink_chars[self.frame % blink_chars.len()];
+            output.push_str(&format!("{} ", blink.color(self.theme.active)));
+        } else {
+            output.push_str(&format!("{} ", "○".color(self.theme.muted)));
+        }
+
+        // Status text (orange when active, white otherwise)
+        if self.active {
+            output.push_str(&format!("{}", self.status.color(self.theme.active)));
+        } else {
+            output.push_str(&format!("{}", self.status.color(self.theme.primary)));
+        }
+
+        // Progress if present
+        if let Some((current, total)) = self.progress {
+            output.push_str(&format!(
+                " [{}/{}]",
+                current.to_string().color(self.theme.primary),
+                total.to_string().color(self.theme.muted)
+            ));
+        }
+
+        // Detail if present
+        if let Some(ref detail) = self.detail {
+            output.push_str(&format!(" - {}", detail.color(self.theme.muted)));
+        }
+
+        output
+    }
+
+    /// Render with ANSI blinking enabled.
+    pub fn render_with_blink(&self) -> String {
+        if self.active {
+            format!("{}{}{}", ansi::BLINK_START, self.render(), ansi::BLINK_END)
+        } else {
+            self.render()
+        }
     }
 }
 

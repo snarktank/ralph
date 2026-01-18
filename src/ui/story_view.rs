@@ -7,7 +7,7 @@
 
 use owo_colors::OwoColorize;
 
-use crate::ui::colors::Theme;
+use crate::ui::colors::{ansi, Theme};
 
 /// Information about a user story for display purposes.
 #[derive(Debug, Clone)]
@@ -122,8 +122,19 @@ impl StoryView {
         let id_colored = id_display.color(self.theme.story_id);
         let status_colored = match state {
             StoryViewState::Pending => status_display.color(self.theme.muted).to_string(),
-            StoryViewState::InProgress => status_display.color(self.theme.in_progress).to_string(),
-            StoryViewState::Completed => status_display.color(self.theme.success).to_string(),
+            StoryViewState::InProgress => {
+                // Use orange for active/in-progress state
+                status_display.color(self.theme.active).bold().to_string()
+            }
+            StoryViewState::Completed => {
+                // Use strikethrough for completed items
+                format!(
+                    "{}{}{}",
+                    ansi::STRIKETHROUGH_START,
+                    status_display.color(self.theme.completed),
+                    ansi::STRIKETHROUGH_END
+                )
+            }
             StoryViewState::Failed => status_display.color(self.theme.error).to_string(),
         };
 

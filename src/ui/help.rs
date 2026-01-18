@@ -183,6 +183,11 @@ pub const GLOBAL_OPTIONS: &[CommandInfo] = &[
     ),
     CommandInfo::new("--no-animation", "Disable startup animations", None),
     CommandInfo::new("--quiet, -q", "Suppress all output except errors", None),
+    CommandInfo::new(
+        "-v, -vv, -vvv",
+        "Increase verbosity (expand details, debug info)",
+        None,
+    ),
     CommandInfo::new("--help, -h", "Print help information", None),
     CommandInfo::new(
         "--version, -V",

@@ -41,6 +41,12 @@ pub struct DisplayOptions {
     pub color: Option<bool>,
     /// Whether to suppress all non-error output
     pub quiet: bool,
+    /// Whether to show streaming output (under the hood view)
+    pub show_streaming: bool,
+    /// Whether to expand detailed sections by default
+    pub expand_details: bool,
+    /// Verbosity level (0 = normal, 1 = verbose, 2 = very verbose)
+    pub verbosity: u8,
 }
 
 impl DisplayOptions {
@@ -75,6 +81,42 @@ impl DisplayOptions {
     pub fn with_quiet(mut self, quiet: bool) -> Self {
         self.quiet = quiet;
         self
+    }
+
+    /// Enable streaming output (under the hood view).
+    pub fn with_streaming(mut self, show: bool) -> Self {
+        self.show_streaming = show;
+        self
+    }
+
+    /// Expand detailed sections by default.
+    pub fn with_expand_details(mut self, expand: bool) -> Self {
+        self.expand_details = expand;
+        self
+    }
+
+    /// Set verbosity level.
+    ///
+    /// - 0: Normal output
+    /// - 1: Verbose (show streaming, expand details)
+    /// - 2: Very verbose (show all internal details)
+    pub fn with_verbosity(mut self, level: u8) -> Self {
+        self.verbosity = level;
+        if level >= 1 {
+            self.show_streaming = true;
+            self.expand_details = true;
+        }
+        self
+    }
+
+    /// Check if streaming output should be shown.
+    pub fn should_show_streaming(&self) -> bool {
+        self.show_streaming || self.verbosity >= 1
+    }
+
+    /// Check if details should be expanded.
+    pub fn should_expand_details(&self) -> bool {
+        self.expand_details || self.verbosity >= 1
     }
 
     /// Check if colors should be enabled based on options and environment.

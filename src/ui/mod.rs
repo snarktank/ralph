@@ -5,6 +5,7 @@
 
 #![allow(unused_imports)]
 
+mod collapsible;
 mod colors;
 mod display;
 mod ghostty;
@@ -12,6 +13,7 @@ mod help;
 mod image_to_ansi;
 mod interrupt;
 mod iteration_view;
+mod keyboard;
 mod kitty_graphics;
 mod mascot;
 mod quality_gates;
@@ -21,7 +23,12 @@ mod summary;
 pub mod tui;
 mod tui_runner;
 
-pub use colors::Theme;
+pub use collapsible::{
+    CollapsibleIterationSummary, CollapsibleSection, CollapsibleState, StreamingDisplayOptions,
+};
+pub use colors::{
+    active_text, ansi, blinking_text, completed_text, muted_text, primary_text, StyledText, Theme,
+};
 pub use display::{DisplayOptions, RalphDisplay, UiMode};
 pub use ghostty::{
     file_hyperlink, file_hyperlink_with_line, hyperlink, GhosttyFeatures, SyncGuard,
@@ -39,11 +46,16 @@ pub use iteration_view::{
     ActivityIndicator, GateProgress, GateProgressInfo, GateSummary, IterationPreview,
     IterationSummary, IterationSummaryStack, LiveIterationPanel,
 };
+pub use keyboard::{
+    render_compact_hint, render_toggle_hint, KeyBindings, KeyboardListener, ListenerHandle,
+    ToggleEvent, ToggleState,
+};
 pub use kitty_graphics::{display_mascot, mascot_inline_string, ImagePlacement, KittyGraphics};
 pub use mascot::{random_image_mascot, AnimationConfig, Mascot, MascotRenderer, PeekAnimation};
 pub use quality_gates::{GateStatus, QualityGateRenderer, QualityGateView};
 pub use spinner::{
-    progress_chars, spinner_chars, IterationProgress, ProgressManager, RalphSpinner, SpinnerStyle,
+    blink_chars, progress_chars, spinner_chars, BlinkStyle, BlinkingIndicator, IterationProgress,
+    LiveStatusIndicator, ProgressManager, RalphSpinner, SpinnerStyle,
 };
 pub use story_view::{StoryInfo, StoryView, StoryViewState};
 pub use summary::{ExecutionSummary, GateStatistics, StoryResult, SummaryRenderer};
