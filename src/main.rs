@@ -5,16 +5,26 @@ use std::path::PathBuf;
 mod integrations;
 mod mcp;
 mod quality;
+mod ui;
 
 use mcp::RalphMcpServer;
+use ui::HelpRenderer;
 
 #[derive(Parser, Debug)]
 #[command(name = "ralph")]
-#[command(version)]
+#[command(version, disable_version_flag = true)]
 #[command(about = "Enterprise-ready autonomous AI agent framework")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    /// Disable startup animations
+    #[arg(long, global = true)]
+    no_animation: bool,
+
+    /// Show version information with mascot
+    #[arg(short = 'V', long)]
+    version: bool,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -32,6 +42,15 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+
+    // Create help renderer with animation setting
+    let help_renderer = HelpRenderer::new().with_animation(!cli.no_animation);
+
+    // Handle version flag first (styled version with mascot)
+    if cli.version {
+        print!("{}", help_renderer.render_version());
+        return Ok(());
+    }
 
     match cli.command {
         Some(Commands::Quality) => {
@@ -68,10 +87,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             service.waiting().await?;
         }
         None => {
-            // Initialize logging to stdout for default mode
-            tracing_subscriber::fmt::init();
-            println!("Ralph - Enterprise-ready autonomous AI agent framework");
-            println!("Use --help for available commands");
+            // Default: show styled help with mascot
+            print!("{}", help_renderer.render_help());
         }
     }
 

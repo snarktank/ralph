@@ -22,7 +22,7 @@ fn test_version_flag_short() {
         .arg("-V")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ralph"))
+        .stdout(predicate::str::contains("RALPH").or(predicate::str::contains("ralph")))
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
@@ -32,7 +32,7 @@ fn test_version_flag_long() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ralph"))
+        .stdout(predicate::str::contains("RALPH").or(predicate::str::contains("ralph")))
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
@@ -131,7 +131,8 @@ fn test_no_args_shows_welcome() {
     ralph_cmd()
         .assert()
         .success()
-        .stdout(predicate::str::contains("Ralph"))
+        // Output contains "ralph" in the USAGE section
+        .stdout(predicate::str::contains("ralph"))
         .stdout(predicate::str::contains("--help"));
 }
 
