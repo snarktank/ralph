@@ -285,3 +285,14 @@ Feature: Parallel Story Execution
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
+
+## 2026-01-18 11:41 - US-025
+- **What was implemented**: Implement sequential fallback on conflict
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/parallel/scheduler.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---

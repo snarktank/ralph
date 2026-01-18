@@ -509,7 +509,7 @@
       "description": "As a user, I want conflicting stories to run sequentially instead of failing.",
       "id": "US-025",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 25,
       "targetFiles": [
         "src/parallel/scheduler.rs"
