@@ -51,6 +51,51 @@ pub struct ParallelExecutionState {
     pub locked_files: HashMap<PathBuf, String>,
 }
 
+impl ParallelExecutionState {
+    /// Attempts to acquire locks on the given file patterns for a story.
+    ///
+    /// Returns `true` if all locks were acquired successfully, `false` if any
+    /// file is already locked by another story. If acquisition fails, no locks
+    /// are added (atomic behavior).
+    ///
+    /// # Arguments
+    ///
+    /// * `story_id` - The ID of the story requesting the locks
+    /// * `target_files` - List of file patterns that the story will modify
+    pub fn acquire_locks(&mut self, story_id: &str, target_files: &[String]) -> bool {
+        // First, check if any file is already locked by another story
+        for file_pattern in target_files {
+            let path = PathBuf::from(file_pattern);
+            if let Some(locking_story) = self.locked_files.get(&path) {
+                if locking_story != story_id {
+                    // File is locked by another story
+                    return false;
+                }
+            }
+        }
+
+        // All files are available, acquire all locks
+        for file_pattern in target_files {
+            let path = PathBuf::from(file_pattern);
+            self.locked_files.insert(path, story_id.to_string());
+        }
+
+        true
+    }
+
+    /// Releases all file locks held by a story.
+    ///
+    /// This should be called when a story completes (success or failure).
+    ///
+    /// # Arguments
+    ///
+    /// * `story_id` - The ID of the story releasing its locks
+    pub fn release_locks(&mut self, story_id: &str) {
+        self.locked_files
+            .retain(|_path, locking_story| locking_story != story_id);
+    }
+}
+
 /// The main parallel runner that executes multiple stories concurrently.
 ///
 /// This struct manages parallel story execution with concurrency limiting
@@ -180,11 +225,12 @@ impl ParallelRunner {
             drop(state);
 
             // Get stories ready to execute (dependencies satisfied, not completed, not in flight)
-            let ready_stories: Vec<String> = graph
+            // Keep the full StoryNode so we have access to target_files for locking
+            let ready_stories: Vec<_> = graph
                 .get_ready_stories(&completed)
                 .into_iter()
                 .filter(|s| !in_flight.contains(&s.id))
-                .map(|s| s.id.clone())
+                .cloned()
                 .collect();
 
             // Check if we're done or stuck
@@ -218,16 +264,25 @@ impl ParallelRunner {
             // Spawn tasks for ready stories (up to available semaphore permits)
             let mut handles = Vec::new();
 
-            for story_id in ready_stories {
+            for story in ready_stories {
+                let story_id = story.id.clone();
+                let target_files = story.target_files.clone();
+
                 // Try to acquire semaphore permit
                 let permit = match self.semaphore.clone().try_acquire_owned() {
                     Ok(p) => p,
                     Err(_) => break, // No more permits available
                 };
 
-                // Mark story as in-flight
+                // Try to acquire file locks; skip this story if files are locked
                 {
                     let mut state = self.execution_state.write().await;
+                    if !state.acquire_locks(&story_id, &target_files) {
+                        // Files are locked by another story, skip for now
+                        drop(permit); // Release the semaphore permit
+                        continue;
+                    }
+                    // Mark story as in-flight
                     state.in_flight.insert(story_id.clone());
                 }
 
@@ -258,6 +313,8 @@ impl ParallelRunner {
                     // Update state based on result
                     let mut state = execution_state.write().await;
                     state.in_flight.remove(&story_id_clone);
+                    // Release file locks (success or failure)
+                    state.release_locks(&story_id_clone);
 
                     match result {
                         Ok(exec_result) if exec_result.success => {

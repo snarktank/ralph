@@ -407,7 +407,7 @@
       "description": "As a developer, I want to control parallel concurrency from CLI.",
       "id": "US-020",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 20,
       "targetFiles": [
         "src/main.rs"
