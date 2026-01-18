@@ -353,3 +353,14 @@ Feature: Parallel Story Execution
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
+
+## 2026-01-18 11:57 - US-031
+- **What was implemented**: Add unit tests for DependencyGraph
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/parallel/dependency.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---

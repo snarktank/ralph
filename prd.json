@@ -634,7 +634,7 @@
       "description": "As a developer, I need comprehensive tests for the dependency graph.",
       "id": "US-031",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 31,
       "targetFiles": [
         "src/parallel/dependency.rs"
