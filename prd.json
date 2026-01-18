@@ -72,7 +72,7 @@
       "description": "As a developer, I need the parallel module directory and mod.rs created.",
       "id": "US-004",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 4,
       "targetFiles": [
         "src/parallel/mod.rs",
