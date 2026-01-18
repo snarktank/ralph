@@ -592,7 +592,7 @@
       "description": "As a user, I want reconciliation to run after parallel batch completion.",
       "id": "US-029",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 29,
       "targetFiles": [
         "src/parallel/scheduler.rs"

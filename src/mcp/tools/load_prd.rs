@@ -47,6 +47,69 @@ pub struct PrdFile {
     /// List of user stories
     #[serde(rename = "userStories")]
     pub user_stories: Vec<PrdUserStory>,
+    /// Configuration for parallel story execution
+    #[serde(default)]
+    pub parallel: Option<ParallelConfig>,
+}
+
+/// Strategy for handling conflicts in parallel execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ParallelConflictStrategy {
+    /// Detect conflicts based on file paths (target_files).
+    /// Stories modifying the same files cannot run concurrently.
+    #[default]
+    FileBased,
+    /// Detect conflicts based on entity references.
+    /// Stories referencing the same entities cannot run concurrently.
+    EntityBased,
+    /// No conflict detection. All ready stories can run concurrently.
+    None,
+}
+
+/// Mode for inferring dependencies between stories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum InferenceMode {
+    /// Automatically infer dependencies from target file patterns.
+    #[default]
+    Auto,
+    /// Only use explicitly declared dependencies.
+    Explicit,
+    /// Disable dependency inference entirely.
+    Disabled,
+}
+
+/// Configuration for parallel story execution in the PRD.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ParallelConfig {
+    /// Whether parallel execution is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Maximum number of stories to execute concurrently.
+    #[serde(rename = "maxConcurrency", default = "default_max_concurrency")]
+    pub max_concurrency: u32,
+    /// Strategy for detecting and handling conflicts.
+    #[serde(rename = "conflictStrategy", default)]
+    pub conflict_strategy: ParallelConflictStrategy,
+    /// Mode for inferring dependencies between stories.
+    #[serde(rename = "inferenceMode", default)]
+    pub inference_mode: InferenceMode,
+}
+
+fn default_max_concurrency() -> u32 {
+    3
+}
+
+impl Default for ParallelConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_concurrency: default_max_concurrency(),
+            conflict_strategy: ParallelConflictStrategy::default(),
+            inference_mode: InferenceMode::default(),
+        }
+    }
 }
 
 /// User story structure for validation.
@@ -556,5 +619,139 @@ mod tests {
 
         let story: PrdUserStory = serde_json::from_str(json).unwrap();
         assert!(story.target_files.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_prd_without_parallel() {
+        let mut file = NamedTempFile::new().unwrap();
+        let prd_content = r#"{
+            "project": "TestProject",
+            "branchName": "feature/test",
+            "description": "Test PRD",
+            "userStories": [
+                {
+                    "id": "US-001",
+                    "title": "First story",
+                    "priority": 1,
+                    "passes": false
+                }
+            ]
+        }"#;
+        file.write_all(prd_content.as_bytes()).unwrap();
+
+        let prd = validate_prd(file.path()).unwrap();
+        assert!(prd.parallel.is_none());
+    }
+
+    #[test]
+    fn test_deserialize_prd_with_parallel_enabled() {
+        let mut file = NamedTempFile::new().unwrap();
+        let prd_content = r#"{
+            "project": "TestProject",
+            "branchName": "feature/test",
+            "description": "Test PRD",
+            "userStories": [
+                {
+                    "id": "US-001",
+                    "title": "First story",
+                    "priority": 1,
+                    "passes": false
+                }
+            ],
+            "parallel": {
+                "enabled": true,
+                "maxConcurrency": 5,
+                "conflictStrategy": "entity_based",
+                "inferenceMode": "explicit"
+            }
+        }"#;
+        file.write_all(prd_content.as_bytes()).unwrap();
+
+        let prd = validate_prd(file.path()).unwrap();
+        assert!(prd.parallel.is_some());
+        let parallel = prd.parallel.unwrap();
+        assert!(parallel.enabled);
+        assert_eq!(parallel.max_concurrency, 5);
+        assert_eq!(
+            parallel.conflict_strategy,
+            ParallelConflictStrategy::EntityBased
+        );
+        assert_eq!(parallel.inference_mode, InferenceMode::Explicit);
+    }
+
+    #[test]
+    fn test_deserialize_prd_with_partial_parallel_config() {
+        let mut file = NamedTempFile::new().unwrap();
+        let prd_content = r#"{
+            "project": "TestProject",
+            "branchName": "feature/test",
+            "description": "Test PRD",
+            "userStories": [
+                {
+                    "id": "US-001",
+                    "title": "First story",
+                    "priority": 1,
+                    "passes": false
+                }
+            ],
+            "parallel": {
+                "enabled": true
+            }
+        }"#;
+        file.write_all(prd_content.as_bytes()).unwrap();
+
+        let prd = validate_prd(file.path()).unwrap();
+        assert!(prd.parallel.is_some());
+        let parallel = prd.parallel.unwrap();
+        assert!(parallel.enabled);
+        // Check defaults are applied
+        assert_eq!(parallel.max_concurrency, 3);
+        assert_eq!(
+            parallel.conflict_strategy,
+            ParallelConflictStrategy::FileBased
+        );
+        assert_eq!(parallel.inference_mode, InferenceMode::Auto);
+    }
+
+    #[test]
+    fn test_parallel_config_default() {
+        let config = ParallelConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.max_concurrency, 3);
+        assert_eq!(
+            config.conflict_strategy,
+            ParallelConflictStrategy::FileBased
+        );
+        assert_eq!(config.inference_mode, InferenceMode::Auto);
+    }
+
+    #[test]
+    fn test_parallel_conflict_strategy_serialize() {
+        let strategy = ParallelConflictStrategy::FileBased;
+        let json = serde_json::to_string(&strategy).unwrap();
+        assert_eq!(json, "\"file_based\"");
+
+        let strategy = ParallelConflictStrategy::EntityBased;
+        let json = serde_json::to_string(&strategy).unwrap();
+        assert_eq!(json, "\"entity_based\"");
+
+        let strategy = ParallelConflictStrategy::None;
+        let json = serde_json::to_string(&strategy).unwrap();
+        assert_eq!(json, "\"none\"");
+    }
+
+    #[test]
+    fn test_inference_mode_serialize() {
+        let mode = InferenceMode::Auto;
+        let json = serde_json::to_string(&mode).unwrap();
+        assert_eq!(json, "\"auto\"");
+
+        let mode = InferenceMode::Explicit;
+        let json = serde_json::to_string(&mode).unwrap();
+        assert_eq!(json, "\"explicit\"");
+
+        let mode = InferenceMode::Disabled;
+        let json = serde_json::to_string(&mode).unwrap();
+        assert_eq!(json, "\"disabled\"");
     }
 }
