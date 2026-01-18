@@ -69,6 +69,9 @@ pub struct PrdUserStory {
     /// IDs of stories this story depends on
     #[serde(rename = "dependsOn", default)]
     pub depends_on: Vec<String>,
+    /// Files that this story will modify (for conflict detection)
+    #[serde(rename = "targetFiles", default)]
+    pub target_files: Vec<String>,
 }
 
 /// Validation error types for PRD files.
@@ -501,5 +504,57 @@ mod tests {
 
         let story: PrdUserStory = serde_json::from_str(json).unwrap();
         assert!(story.depends_on.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_story_without_target_files() {
+        let json = r#"{
+            "id": "US-001",
+            "title": "Test Story",
+            "description": "A story without target files",
+            "acceptanceCriteria": ["AC1"],
+            "priority": 1,
+            "passes": false
+        }"#;
+
+        let story: PrdUserStory = serde_json::from_str(json).unwrap();
+        assert_eq!(story.id, "US-001");
+        assert_eq!(story.title, "Test Story");
+        assert!(story.target_files.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_story_with_target_files() {
+        let json = r#"{
+            "id": "US-002",
+            "title": "Story with target files",
+            "description": "A story that modifies specific files",
+            "acceptanceCriteria": ["AC1"],
+            "priority": 2,
+            "passes": false,
+            "targetFiles": ["src/main.rs", "src/lib.rs", "Cargo.toml"]
+        }"#;
+
+        let story: PrdUserStory = serde_json::from_str(json).unwrap();
+        assert_eq!(story.id, "US-002");
+        assert_eq!(story.title, "Story with target files");
+        assert_eq!(
+            story.target_files,
+            vec!["src/main.rs", "src/lib.rs", "Cargo.toml"]
+        );
+    }
+
+    #[test]
+    fn test_deserialize_story_with_empty_target_files() {
+        let json = r#"{
+            "id": "US-001",
+            "title": "Story with empty target files",
+            "priority": 1,
+            "passes": false,
+            "targetFiles": []
+        }"#;
+
+        let story: PrdUserStory = serde_json::from_str(json).unwrap();
+        assert!(story.target_files.is_empty());
     }
 }

@@ -31,7 +31,7 @@
       "description": "As a PRD author, I want to specify explicit story dependencies.",
       "id": "US-002",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 2,
       "targetFiles": [
         "src/mcp/tools/load_prd.rs"
