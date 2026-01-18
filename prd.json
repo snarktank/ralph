@@ -102,7 +102,7 @@
       "description": "As a maintainer, I want to verify the optimizations work and measure the improvement.",
       "id": "US-006",
       "notes": "Verify all optimizations work together",
-      "passes": false,
+      "passes": true,
       "priority": 6,
       "title": "Test and benchmark optimized builds"
     },
