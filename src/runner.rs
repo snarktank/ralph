@@ -6,10 +6,12 @@ use tokio::sync::watch;
 
 use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::load_prd::{PrdFile, PrdUserStory};
+use crate::parallel::scheduler::ParallelRunnerConfig;
 use crate::ui::{DisplayOptions, TuiRunnerDisplay};
 
 /// Configuration for the runner
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // parallel fields will be used in future stories
 pub struct RunnerConfig {
     /// Path to the PRD file (defaults to "prd.json" in current dir)
     pub prd_path: PathBuf,
@@ -23,6 +25,10 @@ pub struct RunnerConfig {
     pub agent_command: Option<String>,
     /// Display options for UI rendering (includes quiet mode, verbosity, etc.)
     pub display_options: DisplayOptions,
+    /// Enable parallel execution mode
+    pub parallel: bool,
+    /// Configuration for parallel execution (used when parallel is true)
+    pub parallel_config: Option<ParallelRunnerConfig>,
 }
 
 impl Default for RunnerConfig {
@@ -34,6 +40,8 @@ impl Default for RunnerConfig {
             max_total_iterations: 0, // unlimited
             agent_command: None,
             display_options: DisplayOptions::default(),
+            parallel: false,
+            parallel_config: None,
         }
     }
 }
@@ -65,8 +73,26 @@ impl Runner {
         Self { config }
     }
 
-    /// Run all stories until all pass or an error occurs
+    /// Run all stories until all pass or an error occurs.
+    ///
+    /// Routes to parallel or sequential execution based on config.parallel.
     pub async fn run(&self) -> RunResult {
+        if self.config.parallel {
+            // Use parallel execution
+            let parallel_config = self.config.parallel_config.clone().unwrap_or_default();
+            let parallel_runner = crate::parallel::scheduler::ParallelRunner::new(
+                parallel_config,
+                self.config.clone(),
+            );
+            parallel_runner.run().await
+        } else {
+            // Use sequential execution
+            self.run_sequential().await
+        }
+    }
+
+    /// Run all stories sequentially until all pass or an error occurs
+    async fn run_sequential(&self) -> RunResult {
         let mut total_iterations: u32 = 0;
 
         // Create TUI display with display options
@@ -199,6 +225,7 @@ impl Runner {
                         quality_profile: None,
                         agent_command: agent.clone(),
                         max_iterations: self.config.max_iterations_per_story,
+                        git_mutex: None, // Sequential execution doesn't need mutex
                     };
 
                     let executor = StoryExecutor::new(executor_config);

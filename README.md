@@ -234,6 +234,96 @@ Edit `prompt.md` to customize Ralph's behavior for your project:
 - Include codebase conventions
 - Add common gotchas for your stack
 
+## Parallel Execution
+
+Ralph can execute independent stories in parallel to speed up development. Stories that don't depend on each other run concurrently, while dependencies are respected.
+
+### Enabling Parallel Mode
+
+```bash
+ralph --parallel                    # Enable parallel execution
+ralph --parallel --max-concurrency 5  # Run up to 5 stories at once
+```
+
+### CLI Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--parallel` | `false` | Enable parallel story execution |
+| `--max-concurrency` | `3` | Maximum concurrent stories (0 = unlimited) |
+
+### PRD Fields for Parallel Execution
+
+Add these optional fields to your user stories in `prd.json`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dependsOn` | `string[]` | Story IDs that must complete before this story starts |
+| `targetFiles` | `string[]` | File paths/patterns this story will modify |
+
+**How they work:**
+- `dependsOn`: Explicit dependencies. Story won't start until all listed stories pass.
+- `targetFiles`: Used for automatic conflict detection. Stories with overlapping files run sequentially to prevent merge conflicts.
+
+### Example PRD with Dependencies
+
+```json
+{
+  "branchName": "feature/user-auth",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add user model",
+      "targetFiles": ["src/models/user.rs", "src/models/mod.rs"],
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Add auth middleware",
+      "dependsOn": ["US-001"],
+      "targetFiles": ["src/middleware/auth.rs"],
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Add login endpoint",
+      "dependsOn": ["US-001", "US-002"],
+      "targetFiles": ["src/routes/auth.rs"],
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Add user settings page",
+      "dependsOn": ["US-001"],
+      "targetFiles": ["src/pages/settings.rs"],
+      "passes": false
+    }
+  ]
+}
+```
+
+In this example:
+- **US-001** runs first (no dependencies)
+- **US-002** and **US-004** can run in parallel after US-001 completes (different target files)
+- **US-003** waits for both US-001 and US-002
+
+### Automatic Dependency Inference
+
+When `targetFiles` patterns overlap between stories, Ralph automatically infers dependencies based on priority. Higher-priority stories (lower priority number) run first.
+
+For example, if two stories both target `src/**/*.rs`, the higher-priority story becomes a dependency of the lower-priority one.
+
+### Conflict Handling
+
+Ralph prevents conflicts through:
+
+1. **Pre-execution checks**: Stories with overlapping `targetFiles` don't run simultaneously
+2. **File locking**: Each story locks its target files during execution
+3. **Git mutex**: Git operations are serialized to prevent repository corruption
+4. **Post-batch reconciliation**: After each parallel batch, Ralph verifies the codebase compiles and has no merge conflicts
+
+If conflicts are detected, affected stories automatically retry sequentially.
+
 ## Archiving
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.

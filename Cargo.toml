@@ -32,10 +32,13 @@ axum = "0.8"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 config = { version = "0.14", default-features = false, features = ["toml"] }
+futures = "0.3"
+glob = "0.3"
 graphql_client = { version = "0.14", features = ["reqwest"] }
 hex = "0.4"
 hmac = "0.12"
 octocrab = "0.42"
+petgraph = "0.6"
 regex = "1"
 reqwest = { version = "0.12", features = ["json"] }
 rmcp = { version = "0.8", features = ["server", "transport-io", "macros"] }

@@ -13,7 +13,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::watch;
+use tokio::sync::{watch, Mutex};
 
 use crate::mcp::tools::load_prd::{PrdFile, PrdUserStory};
 use crate::quality::{GateResult, Profile, QualityGateChecker};
@@ -85,6 +85,8 @@ pub struct ExecutorConfig {
     pub agent_command: String,
     /// Maximum iterations per story
     pub max_iterations: u32,
+    /// Optional mutex for serializing git operations across parallel executions
+    pub git_mutex: Option<Arc<Mutex<()>>>,
 }
 
 impl Default for ExecutorConfig {
@@ -96,6 +98,7 @@ impl Default for ExecutorConfig {
             quality_profile: None,
             agent_command: "claude".to_string(),
             max_iterations: 10,
+            git_mutex: None,
         }
     }
 }
@@ -182,7 +185,7 @@ impl StoryExecutor {
 
             if all_passed {
                 // Success! Create commit and update PRD
-                let commit_hash = self.create_commit(story)?;
+                let commit_hash = self.create_commit(story).await?;
                 self.update_prd_passes(story_id)?;
                 self.append_progress(story, &files_changed, iteration)?;
 
@@ -355,7 +358,18 @@ impl StoryExecutor {
     }
 
     /// Create a git commit with the proper format
-    fn create_commit(&self, story: &PrdUserStory) -> Result<String, ExecutorError> {
+    ///
+    /// If a git_mutex is configured, this method will acquire the lock before
+    /// performing git operations to prevent concurrent git operations that could
+    /// corrupt the repository.
+    async fn create_commit(&self, story: &PrdUserStory) -> Result<String, ExecutorError> {
+        // Acquire git mutex if configured (for parallel execution)
+        let _guard = if let Some(ref mutex) = self.config.git_mutex {
+            Some(mutex.lock().await)
+        } else {
+            None
+        };
+
         // Stage all changes
         let status = Command::new("git")
             .args(["add", "-A"])
@@ -395,6 +409,7 @@ impl StoryExecutor {
 
         let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
         Ok(hash)
+        // _guard is dropped here, releasing the mutex lock
     }
 
     /// Update the PRD file to set passes: true for the story

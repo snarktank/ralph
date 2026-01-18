@@ -672,6 +672,7 @@ impl RalphMcpServer {
                 .map(|c| c.profiles.get("standard").cloned().unwrap_or_default()),
             agent_command,
             max_iterations,
+            git_mutex: None, // MCP server executes single story at a time
         };
 
         // Clone necessary data for the spawned task
