@@ -6,6 +6,7 @@ use tokio::sync::watch;
 
 use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::load_prd::{PrdFile, PrdUserStory};
+use crate::ui::TuiRunnerDisplay;
 
 /// Configuration for the runner
 #[derive(Debug, Clone)]
@@ -68,6 +69,9 @@ impl Runner {
     pub async fn run(&self) -> RunResult {
         let mut total_iterations: u32 = 0;
 
+        // Create TUI display
+        let mut display = TuiRunnerDisplay::new().with_quiet(self.config.quiet);
+
         // Load and validate PRD
         let prd = match self.load_prd() {
             Ok(prd) => prd,
@@ -84,13 +88,18 @@ impl Runner {
 
         let total_stories = prd.user_stories.len();
 
+        // Initialize display with story list
+        let story_status: Vec<(String, bool)> = prd
+            .user_stories
+            .iter()
+            .map(|s| (s.id.clone(), s.passes))
+            .collect();
+        display.init_stories(story_status);
+
         // Check if all stories already pass
         let passing_count = prd.user_stories.iter().filter(|s| s.passes).count();
         if passing_count == total_stories {
-            if !self.config.quiet {
-                println!("All {} stories passed!", total_stories);
-                println!("<promise>COMPLETE</promise>");
-            }
+            display.display_all_complete(total_stories);
             return RunResult {
                 all_passed: true,
                 stories_passed: total_stories,
@@ -114,13 +123,13 @@ impl Runner {
             }
         };
 
-        if !self.config.quiet {
-            println!("Starting Ralph iteration loop...");
-            println!("PRD: {}", self.config.prd_path.display());
-            println!("Agent: {}", agent);
-            println!("Stories: {}/{} passing", passing_count, total_stories);
-            println!();
-        }
+        // Display startup banner
+        display.display_startup(
+            &self.config.prd_path.display().to_string(),
+            &agent,
+            passing_count,
+            total_stories,
+        );
 
         // Main loop - continue until all stories pass
         loop {
@@ -138,17 +147,21 @@ impl Runner {
                 }
             };
 
+            // Update display with current story states
+            let story_status: Vec<(String, bool)> = prd
+                .user_stories
+                .iter()
+                .map(|s| (s.id.clone(), s.passes))
+                .collect();
+            display.init_stories(story_status);
+
             // Find next story to work on (highest priority where passes: false)
             let next_story = self.find_next_story(&prd);
 
             match next_story {
                 None => {
                     // All stories pass!
-                    if !self.config.quiet {
-                        println!();
-                        println!("All {} stories passed!", total_stories);
-                        println!("<promise>COMPLETE</promise>");
-                    }
+                    display.display_all_complete(total_stories);
                     return RunResult {
                         all_passed: true,
                         stories_passed: total_stories,
@@ -174,14 +187,8 @@ impl Runner {
                         };
                     }
 
-                    if !self.config.quiet {
-                        let passing = self.count_passing_stories().unwrap_or(0);
-                        println!(
-                            "=== Story: {} - {} (priority {}) ===",
-                            story.id, story.title, story.priority
-                        );
-                        println!("Progress: {}/{} stories passing", passing, total_stories);
-                    }
+                    // Display story start
+                    display.start_story(&story.id, &story.title, story.priority);
 
                     // Execute the story
                     let executor_config = ExecutorConfig {
@@ -197,13 +204,10 @@ impl Runner {
                     let (_cancel_tx, cancel_rx) = watch::channel(false);
 
                     let story_id = story.id.clone();
-                    let quiet = self.config.quiet;
 
                     let result = executor
                         .execute_story(&story_id, cancel_rx, |iter, max| {
-                            if !quiet {
-                                println!("  Iteration {}/{}", iter, max);
-                            }
+                            display.update_iteration(iter, max);
                         })
                         .await;
 
@@ -212,30 +216,17 @@ impl Runner {
                     match result {
                         Ok(exec_result) => {
                             if exec_result.success {
-                                if !self.config.quiet {
-                                    println!(
-                                        "  ✓ Story {} completed (commit: {})",
-                                        story_id,
-                                        exec_result.commit_hash.as_deref().unwrap_or("none")
-                                    );
-                                    println!();
-                                }
-                            } else if !self.config.quiet {
-                                println!(
-                                    "  ✗ Story {} failed: {}",
-                                    story_id,
-                                    exec_result.error.as_deref().unwrap_or("unknown")
+                                display
+                                    .complete_story(&story_id, exec_result.commit_hash.as_deref());
+                            } else {
+                                display.fail_story(
+                                    &story_id,
+                                    exec_result.error.as_deref().unwrap_or("unknown"),
                                 );
-                                println!("  Continuing to next story...");
-                                println!();
                             }
                         }
                         Err(e) => {
-                            if !self.config.quiet {
-                                println!("  ✗ Story {} error: {}", story_id, e);
-                                println!("  Continuing to next story...");
-                                println!();
-                            }
+                            display.fail_story(&story_id, &e.to_string());
                             // Don't fail the whole run, just continue
                         }
                     }

@@ -12,11 +12,14 @@ mod help;
 mod image_to_ansi;
 mod interrupt;
 mod iteration_view;
+mod kitty_graphics;
 mod mascot;
 mod quality_gates;
 mod spinner;
 mod story_view;
 mod summary;
+pub mod tui;
+mod tui_runner;
 
 pub use colors::Theme;
 pub use display::{DisplayOptions, RalphDisplay, UiMode};
@@ -36,6 +39,7 @@ pub use iteration_view::{
     ActivityIndicator, GateProgress, GateProgressInfo, GateSummary, IterationPreview,
     IterationSummary, IterationSummaryStack, LiveIterationPanel,
 };
+pub use kitty_graphics::{display_mascot, mascot_inline_string, ImagePlacement, KittyGraphics};
 pub use mascot::{random_image_mascot, AnimationConfig, Mascot, MascotRenderer, PeekAnimation};
 pub use quality_gates::{GateStatus, QualityGateRenderer, QualityGateView};
 pub use spinner::{
@@ -43,3 +47,4 @@ pub use spinner::{
 };
 pub use story_view::{StoryInfo, StoryView, StoryViewState};
 pub use summary::{ExecutionSummary, GateStatistics, StoryResult, SummaryRenderer};
+pub use tui_runner::TuiRunnerDisplay;

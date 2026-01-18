@@ -53,10 +53,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Terminal UI dependencies
 console = "0.15"
-crossterm = "0.27"
+crossterm = "0.28"
 ctrlc = "3.4"
 indicatif = "0.17"
 owo-colors = "4"
+ratatui = { version = "0.29", features = ["crossterm"] }
+base64 = "0.22"
 
 # Image-to-ANSI conversion
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

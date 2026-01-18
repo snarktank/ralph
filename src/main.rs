@@ -237,8 +237,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         None => {
             // Default: run stories if prd.json exists, otherwise show help
-            if cli.prd.exists() {
-                run_stories(&cli, cli.prd.clone(), cli.dir.clone(), cli.max_iterations).await?;
+            // Check multiple locations: prd.json, ralph/prd.json
+            let prd_path = find_prd_file(&cli.prd);
+            if let Some(prd) = prd_path {
+                run_stories(&cli, prd, cli.dir.clone(), cli.max_iterations).await?;
             } else {
                 print!("{}", help_renderer.render_help());
             }
@@ -246,6 +248,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+/// Find the PRD file, checking multiple locations
+fn find_prd_file(default_path: &std::path::Path) -> Option<PathBuf> {
+    // Check the specified path first
+    if default_path.exists() {
+        return Some(default_path.to_path_buf());
+    }
+
+    // Check ralph/prd.json
+    let ralph_prd = PathBuf::from("ralph/prd.json");
+    if ralph_prd.exists() {
+        return Some(ralph_prd);
+    }
+
+    // Check .ralph/prd.json
+    let dot_ralph_prd = PathBuf::from(".ralph/prd.json");
+    if dot_ralph_prd.exists() {
+        return Some(dot_ralph_prd);
+    }
+
+    None
 }
 
 /// Run stories from the PRD until all pass
