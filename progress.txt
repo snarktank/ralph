@@ -82,3 +82,19 @@ Started: Sat Jan 17 21:41:00 MST 2026
   - ANSI escape codes `\x1b[1A\x1b[2K` for clearing previous output (move up 1 line, clear line)
   - Duration formatting: seconds use `{:.1}s`, minutes use `{}m{:.1}s`
 ---
+
+## 2026-01-17 - US-006
+- What was implemented: Added collapsible iteration summaries with auto-expand for failures
+- Files changed:
+  - src/ui/iteration_view.rs: Added GateSummary, IterationSummary, and IterationSummaryStack structs with 28 new tests
+  - src/ui/mod.rs: Exported new types (GateSummary, IterationSummary, IterationSummaryStack)
+- **Learnings for future iterations:**
+  - IterationSummary renders collapsed format: "▸ Iteration 1/5: ✓ build ✓ lint ✓ test (3.2s)"
+  - Failed iterations auto-expand with "▾" indicator and show error details indented
+  - GateSummary supports optional duration and error_details for rich failure reporting
+  - IterationSummaryStack manages multiple completed iterations with total duration tracking
+  - render() auto-chooses collapsed vs expanded based on pass/fail status
+  - render_collapsed() vs render_expanded() available for explicit control
+  - LiveIterationPanel.to_summary() converts live panel to summary after completion
+  - render_final_summary() shows "All iterations passed" or "X/Y iterations passed" with total time
+---
