@@ -293,6 +293,8 @@ async fn run_stories(
         max_total_iterations: 0, // unlimited
         agent_command: None,     // auto-detect
         quiet: cli.quiet,
+        parallel: false,
+        parallel_config: None,
     };
 
     let runner = Runner::new(config);

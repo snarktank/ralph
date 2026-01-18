@@ -324,7 +324,7 @@
       "description": "As a user, I want parallel story execution.",
       "id": "US-016",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 16,
       "targetFiles": [
         "src/parallel/scheduler.rs"

@@ -6,10 +6,12 @@ use tokio::sync::watch;
 
 use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::load_prd::{PrdFile, PrdUserStory};
+use crate::parallel::scheduler::ParallelRunnerConfig;
 use crate::ui::TuiRunnerDisplay;
 
 /// Configuration for the runner
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // parallel fields will be used in future stories
 pub struct RunnerConfig {
     /// Path to the PRD file (defaults to "prd.json" in current dir)
     pub prd_path: PathBuf,
@@ -23,6 +25,10 @@ pub struct RunnerConfig {
     pub agent_command: Option<String>,
     /// Quiet mode - suppress output
     pub quiet: bool,
+    /// Enable parallel execution mode
+    pub parallel: bool,
+    /// Configuration for parallel execution (used when parallel is true)
+    pub parallel_config: Option<ParallelRunnerConfig>,
 }
 
 impl Default for RunnerConfig {
@@ -34,6 +40,8 @@ impl Default for RunnerConfig {
             max_total_iterations: 0, // unlimited
             agent_command: None,
             quiet: false,
+            parallel: false,
+            parallel_config: None,
         }
     }
 }
