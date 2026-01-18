@@ -530,7 +530,7 @@
       "description": "As a developer, I need reconciliation infrastructure.",
       "id": "US-026",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 26,
       "targetFiles": [
         "src/parallel/reconcile.rs"
