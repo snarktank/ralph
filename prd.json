@@ -448,7 +448,7 @@
       "description": "As a developer, I need to serialize git operations across parallel stories.",
       "id": "US-022",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 22,
       "targetFiles": [
         "src/parallel/scheduler.rs"

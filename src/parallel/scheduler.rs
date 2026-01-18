@@ -11,6 +11,21 @@ use crate::mcp::tools::load_prd::{validate_prd, PrdFile};
 use crate::parallel::dependency::DependencyGraph;
 use crate::runner::{RunResult, RunnerConfig};
 
+/// Strategy for detecting conflicts between parallel story executions.
+#[allow(dead_code)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum ConflictStrategy {
+    /// Detect conflicts based on file paths (target_files).
+    /// Stories modifying the same files cannot run concurrently.
+    #[default]
+    FileBased,
+    /// Detect conflicts based on entity references.
+    /// Stories referencing the same entities cannot run concurrently.
+    EntityBased,
+    /// No conflict detection. All ready stories can run concurrently.
+    None,
+}
+
 /// Configuration options for parallel story execution.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -21,6 +36,8 @@ pub struct ParallelRunnerConfig {
     pub infer_dependencies: bool,
     /// Whether to fall back to sequential execution on errors.
     pub fallback_to_sequential: bool,
+    /// Strategy for detecting conflicts between parallel stories.
+    pub conflict_strategy: ConflictStrategy,
 }
 
 impl Default for ParallelRunnerConfig {
@@ -29,6 +46,7 @@ impl Default for ParallelRunnerConfig {
             max_concurrency: 3,
             infer_dependencies: true,
             fallback_to_sequential: true,
+            conflict_strategy: ConflictStrategy::default(),
         }
     }
 }
