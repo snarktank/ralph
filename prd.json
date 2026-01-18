@@ -301,7 +301,7 @@
       "description": "As a developer, I need the main parallel runner structure.",
       "id": "US-015",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 15,
       "targetFiles": [
         "src/parallel/scheduler.rs"
