@@ -196,19 +196,57 @@ setup_git_branch() {
   
   echo "Setting up git branch: $target_branch"
   
-  # Stash any uncommitted changes first
-  if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-    echo "   Stashing uncommitted changes..."
-    git stash --include-untracked
-    STASHED=1
-  else
-    STASHED=0
+  # Save old branch files for archiving BEFORE switching (if branch changed)
+  # These will be used later for archiving the previous run
+  local old_prd_file=""
+  local old_progress_file=""
+  if [ -n "$current_branch" ] && [ "$current_branch" != "$target_branch" ]; then
+    if [ -f "$PRD_FILE" ]; then
+      old_prd_file="${PRD_FILE}.ralph_archive_tmp"
+      cp "$PRD_FILE" "$old_prd_file" 2>/dev/null || true
+    fi
+    if [ -f "$PROGRESS_FILE" ]; then
+      old_progress_file="${PROGRESS_FILE}.ralph_archive_tmp"
+      cp "$PROGRESS_FILE" "$old_progress_file" 2>/dev/null || true
+    fi
   fi
+  
+  # Check for ANY changes (tracked OR untracked)
+  local has_changes=0
+  if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    has_changes=1
+  fi
+  
+  # Check for untracked files (critical for prd.json/progress.txt)
+  if [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+    has_changes=1
+  fi
+  
+  # Stash any changes (tracked or untracked)
+  local STASHED=0
+  if [ "$has_changes" = "1" ]; then
+    echo "   Stashing uncommitted changes (including untracked files)..."
+    git stash push --include-untracked -m "ralph: auto-stash before branch switch to $target_branch"
+    STASHED=1
+  fi
+  
+  # Store temp file paths for later use in archive management
+  export RALPH_OLD_PRD_FILE="$old_prd_file"
+  export RALPH_OLD_PROGRESS_FILE="$old_progress_file"
   
   # Check if branch exists locally
   if git show-ref --verify --quiet "refs/heads/$target_branch" 2>/dev/null; then
     echo "   Switching to existing branch..."
-    git checkout "$target_branch"
+    if ! git checkout "$target_branch"; then
+      echo "   ERROR: Failed to checkout branch $target_branch"
+      if [ "$STASHED" = "1" ]; then
+        echo "   Your changes are still stashed. Use 'git stash list' to view."
+      fi
+      # Clean up temp files
+      [ -n "$old_prd_file" ] && [ -f "$old_prd_file" ] && rm -f "$old_prd_file"
+      [ -n "$old_progress_file" ] && [ -f "$old_progress_file" ] && rm -f "$old_progress_file"
+      exit 1
+    fi
   else
     # Create branch from main (or master, or current)
     local base_branch="main"
@@ -220,55 +258,52 @@ setup_git_branch() {
       fi
     fi
     echo "   Creating new branch from $base_branch..."
-    git checkout -b "$target_branch" "$base_branch"
+    if ! git checkout -b "$target_branch" "$base_branch"; then
+      echo "   ERROR: Failed to create branch $target_branch from $base_branch"
+      if [ "$STASHED" = "1" ]; then
+        echo "   Your changes are still stashed. Use 'git stash list' to view."
+      fi
+      # Clean up temp files
+      [ -n "$old_prd_file" ] && [ -f "$old_prd_file" ] && rm -f "$old_prd_file"
+      [ -n "$old_progress_file" ] && [ -f "$old_progress_file" ] && rm -f "$old_progress_file"
+      exit 1
+    fi
   fi
   
   # Restore stashed changes
   if [ "$STASHED" = "1" ]; then
     echo "   Restoring stashed changes..."
-    git stash pop || echo "   Warning: Could not restore stash (may be empty or conflicts)"
+    if ! git stash pop; then
+      echo "   WARNING: Stash restore failed (possible conflicts)"
+      echo "   Your stashed changes are still in git stash."
+      echo "   Use 'git stash list' to view and 'git stash pop' to restore manually."
+    fi
+  fi
+  
+  # Verify critical files exist after branch switch
+  if [ ! -f "$PRD_FILE" ]; then
+    echo "   WARNING: prd.json not found after branch switch!"
+    if [ "$STASHED" = "1" ]; then
+      echo "   Check git stash: git stash list"
+    fi
+  fi
+  
+  if [ ! -f "$PROGRESS_FILE" ]; then
+    echo "   WARNING: progress.txt not found after branch switch!"
+    if [ "$STASHED" = "1" ]; then
+      echo "   Check git stash: git stash list"
+    fi
   fi
   
   echo "✓ Now on branch: $target_branch"
 }
 
 # ═══════════════════════════════════════════════════════
-# Archive Management
+# Git Branch Setup Execution (runs before archive)
 # ═══════════════════════════════════════════════════════
 
-# Archive previous run if branch changed
-if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
-  LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
-  
-  if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
-    # Archive the previous run
-    DATE=$(date +%Y-%m-%d)
-    # Strip "ralph/" prefix from branch name for folder
-    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
-    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
-    
-    echo "Archiving previous run: $LAST_BRANCH"
-    mkdir -p "$ARCHIVE_FOLDER"
-    [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
-    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-    echo "   Archived to: $ARCHIVE_FOLDER"
-    
-    # Reset progress file for new run
-    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
-    echo "Started: $(date)" >> "$PROGRESS_FILE"
-    echo "Worker: $WORKER_NAME" >> "$PROGRESS_FILE"
-    echo "---" >> "$PROGRESS_FILE"
-  fi
-fi
-
-# Track current branch
-if [ -f "$PRD_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
-  if [ -n "$CURRENT_BRANCH" ]; then
-    echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
-  fi
-fi
+# Setup git branch before archive management
+setup_git_branch
 
 # Initialize progress file if it doesn't exist
 if [ ! -f "$PROGRESS_FILE" ]; then
@@ -276,6 +311,98 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "Started: $(date)" >> "$PROGRESS_FILE"
   echo "Worker: $WORKER_NAME" >> "$PROGRESS_FILE"
   echo "---" >> "$PROGRESS_FILE"
+fi
+
+# ═══════════════════════════════════════════════════════
+# Archive Management (runs after branch setup)
+# ═══════════════════════════════════════════════════════
+
+# Archive previous run if branch changed
+# This runs AFTER setup_git_branch() to ensure we're on the correct branch
+if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+  LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
+  
+  if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
+    # Archive files from the OLD branch (saved before branch switch)
+    # Use temp files if they exist, otherwise fall back to current files
+    DATE=$(date +%Y-%m-%d)
+    # Strip "ralph/" prefix from branch name for folder
+    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
+    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
+    
+    echo "Archiving previous run: $LAST_BRANCH"
+    # Use temp files saved before branch switch, if they exist
+    old_prd="${RALPH_OLD_PRD_FILE:-}"
+    old_progress="${RALPH_OLD_PROGRESS_FILE:-}"
+    
+    if mkdir -p "$ARCHIVE_FOLDER"; then
+      
+      # Archive prd.json from old branch
+      if [ -n "$old_prd" ] && [ -f "$old_prd" ]; then
+        if cp "$old_prd" "$ARCHIVE_FOLDER/prd.json" && [ -f "$ARCHIVE_FOLDER/prd.json" ]; then
+          echo "   ✓ Archived prd.json from old branch"
+          rm -f "$old_prd"
+        else
+          echo "   Warning: Failed to copy prd.json from old branch"
+        fi
+      elif [ -f "$PRD_FILE" ]; then
+        # Fallback to current file if temp file doesn't exist
+        if cp "$PRD_FILE" "$ARCHIVE_FOLDER/prd.json" && [ -f "$ARCHIVE_FOLDER/prd.json" ]; then
+          echo "   ✓ Archived prd.json"
+        else
+          echo "   Warning: Failed to copy prd.json"
+        fi
+      fi
+      
+      # Archive progress.txt from old branch
+      if [ -n "$old_progress" ] && [ -f "$old_progress" ]; then
+        if cp "$old_progress" "$ARCHIVE_FOLDER/progress.txt" && [ -f "$ARCHIVE_FOLDER/progress.txt" ]; then
+          echo "   ✓ Archived progress.txt from old branch"
+          # Only reset after successful copy and verification
+          echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+          echo "Started: $(date)" >> "$PROGRESS_FILE"
+          echo "Worker: $WORKER_NAME" >> "$PROGRESS_FILE"
+          echo "---" >> "$PROGRESS_FILE"
+          rm -f "$old_progress"
+        else
+          echo "   Warning: Failed to copy progress.txt from old branch - NOT resetting"
+        fi
+      elif [ -f "$PROGRESS_FILE" ]; then
+        # Fallback to current file if temp file doesn't exist
+        if cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/progress.txt" && [ -f "$ARCHIVE_FOLDER/progress.txt" ]; then
+          echo "   ✓ Archived progress.txt"
+          # Only reset after successful copy and verification
+          echo "# Ralph Progress Log" > "$PROGRESS_FILE"
+          echo "Started: $(date)" >> "$PROGRESS_FILE"
+          echo "Worker: $WORKER_NAME" >> "$PROGRESS_FILE"
+          echo "---" >> "$PROGRESS_FILE"
+        else
+          echo "   Warning: Failed to copy progress.txt - NOT resetting"
+        fi
+      fi
+      
+      echo "   Archived to: $ARCHIVE_FOLDER"
+    else
+      echo "   Error: Failed to create archive directory: $ARCHIVE_FOLDER"
+    fi
+    
+    # Clean up any remaining temp files
+    [ -n "$old_prd" ] && [ -f "$old_prd" ] && rm -f "$old_prd"
+    [ -n "$old_progress" ] && [ -f "$old_progress" ] && rm -f "$old_progress"
+    
+    # Clear exported variables
+    unset RALPH_OLD_PRD_FILE
+    unset RALPH_OLD_PROGRESS_FILE
+  fi
+fi
+
+# Track current branch (after setup completes successfully)
+if [ -f "$PRD_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+  if [ -n "$CURRENT_BRANCH" ]; then
+    echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════
@@ -289,9 +416,6 @@ echo "╠═══════════════════════�
 echo "║  Worker: $WORKER_NAME"
 printf "║  Max iterations: %-36s║\n" "$MAX_ITERATIONS"
 echo "╚═══════════════════════════════════════════════════════╝"
-
-# Setup git branch before starting iterations
-setup_git_branch
 
 CONSECUTIVE_ERRORS=0
 MAX_RETRIES=3

@@ -83,7 +83,7 @@ export async function generatePRD(featureDescription, answers, projectName = 'Pr
     updateProgress('generating', 'Using Cursor CLI agent to generate PRD...');
     try {
       const result = await generatePRDWithAgent(featureDescription, answers, projectName, updateProgress);
-      updateProgress('complete', 'PRD generated successfully');
+      // Note: generatePRDWithAgent already logs 'complete' status via updateProgress callback
       return result;
     } catch (error) {
       // Fallback to template generation

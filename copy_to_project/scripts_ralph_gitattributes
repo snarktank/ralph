@@ -1,0 +1,7 @@
+# Ralph Scripts Protection
+# These files are managed by Ralph installation - use merge=ours to prevent overwrites
+
+ralph.sh merge=ours
+prompt.md merge=ours
+*.sh -crlf -text
+*.md -crlf -text
