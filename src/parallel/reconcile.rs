@@ -16,7 +16,12 @@ pub enum ReconciliationIssue {
         affected_files: Vec<String>,
     },
     /// Type inconsistency between modified modules
-    TypeMismatch,
+    TypeMismatch {
+        /// File where the type error was found
+        file: String,
+        /// Error message from the compiler
+        error: String,
+    },
     /// Duplicate import detected
     ImportDuplicate,
 }
@@ -103,6 +108,79 @@ impl ReconciliationEngine {
             }]
         }
     }
+
+    /// Checks for type errors in the project by running `cargo check`
+    ///
+    /// Runs `cargo check` and parses the output for error messages.
+    /// Returns a vector of `ReconciliationIssue::TypeMismatch` for each error found.
+    ///
+    /// # Returns
+    /// A vector of `ReconciliationIssue` containing any detected type errors.
+    /// Returns an empty vector if no type errors are detected or if this is not a Rust project.
+    pub fn check_type_errors(&self) -> Vec<ReconciliationIssue> {
+        // Check if this is a Rust project by looking for Cargo.toml
+        let cargo_toml = self.project_root.join("Cargo.toml");
+        if !cargo_toml.exists() {
+            return Vec::new();
+        }
+
+        let output = Command::new("cargo")
+            .args(["check", "--message-format=short"])
+            .current_dir(&self.project_root)
+            .output();
+
+        let output = match output {
+            Ok(o) => o,
+            Err(_) => return Vec::new(),
+        };
+
+        // cargo check returns non-zero exit status when there are errors
+        // We need to parse stderr for error messages
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        // Parse error messages in the short format: "file:line:col: error: message"
+        let mut issues = Vec::new();
+        for line in stderr.lines() {
+            // Match lines that look like error messages
+            // Format: "src/file.rs:10:5: error[E0001]: some error message"
+            // Or: "error[E0001]: some error message"
+            // Or: "error: some error message"
+            if line.starts_with("error") || line.contains(": error") {
+                let (file, error) = Self::parse_error_line(line);
+                issues.push(ReconciliationIssue::TypeMismatch { file, error });
+            }
+        }
+
+        issues
+    }
+
+    /// Parses an error line from cargo check output
+    ///
+    /// # Arguments
+    /// * `line` - A line from cargo check stderr
+    ///
+    /// # Returns
+    /// A tuple of (file, error) where file is the affected file path and error is the message
+    fn parse_error_line(line: &str) -> (String, String) {
+        // Try to parse "file:line:col: error[...]: message" format
+        if let Some(colon_pos) = line.find(": error") {
+            let file_part = &line[..colon_pos];
+            let error_part = &line[colon_pos + 2..]; // Skip ": "
+
+            // Extract just the file path (before line:col)
+            let file = file_part.split(':').next().unwrap_or("unknown").to_string();
+
+            return (file, error_part.trim().to_string());
+        }
+
+        // If line starts with "error", there's no file info
+        if line.starts_with("error") {
+            return ("unknown".to_string(), line.to_string());
+        }
+
+        // Fallback
+        ("unknown".to_string(), line.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -148,6 +226,71 @@ mod tests {
             assert!(affected_files.contains(&"file2.rs".to_string()));
         } else {
             panic!("Expected GitConflict variant");
+        }
+    }
+
+    #[test]
+    fn test_check_type_errors_valid_project() {
+        // Use current directory which is a valid Rust project
+        let cwd = env::current_dir().expect("Failed to get current directory");
+        let engine = ReconciliationEngine::new(cwd);
+        let issues = engine.check_type_errors();
+        // A valid project should have no type errors
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_check_type_errors_non_rust_project() {
+        // Use a directory without Cargo.toml
+        let engine = ReconciliationEngine::new(PathBuf::from("/tmp"));
+        let issues = engine.check_type_errors();
+        // Should return empty for non-Rust projects
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_check_type_errors_invalid_directory() {
+        let engine = ReconciliationEngine::new(PathBuf::from("/nonexistent/path"));
+        let issues = engine.check_type_errors();
+        // Should return empty on error
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_parse_error_line_with_file() {
+        let line = "src/main.rs:10:5: error[E0425]: cannot find value `foo`";
+        let (file, error) = ReconciliationEngine::parse_error_line(line);
+        assert_eq!(file, "src/main.rs");
+        assert_eq!(error, "error[E0425]: cannot find value `foo`");
+    }
+
+    #[test]
+    fn test_parse_error_line_without_file() {
+        let line = "error[E0463]: can't find crate for `some_crate`";
+        let (file, error) = ReconciliationEngine::parse_error_line(line);
+        assert_eq!(file, "unknown");
+        assert_eq!(error, "error[E0463]: can't find crate for `some_crate`");
+    }
+
+    #[test]
+    fn test_parse_error_line_generic_error() {
+        let line = "error: aborting due to 2 previous errors";
+        let (file, error) = ReconciliationEngine::parse_error_line(line);
+        assert_eq!(file, "unknown");
+        assert_eq!(error, "error: aborting due to 2 previous errors");
+    }
+
+    #[test]
+    fn test_type_mismatch_issue_contains_details() {
+        let issue = ReconciliationIssue::TypeMismatch {
+            file: "src/lib.rs".to_string(),
+            error: "error[E0308]: mismatched types".to_string(),
+        };
+        if let ReconciliationIssue::TypeMismatch { file, error } = issue {
+            assert_eq!(file, "src/lib.rs");
+            assert!(error.contains("mismatched types"));
+        } else {
+            panic!("Expected TypeMismatch variant");
         }
     }
 }

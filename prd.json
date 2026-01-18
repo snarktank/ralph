@@ -550,7 +550,7 @@
       "description": "As a user, I want to know if parallel execution caused git merge conflicts.",
       "id": "US-027",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 27,
       "targetFiles": [
         "src/parallel/reconcile.rs"
