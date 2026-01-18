@@ -7,6 +7,7 @@ use crate::mcp::resources::{
     list_ralph_resources, read_prd_resource, read_status_resource, ResourceError, PRD_RESOURCE_URI,
     STATUS_RESOURCE_URI,
 };
+use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::get_status::{GetStatusRequest, GetStatusResponse};
 use crate::mcp::tools::list_stories::{load_stories, ListStoriesRequest, ListStoriesResponse};
 use crate::mcp::tools::load_prd::{
@@ -21,6 +22,7 @@ use crate::mcp::tools::stop_execution::{
     state_description, StopExecutionRequest,
 };
 use crate::quality::QualityConfig;
+use crate::ui::{DisplayOptions, RalphDisplay};
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
@@ -110,6 +112,11 @@ pub struct RalphMcpServer {
     cancel_receiver: watch::Receiver<bool>,
     /// Tool router for MCP tools
     tool_router: ToolRouter<Self>,
+    /// Display controller for terminal UI
+    display: Arc<RwLock<RalphDisplay>>,
+    /// Test-only: Override agent detection with a mock agent name
+    #[cfg(test)]
+    test_agent_override: Option<String>,
 }
 
 impl RalphMcpServer {
@@ -130,6 +137,26 @@ impl RalphMcpServer {
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            #[cfg(test)]
+            test_agent_override: None,
+        }
+    }
+
+    /// Create a new RalphMcpServer for testing with a mock agent.
+    ///
+    /// This bypasses the real agent detection and uses the provided agent name.
+    #[cfg(test)]
+    pub fn new_for_test(agent_name: &str) -> Self {
+        let (cancel_sender, cancel_receiver) = watch::channel(false);
+        Self {
+            state: Arc::new(RwLock::new(ServerState::default())),
+            config: Arc::new(None),
+            cancel_sender: Arc::new(cancel_sender),
+            cancel_receiver,
+            tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            test_agent_override: Some(agent_name.to_string()),
         }
     }
 
@@ -158,6 +185,9 @@ impl RalphMcpServer {
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            #[cfg(test)]
+            test_agent_override: None,
         }
     }
 
@@ -184,6 +214,75 @@ impl RalphMcpServer {
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            #[cfg(test)]
+            test_agent_override: None,
+        }
+    }
+
+    /// Create a new RalphMcpServer with display options.
+    ///
+    /// # Arguments
+    ///
+    /// * `options` - Display options for configuring terminal UI behavior
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ralph::mcp::RalphMcpServer;
+    /// use ralph::ui::{DisplayOptions, UiMode};
+    ///
+    /// let options = DisplayOptions::new()
+    ///     .with_ui_mode(UiMode::Enabled)
+    ///     .with_color(true)
+    ///     .with_quiet(false);
+    /// let server = RalphMcpServer::with_display(options);
+    /// ```
+    pub fn with_display(options: DisplayOptions) -> Self {
+        let (cancel_sender, cancel_receiver) = watch::channel(false);
+        Self {
+            state: Arc::new(RwLock::new(ServerState::default())),
+            config: Arc::new(None),
+            cancel_sender: Arc::new(cancel_sender),
+            cancel_receiver,
+            tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::with_options(options))),
+            #[cfg(test)]
+            test_agent_override: None,
+        }
+    }
+
+    /// Create a new RalphMcpServer with a preloaded PRD and display options.
+    ///
+    /// # Arguments
+    ///
+    /// * `prd_path` - Path to the PRD file to preload
+    /// * `options` - Display options for configuring terminal UI behavior
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ralph::mcp::RalphMcpServer;
+    /// use ralph::ui::{DisplayOptions, UiMode};
+    /// use std::path::PathBuf;
+    ///
+    /// let options = DisplayOptions::new().with_quiet(true);
+    /// let server = RalphMcpServer::with_prd_and_display(PathBuf::from("prd.json"), options);
+    /// ```
+    pub fn with_prd_and_display(prd_path: PathBuf, options: DisplayOptions) -> Self {
+        let (cancel_sender, cancel_receiver) = watch::channel(false);
+        Self {
+            state: Arc::new(RwLock::new(ServerState {
+                prd_path: Some(prd_path),
+                execution_state: ExecutionState::Idle,
+            })),
+            config: Arc::new(None),
+            cancel_sender: Arc::new(cancel_sender),
+            cancel_receiver,
+            tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::with_options(options))),
+            #[cfg(test)]
+            test_agent_override: None,
         }
     }
 
@@ -234,6 +333,48 @@ impl RalphMcpServer {
     /// This can be passed to async tasks that need to check for cancellation.
     pub fn cancel_receiver(&self) -> watch::Receiver<bool> {
         self.cancel_receiver.clone()
+    }
+
+    /// Get read access to the display controller.
+    ///
+    /// Returns a read guard that provides immutable access to the display.
+    pub async fn display(&self) -> tokio::sync::RwLockReadGuard<'_, RalphDisplay> {
+        self.display.read().await
+    }
+
+    /// Get write access to the display controller.
+    ///
+    /// Returns a write guard that provides mutable access to the display.
+    pub async fn display_mut(&self) -> tokio::sync::RwLockWriteGuard<'_, RalphDisplay> {
+        self.display.write().await
+    }
+
+    /// Update the display based on the current execution state.
+    ///
+    /// This method reads the current execution state and updates the UI accordingly.
+    /// Call this after state transitions to keep the terminal display in sync.
+    pub async fn update_display(&self) {
+        let state = {
+            let server_state = self.state.read().await;
+            server_state.execution_state.clone()
+        };
+
+        let mut display = self.display.write().await;
+        display.update_from_state(&state, None);
+    }
+
+    /// Update the display with story information.
+    ///
+    /// This method reads the current execution state and updates the UI,
+    /// including displaying story details when available.
+    pub async fn update_display_with_story(&self, story_info: Option<&crate::ui::StoryInfo>) {
+        let state = {
+            let server_state = self.state.read().await;
+            server_state.execution_state.clone()
+        };
+
+        let mut display = self.display.write().await;
+        display.update_from_state(&state, story_info);
     }
 }
 
@@ -486,16 +627,123 @@ impl RalphMcpServer {
             };
         }
 
-        // Create started response
-        // Note: In a real implementation, this would spawn an async task to do the actual work.
-        // For now, we just return that execution has started.
-        // The actual execution logic would involve:
-        // 1. Checking out the correct branch
-        // 2. Running the agent to implement the story
-        // 3. Running quality checks
-        // 4. Committing changes
-        // 5. Updating the PRD
-        // The client can poll get_status to check progress.
+        // Detect available agent (use test override if available)
+        #[cfg(test)]
+        let detected_agent = self.test_agent_override.clone().or_else(detect_agent);
+        #[cfg(not(test))]
+        let detected_agent = detect_agent();
+
+        let agent_command = match detected_agent {
+            Some(agent) => agent,
+            None => {
+                // Reset state to idle since we can't run
+                {
+                    let mut state = self.state.write().await;
+                    state.execution_state = ExecutionState::Idle;
+                }
+                let response = create_run_error_response(&RunStoryError::ExecutionError(
+                    "No agent CLI found. Install Claude Code CLI (claude) or Amp CLI (amp)."
+                        .to_string(),
+                ));
+                return serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                });
+            }
+        };
+
+        // Get project root from PRD path
+        let project_root = prd_path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+        // Progress file path (in same directory as PRD)
+        let progress_path = project_root.join("progress.txt");
+
+        // Create executor config
+        let executor_config = ExecutorConfig {
+            prd_path: prd_path.clone(),
+            project_root: project_root.clone(),
+            progress_path,
+            quality_profile: self
+                .config
+                .as_ref()
+                .as_ref()
+                .map(|c| c.profiles.get("standard").cloned().unwrap_or_default()),
+            agent_command,
+            max_iterations,
+        };
+
+        // Clone necessary data for the spawned task
+        let story_id = req.story_id.clone();
+        let state = self.state.clone();
+        let cancel_receiver = self.cancel_receiver();
+        let display = self.display.clone();
+
+        // Spawn async task to execute the story
+        tokio::spawn(async move {
+            let executor = StoryExecutor::new(executor_config);
+
+            // Iteration callback to update state
+            let state_for_callback = state.clone();
+            let on_iteration = move |iteration: u32, _max: u32| {
+                let state_clone = state_for_callback.clone();
+                tokio::spawn(async move {
+                    let mut server_state = state_clone.write().await;
+                    if let ExecutionState::Running {
+                        iteration: iter, ..
+                    } = &mut server_state.execution_state
+                    {
+                        *iter = iteration;
+                    }
+                });
+            };
+
+            // Execute the story
+            match executor
+                .execute_story(&story_id, cancel_receiver, on_iteration)
+                .await
+            {
+                Ok(result) => {
+                    // Update state to Completed
+                    let mut server_state = state.write().await;
+                    server_state.execution_state = ExecutionState::Completed {
+                        story_id: story_id.clone(),
+                        commit_hash: result.commit_hash,
+                    };
+
+                    // Update display
+                    drop(server_state);
+                    if let Ok(mut disp) = display.try_write() {
+                        let completed_state = ExecutionState::Completed {
+                            story_id: story_id.clone(),
+                            commit_hash: None,
+                        };
+                        disp.update_from_state(&completed_state, None);
+                    }
+                }
+                Err(e) => {
+                    // Update state to Failed
+                    let mut server_state = state.write().await;
+                    server_state.execution_state = ExecutionState::Failed {
+                        story_id: story_id.clone(),
+                        error: e.to_string(),
+                    };
+
+                    // Update display
+                    drop(server_state);
+                    if let Ok(mut disp) = display.try_write() {
+                        let failed_state = ExecutionState::Failed {
+                            story_id: story_id.clone(),
+                            error: e.to_string(),
+                        };
+                        disp.update_from_state(&failed_state, None);
+                    }
+                }
+            }
+        });
+
+        // Return started response immediately (execution continues in background)
         let response = create_started_response(&story, max_iterations);
         serde_json::to_string_pretty(&response)
             .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))
@@ -1224,7 +1472,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        let server = RalphMcpServer::new();
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1270,7 +1518,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        let server = RalphMcpServer::new();
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1329,7 +1577,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        let server = RalphMcpServer::new();
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1380,7 +1628,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        let server = RalphMcpServer::new();
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();

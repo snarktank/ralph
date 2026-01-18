@@ -30,6 +30,9 @@ ignore = [
     # rustls-pemfile: unmaintained, used by graphql_client -> reqwest 0.11.
     # No vulnerability, transitioning to rustls-pki-types. Cannot upgrade until graphql_client updates.
     "RUSTSEC-2025-0134",
+    # number_prefix: unmaintained, used by indicatif for progress bars.
+    # No vulnerability, just unmaintained. Cannot upgrade until indicatif updates.
+    "RUSTSEC-2025-0119",
 ]
 
 # =============================================================================

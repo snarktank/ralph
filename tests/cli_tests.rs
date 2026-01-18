@@ -22,7 +22,8 @@ fn test_version_flag_short() {
         .arg("-V")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ralph"))
+        // The styled version uses uppercase RALPH in the banner
+        .stdout(predicate::str::contains("RALPH"))
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
@@ -32,7 +33,8 @@ fn test_version_flag_long() {
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("ralph"))
+        // The styled version uses uppercase RALPH in the banner
+        .stdout(predicate::str::contains("RALPH"))
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
@@ -49,8 +51,8 @@ fn test_help_flag_short() {
         .stdout(predicate::str::contains(
             "Enterprise-ready autonomous AI agent framework",
         ))
-        .stdout(predicate::str::contains("Usage:"))
-        .stdout(predicate::str::contains("Commands:"));
+        .stdout(predicate::str::contains("USAGE:"))
+        .stdout(predicate::str::contains("COMMANDS:"));
 }
 
 #[test]
@@ -62,8 +64,8 @@ fn test_help_flag_long() {
         .stdout(predicate::str::contains(
             "Enterprise-ready autonomous AI agent framework",
         ))
-        .stdout(predicate::str::contains("Usage:"))
-        .stdout(predicate::str::contains("Commands:"));
+        .stdout(predicate::str::contains("USAGE:"))
+        .stdout(predicate::str::contains("COMMANDS:"));
 }
 
 #[test]
