@@ -33,7 +33,7 @@
       "description": "As a CI system, I want fine-grained compiler caching so that unchanged compilation units are reused across builds.",
       "id": "US-002",
       "notes": "Provides fine-grained caching even when dependencies change",
-      "passes": false,
+      "passes": true,
       "priority": 2,
       "title": "Add sccache for compiler-level caching"
     },
