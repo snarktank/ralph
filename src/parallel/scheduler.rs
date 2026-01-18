@@ -8,7 +8,7 @@ use tokio::sync::{watch, Mutex, RwLock, Semaphore};
 
 use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::load_prd::{validate_prd, PrdFile};
-use crate::parallel::dependency::DependencyGraph;
+use crate::parallel::dependency::{DependencyGraph, StoryNode};
 use crate::runner::{RunResult, RunnerConfig};
 
 /// Strategy for detecting conflicts between parallel story executions.
@@ -112,6 +112,80 @@ impl ParallelExecutionState {
         self.locked_files
             .retain(|_path, locking_story| locking_story != story_id);
     }
+}
+
+/// Detects pre-execution conflicts between ready stories based on overlapping target files.
+///
+/// Returns a list of story ID pairs that conflict (have overlapping target_files).
+/// The first element of each pair is always the lower-priority story (higher priority number).
+fn detect_preexecution_conflicts(stories: &[StoryNode]) -> Vec<(String, String)> {
+    let mut conflicts = Vec::new();
+
+    for i in 0..stories.len() {
+        for j in (i + 1)..stories.len() {
+            let story_a = &stories[i];
+            let story_b = &stories[j];
+
+            // Check for overlapping target_files
+            let files_a: HashSet<&String> = story_a.target_files.iter().collect();
+            let files_b: HashSet<&String> = story_b.target_files.iter().collect();
+
+            if !files_a.is_disjoint(&files_b) {
+                // There is an overlap - determine which is lower priority
+                // Lower priority number = higher priority
+                if story_a.priority > story_b.priority {
+                    // story_a has lower priority (higher number), story_b runs first
+                    conflicts.push((story_a.id.clone(), story_b.id.clone()));
+                } else if story_b.priority > story_a.priority {
+                    // story_b has lower priority (higher number), story_a runs first
+                    conflicts.push((story_b.id.clone(), story_a.id.clone()));
+                } else {
+                    // Same priority - use lexicographic order as tiebreaker
+                    // Earlier ID runs first
+                    if story_a.id > story_b.id {
+                        conflicts.push((story_a.id.clone(), story_b.id.clone()));
+                    } else {
+                        conflicts.push((story_b.id.clone(), story_a.id.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    conflicts
+}
+
+/// Filters ready stories to avoid pre-execution conflicts.
+///
+/// When two stories have overlapping target_files, only the higher-priority story
+/// (lower priority number) is included in this batch. The lower-priority story
+/// is deferred to a subsequent batch.
+///
+/// Returns a tuple of (stories to run this batch, deferred story IDs for logging).
+fn filter_conflicting_stories(stories: Vec<StoryNode>) -> (Vec<StoryNode>, Vec<(String, String)>) {
+    if stories.is_empty() {
+        return (stories, Vec::new());
+    }
+
+    let conflicts = detect_preexecution_conflicts(&stories);
+
+    if conflicts.is_empty() {
+        return (stories, Vec::new());
+    }
+
+    // Collect IDs of stories that should be deferred (lower-priority stories in conflicts)
+    let deferred_ids: HashSet<String> = conflicts
+        .iter()
+        .map(|(deferred, _)| deferred.clone())
+        .collect();
+
+    // Filter out deferred stories
+    let filtered: Vec<StoryNode> = stories
+        .into_iter()
+        .filter(|s| !deferred_ids.contains(&s.id))
+        .collect();
+
+    (filtered, conflicts)
 }
 
 /// The main parallel runner that executes multiple stories concurrently.
@@ -254,6 +328,19 @@ impl ParallelRunner {
                 .filter(|s| !in_flight.contains(&s.id))
                 .cloned()
                 .collect();
+
+            // Pre-execution conflict detection: filter out lower-priority stories
+            // that have overlapping target_files with higher-priority stories
+            let (ready_stories, conflicts) = filter_conflicting_stories(ready_stories);
+
+            // Log when sequential fallback is triggered due to conflicts
+            for (deferred_id, higher_priority_id) in &conflicts {
+                eprintln!(
+                    "[parallel] Conflict fallback: {} conflicts with {} over target files. \
+                     Running {} first, {} deferred to next batch.",
+                    deferred_id, higher_priority_id, higher_priority_id, deferred_id
+                );
+            }
 
             // Check if we're done or stuck
             if ready_stories.is_empty() && in_flight.is_empty() {

@@ -489,7 +489,7 @@
       "description": "As a developer, I need to detect when parallel stories modify same files.",
       "id": "US-024",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 24,
       "targetFiles": [
         "src/parallel/conflict.rs"
