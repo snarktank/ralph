@@ -42,12 +42,8 @@ ARG RALPH_REPO=https://github.com/kcirtapfromspace/ralph.git
 ARG RALPH_REF=main
 RUN git clone --depth 1 --branch ${RALPH_REF} ${RALPH_REPO} .
 
-# Build the release binary with BuildKit cache mounts for faster rebuilds
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/app/target \
-    cargo build --release --bin ralph && \
-    cp target/release/ralph /ralph
+# Build the release binary
+RUN cargo build --release --bin ralph
 
 # Stage 2: Create minimal runtime image
 FROM debian:bookworm-slim AS runtime
@@ -66,7 +62,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy the built binary
-COPY --from=builder /ralph /usr/local/bin/ralph
+COPY --from=builder /app/target/release/ralph /usr/local/bin/ralph
 
 # Copy quality configuration (needed for quality checks)
 COPY --from=builder /app/quality ./quality
