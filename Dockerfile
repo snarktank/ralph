@@ -1,12 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# Ralph MCP Server - Optimized multi-stage build with caching
+# Ralph MCP Server - Multi-stage build for minimal image size
 # This Dockerfile builds the Ralph MCP server for use with Docker MCP toolkit
-#
-# Build Optimizations (US-001 through US-005):
-#   - cargo-chef: Caches Rust dependencies between builds
-#   - sccache: Compiler-level caching for faster rebuilds
-#   - BuildKit cache mounts: Persists cargo registry and target directories
 #
 # NOTE: This is a deployment repository. The Dockerfile clones the Ralph source
 # from GitHub during build. Source code lives at: https://github.com/kcirtapfromspace/ralph
@@ -28,58 +23,31 @@
 ARG VERSION=dev
 ARG COMMIT_SHA=unknown
 
-# Stage 1: Install cargo-chef for dependency caching (US-001)
-FROM rust:1.85-slim-bookworm AS chef
-RUN cargo install cargo-chef
-WORKDIR /app
-
-# Stage 2: Plan dependencies (cargo-chef creates a recipe)
-FROM chef AS planner
-# Clone the Ralph source repository
-ARG RALPH_REPO=https://github.com/kcirtapfromspace/ralph.git
-ARG RALPH_REF=main
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-RUN git clone --depth 1 --branch ${RALPH_REF} ${RALPH_REPO} .
-RUN cargo chef prepare --recipe-path recipe.json
-
-# Stage 3: Build dependencies (cached layer)
-FROM chef AS builder
+# Stage 1: Build the Rust binary
+# Using Rust 1.85+ for Edition 2024 support (required by rmcp crate)
+FROM rust:1.85-slim-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     git \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pre-built sccache binary (US-002) - much faster than cargo install
-ARG SCCACHE_VERSION=v0.8.2
-RUN curl -fsSL "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/sccache-${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
-    | tar -xz -C /usr/local/bin --strip-components=1 --wildcards '*/sccache'
-ENV RUSTC_WRAPPER=/usr/local/bin/sccache
-ENV SCCACHE_DIR=/sccache
+WORKDIR /app
 
-# Copy the dependency recipe from planner
-COPY --from=planner /app/recipe.json recipe.json
-
-# Build dependencies only (cached unless Cargo.toml/Cargo.lock change)
-# Uses BuildKit cache mounts for cargo registry and sccache (US-003)
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/sccache \
-    cargo chef cook --release --recipe-path recipe.json
-
-# Clone the full source and build the application
+# Clone the Ralph source repository
+# This Dockerfile is for deployment - source lives in the main ralph repo
 ARG RALPH_REPO=https://github.com/kcirtapfromspace/ralph.git
 ARG RALPH_REF=main
 RUN git clone --depth 1 --branch ${RALPH_REF} ${RALPH_REPO} .
 
-# Build the release binary with cache mounts
+# Build the release binary with BuildKit cache mounts for faster rebuilds
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    --mount=type=cache,target=/sccache \
-    cargo build --release --bin ralph
+    --mount=type=cache,target=/app/target \
+    cargo build --release --bin ralph && \
+    cp target/release/ralph /ralph
 
 # Stage 2: Create minimal runtime image
 FROM debian:bookworm-slim AS runtime
@@ -98,7 +66,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy the built binary
-COPY --from=builder /app/target/release/ralph /usr/local/bin/ralph
+COPY --from=builder /ralph /usr/local/bin/ralph
 
 # Copy quality configuration (needed for quality checks)
 COPY --from=builder /app/quality ./quality
