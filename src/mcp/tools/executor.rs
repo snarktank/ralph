@@ -273,8 +273,12 @@ impl StoryExecutor {
 
         // Detect which agent to use
         let (program, args) = if agent_cmd == "claude" || agent_cmd.contains("claude") {
-            // Claude Code CLI
-            ("claude", vec!["--print", "-p", prompt])
+            // Claude Code CLI - use --print for non-interactive mode
+            // and --dangerously-skip-permissions to allow file changes
+            (
+                "claude",
+                vec!["--print", "--dangerously-skip-permissions", prompt],
+            )
         } else if agent_cmd == "amp" || agent_cmd.contains("amp") {
             // Amp CLI
             ("amp", vec!["--prompt", prompt])
