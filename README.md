@@ -1,6 +1,7 @@
 # Ralph
 
 [![CI](https://github.com/kcirtapfromspace/ralph/actions/workflows/ci.yml/badge.svg)](https://github.com/kcirtapfromspace/ralph/actions/workflows/ci.yml)
+[![Docker](https://github.com/kcirtapfromspace/ralph/actions/workflows/docker.yml/badge.svg)](https://github.com/kcirtapfromspace/ralph/actions/workflows/docker.yml)
 
 ![Ralph](ralph.webp)
 
@@ -51,6 +52,16 @@ To uninstall:
 ```bash
 ./uninstall.sh
 ```
+
+### Docker / Claude Desktop (MCP)
+
+Prefer Claude Desktop over the terminal? Ralph is also available as an MCP server via Docker:
+
+```bash
+docker pull ghcr.io/kcirtapfromspace/ralph:latest
+```
+
+See the [Docker MCP Setup Guide](docs/guides/docker-mcp-setup.md) for Claude Desktop configuration.
 
 ## Usage
 
@@ -227,7 +238,30 @@ Edit `prompt.md` to customize Ralph's behavior for your project:
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
 
+## Docker Deployment
+
+Ralph can also run as an MCP server in Docker for use with Claude Desktop:
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Multi-stage build for Ralph MCP server |
+| `docker-compose.yml` | Local development and testing |
+| `.dockerignore` | Build context optimization |
+| `examples/` | MCP toolkit configuration examples |
+| `docs/guides/docker-mcp-setup.md` | Docker MCP setup guide |
+
+```bash
+# Build locally
+docker build -t ralph-mcp .
+
+# Run with docker-compose
+docker compose up --build
+```
+
+Images are published to `ghcr.io/kcirtapfromspace/ralph` on every push to main.
+
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [Docker MCP Setup Guide](docs/guides/docker-mcp-setup.md)

@@ -3,11 +3,11 @@
 
 #![allow(dead_code)]
 
-use crate::mcp::executor::{ExecutionEvent, ExecutorConfig, IterationDisplay, StoryExecutor};
 use crate::mcp::resources::{
     list_ralph_resources, read_prd_resource, read_status_resource, ResourceError, PRD_RESOURCE_URI,
     STATUS_RESOURCE_URI,
 };
+use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::get_status::{GetStatusRequest, GetStatusResponse};
 use crate::mcp::tools::list_stories::{load_stories, ListStoriesRequest, ListStoriesResponse};
 use crate::mcp::tools::load_prd::{
@@ -21,8 +21,8 @@ use crate::mcp::tools::stop_execution::{
     create_cancelled_response, create_not_running_response, get_running_story_id,
     state_description, StopExecutionRequest,
 };
-use crate::quality::{Profile, QualityConfig};
-use crate::ui::Theme;
+use crate::quality::QualityConfig;
+use crate::ui::{DisplayOptions, RalphDisplay};
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
@@ -106,16 +106,17 @@ pub struct RalphMcpServer {
     state: Arc<RwLock<ServerState>>,
     /// Quality configuration for running quality gates
     config: Arc<Option<QualityConfig>>,
-    /// Theme for UI rendering
-    theme: Theme,
-    /// Whether to show UI during execution
-    show_ui: bool,
     /// Cancellation signal sender - send true to cancel execution
     cancel_sender: Arc<watch::Sender<bool>>,
     /// Cancellation signal receiver - tools check this to know if cancelled
     cancel_receiver: watch::Receiver<bool>,
     /// Tool router for MCP tools
     tool_router: ToolRouter<Self>,
+    /// Display controller for terminal UI
+    display: Arc<RwLock<RalphDisplay>>,
+    /// Test-only: Override agent detection with a mock agent name
+    #[cfg(test)]
+    test_agent_override: Option<String>,
 }
 
 impl RalphMcpServer {
@@ -133,11 +134,29 @@ impl RalphMcpServer {
         Self {
             state: Arc::new(RwLock::new(ServerState::default())),
             config: Arc::new(None),
-            theme: Theme::default(),
-            show_ui: true,
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            #[cfg(test)]
+            test_agent_override: None,
+        }
+    }
+
+    /// Create a new RalphMcpServer for testing with a mock agent.
+    ///
+    /// This bypasses the real agent detection and uses the provided agent name.
+    #[cfg(test)]
+    pub fn new_for_test(agent_name: &str) -> Self {
+        let (cancel_sender, cancel_receiver) = watch::channel(false);
+        Self {
+            state: Arc::new(RwLock::new(ServerState::default())),
+            config: Arc::new(None),
+            cancel_sender: Arc::new(cancel_sender),
+            cancel_receiver,
+            tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            test_agent_override: Some(agent_name.to_string()),
         }
     }
 
@@ -163,11 +182,12 @@ impl RalphMcpServer {
                 execution_state: ExecutionState::Idle,
             })),
             config: Arc::new(None),
-            theme: Theme::default(),
-            show_ui: true,
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            #[cfg(test)]
+            test_agent_override: None,
         }
     }
 
@@ -191,60 +211,79 @@ impl RalphMcpServer {
         Self {
             state: Arc::new(RwLock::new(ServerState::default())),
             config: Arc::new(Some(config)),
-            theme: Theme::default(),
-            show_ui: true,
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::new())),
+            #[cfg(test)]
+            test_agent_override: None,
         }
     }
 
-    /// Create a new RalphMcpServer with UI settings.
+    /// Create a new RalphMcpServer with display options.
     ///
     /// # Arguments
     ///
-    /// * `show_ui` - Whether to show UI during execution
-    /// * `theme` - Theme for UI rendering
+    /// * `options` - Display options for configuring terminal UI behavior
     ///
     /// # Examples
     ///
     /// ```
     /// use ralph::mcp::RalphMcpServer;
-    /// use ralph::ui::Theme;
+    /// use ralph::ui::{DisplayOptions, UiMode};
     ///
-    /// let server = RalphMcpServer::with_ui(true, Theme::default());
+    /// let options = DisplayOptions::new()
+    ///     .with_ui_mode(UiMode::Enabled)
+    ///     .with_color(true)
+    ///     .with_quiet(false);
+    /// let server = RalphMcpServer::with_display(options);
     /// ```
-    pub fn with_ui(show_ui: bool, theme: Theme) -> Self {
+    pub fn with_display(options: DisplayOptions) -> Self {
         let (cancel_sender, cancel_receiver) = watch::channel(false);
         Self {
             state: Arc::new(RwLock::new(ServerState::default())),
             config: Arc::new(None),
-            theme,
-            show_ui,
             cancel_sender: Arc::new(cancel_sender),
             cancel_receiver,
             tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::with_options(options))),
+            #[cfg(test)]
+            test_agent_override: None,
         }
     }
 
-    /// Enable or disable UI display during execution.
-    pub fn set_show_ui(&mut self, show_ui: bool) {
-        self.show_ui = show_ui;
-    }
-
-    /// Set the theme for UI rendering.
-    pub fn set_theme(&mut self, theme: Theme) {
-        self.theme = theme;
-    }
-
-    /// Get whether UI display is enabled.
-    pub fn show_ui(&self) -> bool {
-        self.show_ui
-    }
-
-    /// Get the current theme.
-    pub fn theme(&self) -> Theme {
-        self.theme
+    /// Create a new RalphMcpServer with a preloaded PRD and display options.
+    ///
+    /// # Arguments
+    ///
+    /// * `prd_path` - Path to the PRD file to preload
+    /// * `options` - Display options for configuring terminal UI behavior
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ralph::mcp::RalphMcpServer;
+    /// use ralph::ui::{DisplayOptions, UiMode};
+    /// use std::path::PathBuf;
+    ///
+    /// let options = DisplayOptions::new().with_quiet(true);
+    /// let server = RalphMcpServer::with_prd_and_display(PathBuf::from("prd.json"), options);
+    /// ```
+    pub fn with_prd_and_display(prd_path: PathBuf, options: DisplayOptions) -> Self {
+        let (cancel_sender, cancel_receiver) = watch::channel(false);
+        Self {
+            state: Arc::new(RwLock::new(ServerState {
+                prd_path: Some(prd_path),
+                execution_state: ExecutionState::Idle,
+            })),
+            config: Arc::new(None),
+            cancel_sender: Arc::new(cancel_sender),
+            cancel_receiver,
+            tool_router: Self::tool_router(),
+            display: Arc::new(RwLock::new(RalphDisplay::with_options(options))),
+            #[cfg(test)]
+            test_agent_override: None,
+        }
     }
 
     /// Get read access to the shared state.
@@ -294,6 +333,48 @@ impl RalphMcpServer {
     /// This can be passed to async tasks that need to check for cancellation.
     pub fn cancel_receiver(&self) -> watch::Receiver<bool> {
         self.cancel_receiver.clone()
+    }
+
+    /// Get read access to the display controller.
+    ///
+    /// Returns a read guard that provides immutable access to the display.
+    pub async fn display(&self) -> tokio::sync::RwLockReadGuard<'_, RalphDisplay> {
+        self.display.read().await
+    }
+
+    /// Get write access to the display controller.
+    ///
+    /// Returns a write guard that provides mutable access to the display.
+    pub async fn display_mut(&self) -> tokio::sync::RwLockWriteGuard<'_, RalphDisplay> {
+        self.display.write().await
+    }
+
+    /// Update the display based on the current execution state.
+    ///
+    /// This method reads the current execution state and updates the UI accordingly.
+    /// Call this after state transitions to keep the terminal display in sync.
+    pub async fn update_display(&self) {
+        let state = {
+            let server_state = self.state.read().await;
+            server_state.execution_state.clone()
+        };
+
+        let mut display = self.display.write().await;
+        display.update_from_state(&state, None);
+    }
+
+    /// Update the display with story information.
+    ///
+    /// This method reads the current execution state and updates the UI,
+    /// including displaying story details when available.
+    pub async fn update_display_with_story(&self, story_info: Option<&crate::ui::StoryInfo>) {
+        let state = {
+            let server_state = self.state.read().await;
+            server_state.execution_state.clone()
+        };
+
+        let mut display = self.display.write().await;
+        display.update_from_state(&state, story_info);
     }
 }
 
@@ -546,115 +627,126 @@ impl RalphMcpServer {
             };
         }
 
-        // Execute the story with display
-        // Get the project root (directory containing the PRD)
+        // Detect available agent (use test override if available)
+        #[cfg(test)]
+        let detected_agent = self.test_agent_override.clone().or_else(detect_agent);
+        #[cfg(not(test))]
+        let detected_agent = detect_agent();
+
+        let agent_command = match detected_agent {
+            Some(agent) => agent,
+            None => {
+                // Reset state to idle since we can't run
+                {
+                    let mut state = self.state.write().await;
+                    state.execution_state = ExecutionState::Idle;
+                }
+                let response = create_run_error_response(&RunStoryError::ExecutionError(
+                    "No agent CLI found. Install Claude Code CLI (claude) or Amp CLI (amp)."
+                        .to_string(),
+                ));
+                return serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                });
+            }
+        };
+
+        // Get project root from PRD path
         let project_root = prd_path
             .parent()
             .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
-        // Create executor configuration
-        let profile = Profile::default();
+        // Progress file path (in same directory as PRD)
+        let progress_path = project_root.join("progress.txt");
+
+        // Create executor config
         let executor_config = ExecutorConfig {
+            prd_path: prd_path.clone(),
+            project_root: project_root.clone(),
+            progress_path,
+            quality_profile: self
+                .config
+                .as_ref()
+                .as_ref()
+                .map(|c| c.profiles.get("standard").cloned().unwrap_or_default()),
+            agent_command,
             max_iterations,
-            profile,
-            show_ui: self.show_ui,
-            theme: self.theme,
         };
 
-        // Create iteration display for UI feedback
-        let display = IterationDisplay::with_theme(self.theme);
+        // Clone necessary data for the spawned task
+        let story_id = req.story_id.clone();
+        let state = self.state.clone();
+        let cancel_receiver = self.cancel_receiver();
+        let display = self.display.clone();
 
-        // Create the story executor
-        let state_clone = self.state.clone();
-        let story_id_clone = req.story_id.clone();
-        let mut executor = StoryExecutor::new(executor_config, project_root);
+        // Spawn async task to execute the story
+        tokio::spawn(async move {
+            let executor = StoryExecutor::new(executor_config);
 
-        // Wire up event callback to update state and display
-        let state_for_callback = state_clone.clone();
-        let story_id_for_callback = story_id_clone.clone();
-        executor = executor.on_event(Box::new(move |event| {
-            match &event {
-                ExecutionEvent::IterationStarting {
-                    iteration,
-                    max_iterations,
-                    ..
-                } => {
-                    // Update state with current iteration
-                    // Note: We can't await in this sync callback, so we use try_write
-                    if let Ok(mut state) = state_for_callback.try_write() {
-                        state.execution_state = ExecutionState::Running {
-                            story_id: story_id_for_callback.clone(),
-                            started_at: current_timestamp(),
-                            iteration: *iteration,
-                            max_iterations: *max_iterations,
+            // Iteration callback to update state
+            let state_for_callback = state.clone();
+            let on_iteration = move |iteration: u32, _max: u32| {
+                let state_clone = state_for_callback.clone();
+                tokio::spawn(async move {
+                    let mut server_state = state_clone.write().await;
+                    if let ExecutionState::Running {
+                        iteration: iter, ..
+                    } = &mut server_state.execution_state
+                    {
+                        *iter = iteration;
+                    }
+                });
+            };
+
+            // Execute the story
+            match executor
+                .execute_story(&story_id, cancel_receiver, on_iteration)
+                .await
+            {
+                Ok(result) => {
+                    // Update state to Completed
+                    let mut server_state = state.write().await;
+                    server_state.execution_state = ExecutionState::Completed {
+                        story_id: story_id.clone(),
+                        commit_hash: result.commit_hash,
+                    };
+
+                    // Update display
+                    drop(server_state);
+                    if let Ok(mut disp) = display.try_write() {
+                        let completed_state = ExecutionState::Completed {
+                            story_id: story_id.clone(),
+                            commit_hash: None,
                         };
+                        disp.update_from_state(&completed_state, None);
                     }
                 }
-                ExecutionEvent::IterationCompleted { .. } => {
-                    // Display is updated automatically by the executor
-                }
-                ExecutionEvent::GateProgress(_) => {
-                    // Gate progress is handled by executor's internal display
-                }
-                ExecutionEvent::ExecutionFinished { .. } => {
-                    // Final state update is done below
+                Err(e) => {
+                    // Update state to Failed
+                    let mut server_state = state.write().await;
+                    server_state.execution_state = ExecutionState::Failed {
+                        story_id: story_id.clone(),
+                        error: e.to_string(),
+                    };
+
+                    // Update display
+                    drop(server_state);
+                    if let Ok(mut disp) = display.try_write() {
+                        let failed_state = ExecutionState::Failed {
+                            story_id: story_id.clone(),
+                            error: e.to_string(),
+                        };
+                        disp.update_from_state(&failed_state, None);
+                    }
                 }
             }
-        }));
+        });
 
-        // Show iteration preview before running
-        let gates = executor.gate_names();
-        if self.show_ui {
-            let _ = display.show_iteration_preview(&gates);
-        }
-
-        // Run the story execution (this blocks until complete)
-        let (success, _iterations_run, _total_duration) = executor.run_story(&req.story_id);
-
-        // Show final summary
-        if self.show_ui {
-            let _ = display.show_final_summary();
-        }
-
-        // Update state to completed or failed
-        {
-            let mut state = self.state.write().await;
-            if success {
-                state.execution_state = ExecutionState::Completed {
-                    story_id: req.story_id.clone(),
-                    commit_hash: None, // Commit hash would be set after git commit
-                };
-            } else {
-                state.execution_state = ExecutionState::Failed {
-                    story_id: req.story_id.clone(),
-                    error: "Quality gates failed after max iterations".to_string(),
-                };
-            }
-        }
-
-        // Create response based on result
-        if success {
-            let response = serde_json::json!({
-                "success": true,
-                "story_id": req.story_id,
-                "story_title": story.title,
-                "message": format!("Story {} completed successfully", req.story_id)
-            });
-            serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
-                format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
-            })
-        } else {
-            let response = serde_json::json!({
-                "success": false,
-                "story_id": req.story_id,
-                "story_title": story.title,
-                "message": format!("Story {} failed - quality gates did not pass after {} iterations", req.story_id, max_iterations)
-            });
-            serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
-                format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
-            })
-        }
+        // Return started response immediately (execution continues in background)
+        let response = create_started_response(&story, max_iterations);
+        serde_json::to_string_pretty(&response)
+            .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))
     }
 
     /// Stop the currently executing story.
@@ -1380,9 +1472,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        // Create server with UI disabled for testing
-        let mut server = RalphMcpServer::new();
-        server.set_show_ui(false);
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1411,13 +1501,15 @@ mod tests {
             .await;
 
         // Parse the result as JSON
-        // Now that run_story actually executes, it will return completed/failed status
         let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
         assert_eq!(json["story_id"], "US-001");
         assert_eq!(json["story_title"], "First story");
-        // The message will contain either "completed" or "failed" since execution now runs
-        let message = json["message"].as_str().unwrap();
-        assert!(message.contains("US-001"));
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("Started execution"));
+        assert!(json["message"].as_str().unwrap().contains("5 iterations"));
     }
 
     #[tokio::test]
@@ -1426,9 +1518,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        // Create server with UI disabled for testing
-        let mut server = RalphMcpServer::new();
-        server.set_show_ui(false);
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1458,24 +1548,25 @@ mod tests {
         let _ = server
             .run_story(Parameters(RunStoryRequest {
                 story_id: "US-001".to_string(),
-                max_iterations: Some(3),
+                max_iterations: Some(10),
             }))
             .await;
 
-        // Verify state changed to completed or failed (not running, since execution completes)
+        // Verify state changed to running
         {
             let state = server.state().await;
             match &state.execution_state {
-                ExecutionState::Completed { story_id, .. } => {
+                ExecutionState::Running {
+                    story_id,
+                    max_iterations,
+                    iteration,
+                    ..
+                } => {
                     assert_eq!(story_id, "US-001");
+                    assert_eq!(*max_iterations, 10);
+                    assert_eq!(*iteration, 1);
                 }
-                ExecutionState::Failed { story_id, .. } => {
-                    assert_eq!(story_id, "US-001");
-                }
-                _ => {
-                    // State should be Completed or Failed after execution
-                    // (Running is only transient during execution)
-                }
+                _ => panic!("Expected Running state"),
             }
         }
     }
@@ -1486,9 +1577,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        // Create server with UI disabled for testing
-        let mut server = RalphMcpServer::new();
-        server.set_show_ui(false);
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1512,26 +1601,24 @@ mod tests {
         let result = server
             .run_story(Parameters(RunStoryRequest {
                 story_id: "US-001".to_string(),
-                max_iterations: None, // Should default to 10
+                max_iterations: None,
             }))
             .await;
 
-        // Parse the result as JSON
-        // Now that run_story actually executes, it will return completed/failed status
+        // Parse the result as JSON - should default to 10 iterations
         let json: serde_json::Value = serde_json::from_str(&result).unwrap();
-        assert_eq!(json["story_id"], "US-001");
-        // Message will indicate completion status, not "Started execution"
-        let message = json["message"].as_str().unwrap();
-        assert!(message.contains("US-001"));
+        assert_eq!(json["success"], true);
+        assert!(json["message"].as_str().unwrap().contains("10 iterations"));
 
-        // Verify state is now completed or failed (not running)
+        // Verify state has default max_iterations
         {
             let state = server.state().await;
-            // After execution, state should be Completed or Failed
-            assert!(matches!(
-                state.execution_state,
-                ExecutionState::Completed { .. } | ExecutionState::Failed { .. }
-            ));
+            match &state.execution_state {
+                ExecutionState::Running { max_iterations, .. } => {
+                    assert_eq!(*max_iterations, 10);
+                }
+                _ => panic!("Expected Running state"),
+            }
         }
     }
 
@@ -1541,9 +1628,7 @@ mod tests {
         use std::io::Write;
         use tempfile::NamedTempFile;
 
-        // Create server with UI disabled for testing
-        let mut server = RalphMcpServer::new();
-        server.set_show_ui(false);
+        let server = RalphMcpServer::new_for_test("mock-agent");
 
         // Create and load a valid PRD file
         let mut file = NamedTempFile::new().unwrap();
@@ -1567,16 +1652,15 @@ mod tests {
         server.cancel();
         assert!(server.is_cancelled());
 
-        // Run the story - should reset cancel at the start of execution
+        // Run the story - should reset cancel
         let _ = server
             .run_story(Parameters(RunStoryRequest {
                 story_id: "US-001".to_string(),
-                max_iterations: Some(3), // Use smaller iterations for faster test
+                max_iterations: None,
             }))
             .await;
 
-        // Verify cancel was reset (at start of execution)
-        // Note: After execution completes, cancel should still be false
+        // Verify cancel was reset
         assert!(!server.is_cancelled());
     }
 
@@ -1827,137 +1911,5 @@ mod tests {
             }
             _ => panic!("Expected TextResourceContents"),
         }
-    }
-
-    // ========================================================================
-    // US-010: Display Integration Tests
-    // ========================================================================
-
-    #[test]
-    fn test_server_with_ui_enabled() {
-        let server = RalphMcpServer::with_ui(true, Theme::default());
-        assert!(server.show_ui());
-    }
-
-    #[test]
-    fn test_server_with_ui_disabled() {
-        let server = RalphMcpServer::with_ui(false, Theme::default());
-        assert!(!server.show_ui());
-    }
-
-    #[test]
-    fn test_server_set_show_ui() {
-        let mut server = RalphMcpServer::new();
-        assert!(server.show_ui()); // Default is true
-
-        server.set_show_ui(false);
-        assert!(!server.show_ui());
-
-        server.set_show_ui(true);
-        assert!(server.show_ui());
-    }
-
-    #[test]
-    fn test_server_theme_accessors() {
-        let theme = Theme::default();
-        let server = RalphMcpServer::with_ui(true, theme);
-
-        // Should be able to get the theme
-        let retrieved_theme = server.theme();
-        assert_eq!(retrieved_theme.success, theme.success);
-        assert_eq!(retrieved_theme.error, theme.error);
-    }
-
-    #[test]
-    fn test_server_set_theme() {
-        let mut server = RalphMcpServer::new();
-        let new_theme = Theme::default();
-        server.set_theme(new_theme);
-
-        // Verify theme was updated
-        let theme = server.theme();
-        assert_eq!(theme.success, new_theme.success);
-    }
-
-    #[test]
-    fn test_default_server_has_ui_enabled() {
-        let server = RalphMcpServer::new();
-        assert!(server.show_ui());
-    }
-
-    #[test]
-    fn test_server_with_prd_has_ui_enabled() {
-        let server = RalphMcpServer::with_prd(PathBuf::from("test.json"));
-        assert!(server.show_ui());
-    }
-
-    #[test]
-    fn test_server_with_config_has_ui_enabled() {
-        let config = QualityConfig::default();
-        let server = RalphMcpServer::with_config(config);
-        assert!(server.show_ui());
-    }
-
-    #[tokio::test]
-    async fn test_run_story_updates_state_to_completed_on_success() {
-        // This test verifies that after execution, the state is updated appropriately
-        // Note: The actual execution result depends on quality gates
-        // For this test, we just verify the state machine works
-        let server = RalphMcpServer::new();
-
-        // Verify initial state is idle
-        {
-            let state = server.state().await;
-            assert_eq!(state.execution_state, ExecutionState::Idle);
-        }
-    }
-
-    #[test]
-    fn test_iteration_display_creation() {
-        use crate::mcp::executor::IterationDisplay;
-
-        // Verify we can create an iteration display with theme
-        let theme = Theme::default();
-        let display = IterationDisplay::with_theme(theme);
-
-        // Verify display is properly initialized
-        assert!(display.summaries().is_empty());
-    }
-
-    #[test]
-    fn test_executor_config_creation() {
-        use crate::mcp::executor::ExecutorConfig;
-        use crate::quality::Profile;
-
-        // Verify executor config can be created with show_ui and theme
-        let config = ExecutorConfig {
-            max_iterations: 5,
-            profile: Profile::default(),
-            show_ui: true,
-            theme: Theme::default(),
-        };
-
-        assert_eq!(config.max_iterations, 5);
-        assert!(config.show_ui);
-    }
-
-    #[test]
-    fn test_story_executor_with_display() {
-        use crate::mcp::executor::{ExecutorConfig, StoryExecutor};
-        use crate::quality::Profile;
-
-        // Verify executor can be created with config including UI settings
-        let config = ExecutorConfig {
-            max_iterations: 3,
-            profile: Profile::default(),
-            show_ui: false, // Disable UI for testing
-            theme: Theme::default(),
-        };
-
-        let executor = StoryExecutor::new(config, std::env::current_dir().unwrap());
-        let gates = executor.gate_names();
-
-        // Should have default gates
-        assert!(!gates.is_empty());
     }
 }

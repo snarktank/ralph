@@ -1,168 +1,137 @@
 # Ralph Progress Log
-Started: Sat Jan 17 21:41:00 MST 2026
+Started: Sat Jan 17 20:26:35 MST 2026
 ---
 
 ## Codebase Patterns
-- UI modules are in src/ui/ with mod.rs re-exporting public types
-- Use `owo-colors` for terminal coloring via Theme struct from colors.rs
-- Use `crossterm` for terminal control (cursor, clearing)
-- Use `ctrlc` crate with "termination" feature for interrupt handling
-- Ghostty synchronized output uses escape codes `\x1b[?2026h` and `\x1b[?2026l`
-- Time-based random selection uses SystemTime::now().subsec_nanos() % choices.len()
-- ASCII art stored as &'static str constants
-- Tests in each module use #[cfg(test)] mod tests { ... } pattern
+- This is a Rust project - use `cargo check` for typechecking, `cargo clippy -- -D warnings` for linting, `cargo fmt` for formatting
+- Use `git switch` instead of `git checkout` for branch operations (Safety Net requirement)
+- Module files go in `src/{module}/mod.rs` with the module declaration in main.rs
+- Use `.gitkeep` files to preserve empty directories in git
+- The Ralph code lives at `/Users/thinkstudio/ralph`, the task management (PRD/progress) is at `/Users/thinkstudio/ralphmacchio`
+- **MCP Tool Registration Pattern:** Requires 3 components: (1) `tool_router: ToolRouter<Self>` field, (2) `#[tool_router]` impl block with `#[tool]` methods, (3) `#[tool_handler(router = self.tool_router)]` on ServerHandler impl
+- MCP tool methods must be async and use `Parameters<T>` wrapper for input parameters
 
 ---
 
-## 2026-01-17 - US-001
-- What was implemented: Verified existing mascot module implementation; added missing ctrlc dependency
-- Files changed:
-  - src/ui/mascot.rs (already existed with full implementation)
-  - src/ui/mod.rs (exports mascot types)
-  - Cargo.toml (added ctrlc dependency)
-  - Cargo.lock (updated)
+## 2026-01-17 20:30 MST - US-001
+- **What was implemented:** Created optimized multi-stage Dockerfile for Ralph MCP server
+- **Files changed:**
+  - Created Dockerfile with multi-stage build (builder: rust:1.75-slim-bookworm, runtime: debian:bookworm-slim)
+- **Details:**
+  - Builder stage installs pkg-config and libssl-dev for compilation
+  - Implements dependency caching layer (copy Cargo.toml first, build deps, then copy src)
+  - Runtime stage installs only ca-certificates and libssl3
+  - Creates non-root 'ralph' user for security
+  - Sets ENTRYPOINT to `ralph mcp-server` command
+  - Adds OCI labels including mcp.server=true and mcp.transport=stdio
+  - Dockerfile syntax validated with `docker build --check`
+  - Commit: f95e771
 - **Learnings for future iterations:**
-  - The entire UI module was pre-implemented but not committed. Contains: mascot, colors, display, ghostty, help, interrupt, quality_gates, spinner, story_view, summary
-  - Missing dependency `ctrlc` caused build failure - always run `cargo check` before assuming code works
-  - US-002 (PeekAnimation) and US-003 (HelpRenderer integration) appear to already be implemented in the existing code
+  - The Ralph codebase is at /Users/thinkstudio/ralph, task management at /Users/thinkstudio/ralphmacchio
+  - Docker MCP toolkit expects mcp.server and mcp.transport labels
+  - Use `docker build --check` to validate Dockerfile syntax without building
+  - Multi-stage builds significantly reduce image size (slim base images)
 ---
 
-## 2026-01-17 - US-002
-- What was implemented: Verified existing peek animation and MascotRenderer implementation
-- Files changed:
-  - No code changes needed - implementation was already included in US-001 commit (90b7f39)
-  - prd.json (marked US-002 as passes: true)
+## 2026-01-17 20:35 MST - US-002
+- **What was implemented:** Added Docker build optimization with version tracking
+- **Files changed:**
+  - Modified Dockerfile: Added ARG instructions for VERSION and COMMIT_SHA, LABEL instructions for version tracking
+  - Modified .dockerignore: Added tests/ directory exclusion
+- **Details:**
+  - ARG instructions with default values (VERSION=dev, COMMIT_SHA=unknown)
+  - Re-declared ARGs in runtime stage (required for multi-stage builds)
+  - Added org.opencontainers.image.version and org.opencontainers.image.revision labels
+  - Documented build args usage with example in Dockerfile comments
+  - .dockerignore already had target/, .git/, docs/; added tests/
+  - Dockerfile syntax validated with `docker build --check`
+  - Commit: b5418c8
 - **Learnings for future iterations:**
-  - The mascot.rs module includes complete PeekAnimation with PEEK_FRAMES constants (5 frames per mascot)
-  - AnimationConfig provides configurable frame_delay_ms (default 80ms)
-  - PeekAnimation.play() uses ANSI escape codes: `\x1b[?25l` (hide cursor), `\x1b[?25h` (show cursor)
-  - Ghostty sync uses `\x1b[?2026h` (begin) and `\x1b[?2026l` (end) for flicker-free rendering
-  - MascotRenderer provides render_with_quote() and render_beside_content() methods
-  - 12 dedicated mascot tests all passing
+  - In multi-stage Docker builds, ARGs must be re-declared in each stage where they're used
+  - Use `${VAR}` syntax in LABEL instructions to reference ARG values
+  - OCI standard labels: org.opencontainers.image.version, org.opencontainers.image.revision
 ---
 
-## 2026-01-17 - US-003
-- What was implemented: Integrated mascot into startup display
-- Files changed:
-  - src/main.rs: Added `--no-animation` flag and custom `--version` flag handler with HelpRenderer
-  - src/ui/help.rs: Added `--no-animation` to GLOBAL_OPTIONS; updated render_version() to show mascot beside version box; updated render_help() to show mascot with random quote
-  - tests/cli_tests.rs: Updated tests to accept both "RALPH" (banner) and "ralph" (usage) in output
+## 2026-01-17 20:45 MST - US-003
+- **What was implemented:** Created docker-compose.yml for local MCP server testing
+- **Files changed:**
+  - Created docker-compose.yml with ralph-mcp service and 'with-prd' profile variant
+- **Details:**
+  - Main service `ralph-mcp` with stdin_open and tty for stdio transport
+  - Volume mounts for prd.json and quality directory (read-only)
+  - RUST_LOG environment variable set to info
+  - Second service `ralph-mcp-with-prd` with profile 'with-prd' for preloaded PRD testing
+  - Validated with `docker compose config` and `docker compose --profile with-prd config`
+  - Commit: d356acb
 - **Learnings for future iterations:**
-  - When adding custom flags that conflict with clap's auto-generated ones (like `--version`), use `disable_version_flag = true` in the `#[command()]` attribute
-  - HelpRenderer already had `animate` field and `with_animation()` builder - just needed to wire it up in main.rs
-  - MascotRenderer.render_beside_content() combines content and mascot side-by-side
-  - MascotRenderer.render_with_quote() renders mascot art with a random quote below
-  - Tests use `predicate::str::contains()` which is case-sensitive; use `.or()` for alternatives
+  - Docker Compose profiles allow optional services (use `--profile <name>` to enable)
+  - Use `stdin_open: true` and `tty: true` for MCP stdio transport in Docker
+  - Volume mounts with `:ro` suffix for read-only access
+  - `docker compose config` validates YAML syntax and shows resolved configuration
 ---
 
-## 2026-01-17 - US-004
-- What was implemented: Created iteration view component module
-- Files changed:
-  - src/ui/iteration_view.rs: New module with IterationPreview struct and 7 unit tests
-  - src/ui/mod.rs: Added iteration_view module and exported IterationPreview
+## 2026-01-17 20:36 MST - US-004
+- **What was implemented:** Configured Ralph for Docker MCP toolkit ecosystem
+- **Files changed:**
+  - Created examples/mcp-toolkit-config.json - Docker MCP toolkit configuration
+  - Created examples/README.md - Documentation for config usage
+  - Modified Dockerfile - Added HEALTHCHECK instruction
+- **Details:**
+  - mcp-toolkit-config.json specifies ghcr.io/kcirtapfromspace/ralph:latest image
+  - Config includes stdio transport settings and RUST_LOG environment variable
+  - HEALTHCHECK uses `ralph --help` to verify binary is functional (appropriate for stdio MCP servers)
+  - README.md documents usage with Claude Desktop, config options, and manual docker run commands
+  - JSON syntax validated with python3 json.tool
+  - Dockerfile syntax validated with `docker build --check`
+  - Commit: 5332d76
 - **Learnings for future iterations:**
-  - IterationPreview shows gates to run with arrow separator: "Will run: build → lint → test"
-  - Use `→` (unicode arrow) instead of `->` for better visual appearance in terminal
-  - render() returns full output with "Will run:" prefix, render_compact() returns just gate chain
-  - Empty gates list handled gracefully with "No gates configured" message
-  - Follow the quality_gates.rs pattern: struct with Theme, constructor methods, and render methods
+  - MCP toolkit config format: `{ "mcpServers": { "name": { "command": "docker", "args": [...], "transport": "stdio" } } }`
+  - Claude Desktop config locations: macOS `~/Library/Application Support/Claude/`, Windows `%APPDATA%\Claude/`, Linux `~/.config/claude/`
+  - For stdio-based MCP servers, HEALTHCHECK should verify binary responds (--help flag works well)
+  - HEALTHCHECK in Docker: `HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 CMD [...]`
 ---
 
-## 2026-01-17 - US-005
-- What was implemented: Added live gate progress display for real-time iteration tracking
-- Files changed:
-  - src/ui/iteration_view.rs: Added GateProgress enum, GateProgressInfo struct, and LiveIterationPanel with 24 new tests
-  - src/ui/mod.rs: Exported new types (GateProgress, GateProgressInfo, LiveIterationPanel)
+## 2026-01-17 20:50 MST - US-005
+- **What was implemented:** Added GitHub Container Registry publishing workflow
+- **Files changed:**
+  - Created .github/workflows/docker.yml - GitHub Actions workflow for Docker builds
+- **Details:**
+  - Triggers on push to main branch and v* tags
+  - Uses docker/build-push-action@v6 for multi-platform builds
+  - Builds for linux/amd64 and linux/arm64 platforms
+  - Pushes to ghcr.io/kcirtapfromspace/ralph
+  - Uses docker/metadata-action@v5 for intelligent tagging:
+    - Branch name for branch pushes
+    - Semantic versioning (version, major.minor) for tags
+    - Git SHA prefix for traceability
+    - 'latest' tag for main branch
+  - Uses GitHub Actions cache for faster builds
+  - YAML syntax validated with Ruby YAML parser
+  - Commit: df8d17b
 - **Learnings for future iterations:**
-  - There's already a GateStatus enum in quality_gates.rs - named new struct GateProgressInfo to avoid conflict
-  - Use spinner_chars::BRAILLE from spinner.rs for animated progress indicators
-  - ghostty::begin_sync() and ghostty::end_sync() wrap output for flicker-free rendering
-  - LiveIterationPanel tracks: iteration number, gate statuses with timing, elapsed time, spinner frame
-  - render() produces multi-line output, render_inline() produces single-line summary
-  - ANSI escape codes `\x1b[1A\x1b[2K` for clearing previous output (move up 1 line, clear line)
-  - Duration formatting: seconds use `{:.1}s`, minutes use `{}m{:.1}s`
+  - Use docker/setup-qemu-action for multi-platform builds (enables ARM emulation)
+  - docker/setup-buildx-action enables advanced Docker BuildKit features
+  - docker/metadata-action provides intelligent tagging strategies (semver, sha, latest)
+  - GitHub Actions cache (type=gha) speeds up Docker layer caching
+  - packages: write permission is required for GHCR push
 ---
 
-## 2026-01-17 - US-006
-- What was implemented: Added collapsible iteration summaries with auto-expand for failures
-- Files changed:
-  - src/ui/iteration_view.rs: Added GateSummary, IterationSummary, and IterationSummaryStack structs with 28 new tests
-  - src/ui/mod.rs: Exported new types (GateSummary, IterationSummary, IterationSummaryStack)
+## 2026-01-17 21:00 MST - US-006
+- **What was implemented:** Comprehensive Docker MCP integration documentation
+- **Files changed:**
+  - Created docs/guides/docker-mcp-setup.md - Complete Docker MCP setup guide (~450 lines)
+  - Created README.md - Project README with links to documentation
+  - Modified examples/README.md - Updated links to point to new documentation
+- **Details:**
+  - Documentation includes prerequisites (Docker, Claude Desktop)
+  - Step-by-step configuration for Quick Start and detailed setup
+  - Multiple configuration examples: basic, with PRD, with debug logging, with custom quality profile
+  - Docker run command examples for various use cases
+  - Comprehensive troubleshooting section with common issues and solutions
+  - All markdown links validated as working
+  - Commit: 44aec68
 - **Learnings for future iterations:**
-  - IterationSummary renders collapsed format: "▸ Iteration 1/5: ✓ build ✓ lint ✓ test (3.2s)"
-  - Failed iterations auto-expand with "▾" indicator and show error details indented
-  - GateSummary supports optional duration and error_details for rich failure reporting
-  - IterationSummaryStack manages multiple completed iterations with total duration tracking
-  - render() auto-chooses collapsed vs expanded based on pass/fail status
-  - render_collapsed() vs render_expanded() available for explicit control
-  - LiveIterationPanel.to_summary() converts live panel to summary after completion
-  - render_final_summary() shows "All iterations passed" or "X/Y iterations passed" with total time
----
-
-## 2026-01-17 - US-007
-- What was implemented: Added streaming activity indicator for showing current file/action during operations
-- Files changed:
-  - src/ui/iteration_view.rs: Added ActivityIndicator struct with 25 new tests
-  - src/ui/mod.rs: Exported ActivityIndicator
-- **Learnings for future iterations:**
-  - ActivityIndicator shows current action beneath running gate: "Running: src/tests/auth.rs:142"
-  - Supports file:line format with optional line number for clickable hyperlinks
-  - Uses ghostty::file_hyperlink_with_line() for OSC 8 hyperlinks in Ghostty
-  - is_file_activity() heuristic checks for path separators or common file extensions (.rs, .ts, .js, .py)
-  - Convenience constructors: running_file(), running_file_at_line(), testing(), compiling(), linting()
-  - LiveIterationPanel.set_activity() sets activity, clear_activity() clears it
-  - pass_gate() and fail_gate() automatically clear activity when gate completes
-  - render() only shows activity beneath gates with GateProgress::Running status
-  - render() uses 4-space indent for activity (2 for gate, 2 more for activity beneath)
----
-
-## 2026-01-17 - US-008
-- What was implemented: Integrated iteration view with executor for progress callbacks
-- Files changed:
-  - src/mcp/executor.rs: New module with StoryExecutor, IterationDisplay, and event types
-  - src/mcp/mod.rs: Exported executor module and public types
-- **Learnings for future iterations:**
-  - StoryExecutor orchestrates the iteration loop with configurable max_iterations
-  - GateProgressEvent enum: Started, Completed, Activity for fine-grained progress tracking
-  - ExecutionEvent enum: IterationStarting, GateProgress, IterationCompleted, ExecutionFinished
-  - on_event() callback accepts Box<dyn FnMut(ExecutionEvent) + Send> for async compatibility
-  - on_gate_progress() is convenience wrapper filtering to just GateProgress events
-  - IterationDisplay manages UI: show_iteration_preview(), start_iteration(), update_gate(), finish_iteration()
-  - run_quality_gates() emits Started before and Completed after each gate check
-  - Profile configuration determines which gates run (coverage, lint, format, security_audit)
-  - ExecutorConfig bundles max_iterations, profile, show_ui flag, and theme
-  - Tests verify callback wiring and display state management
----
-
-## 2026-01-17 - US-009
-- What was implemented: Added progress callbacks to quality gate checker
-- Files changed:
-  - src/quality/gates.rs: Added GateProgressState enum, GateProgressUpdate struct, and run_all_gates_with_progress() method with 8 new tests
-  - src/quality/mod.rs: Exported GateProgressState and GateProgressUpdate types
-- **Learnings for future iterations:**
-  - GateProgressState has three states: Running, Passed, Failed (simpler than UI's GateProgress which includes Pending)
-  - GateProgressUpdate wraps gate_name, state, and optional duration for completed gates
-  - run_all_gates_with_progress() emits Running before each gate starts, Passed/Failed after completion
-  - Duration is captured with Instant::now() and elapsed() for accurate timing
-  - Callback signature is FnMut(GateProgressUpdate) - accepts struct rather than separate args
-  - Convenience methods: is_running(), is_passed(), is_failed(), is_completed(), format_duration()
-  - The method returns Vec<GateResult> same as run_all() for compatibility
-  - Tests verify: correct gate order, Running before complete, duration presence, state/result consistency
----
-
-## 2026-01-17 - US-010
-- What was implemented: Wired iteration display to MCP server execution
-- Files changed:
-  - src/mcp/server.rs: Added theme/show_ui fields, with_ui() constructor, accessors; rewrote run_story() to use StoryExecutor with real execution and display
-  - prd.json: Marked US-010 as passes: true
-- **Learnings for future iterations:**
-  - RalphMcpServer now has theme: Theme and show_ui: bool fields for UI configuration
-  - with_ui(show_ui, theme) constructor creates server with custom UI settings
-  - set_show_ui() and set_theme() allow runtime configuration changes
-  - run_story() now actually executes using StoryExecutor, not just a stub
-  - IterationDisplay.show_iteration_preview() shows gates before execution starts
-  - Event callback with try_write() for non-blocking state updates from sync callbacks
-  - After execution, state transitions to Completed or Failed (not Running)
-  - Updated tests to use set_show_ui(false) for faster execution without terminal output
-  - Tests now check for Completed/Failed state instead of Running since execution completes synchronously
+  - When creating documentation in a deployment repo, link back to main repo for native setup guides
+  - Use bash link validation to check relative paths: grep for markdown links and verify files exist
+  - Docker MCP troubleshooting: common issues are docker not running, image not found, permissions, stdin flag missing
 ---

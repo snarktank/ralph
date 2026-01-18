@@ -29,16 +29,13 @@ exclude = [
 [dependencies]
 async-trait = "0.1"
 axum = "0.8"
+chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 config = { version = "0.14", default-features = false, features = ["toml"] }
-crossterm = "0.29.0"
-ctrlc = { version = "3.5.1", features = ["termination"] }
 graphql_client = { version = "0.14", features = ["reqwest"] }
 hex = "0.4"
 hmac = "0.12"
-indicatif = "0.18.3"
 octocrab = "0.42"
-owo-colors = "4.2.3"
 regex = "1"
 reqwest = { version = "0.12", features = ["json"] }
 rmcp = { version = "0.8", features = ["server", "transport-io", "macros"] }
@@ -53,6 +50,13 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Terminal UI dependencies
+console = "0.15"
+crossterm = "0.27"
+ctrlc = "3.4"
+indicatif = "0.17"
+owo-colors = "4"
 
 [dev-dependencies]
 assert_cmd = "2"

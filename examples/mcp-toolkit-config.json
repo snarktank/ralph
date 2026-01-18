@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "ralph": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "ghcr.io/kcirtapfromspace/ralph:latest"
+      ],
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "transport": "stdio"
+    }
+  }
+}
