@@ -149,3 +149,20 @@ Started: Sat Jan 17 21:41:00 MST 2026
   - The method returns Vec<GateResult> same as run_all() for compatibility
   - Tests verify: correct gate order, Running before complete, duration presence, state/result consistency
 ---
+
+## 2026-01-17 - US-010
+- What was implemented: Wired iteration display to MCP server execution
+- Files changed:
+  - src/mcp/server.rs: Added theme/show_ui fields, with_ui() constructor, accessors; rewrote run_story() to use StoryExecutor with real execution and display
+  - prd.json: Marked US-010 as passes: true
+- **Learnings for future iterations:**
+  - RalphMcpServer now has theme: Theme and show_ui: bool fields for UI configuration
+  - with_ui(show_ui, theme) constructor creates server with custom UI settings
+  - set_show_ui() and set_theme() allow runtime configuration changes
+  - run_story() now actually executes using StoryExecutor, not just a stub
+  - IterationDisplay.show_iteration_preview() shows gates before execution starts
+  - Event callback with try_write() for non-blocking state updates from sync callbacks
+  - After execution, state transitions to Completed or Failed (not Running)
+  - Updated tests to use set_show_ui(false) for faster execution without terminal output
+  - Tests now check for Completed/Failed state instead of Running since execution completes synchronously
+---
