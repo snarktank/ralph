@@ -98,3 +98,20 @@ Started: Sat Jan 17 21:41:00 MST 2026
   - LiveIterationPanel.to_summary() converts live panel to summary after completion
   - render_final_summary() shows "All iterations passed" or "X/Y iterations passed" with total time
 ---
+
+## 2026-01-17 - US-007
+- What was implemented: Added streaming activity indicator for showing current file/action during operations
+- Files changed:
+  - src/ui/iteration_view.rs: Added ActivityIndicator struct with 25 new tests
+  - src/ui/mod.rs: Exported ActivityIndicator
+- **Learnings for future iterations:**
+  - ActivityIndicator shows current action beneath running gate: "Running: src/tests/auth.rs:142"
+  - Supports file:line format with optional line number for clickable hyperlinks
+  - Uses ghostty::file_hyperlink_with_line() for OSC 8 hyperlinks in Ghostty
+  - is_file_activity() heuristic checks for path separators or common file extensions (.rs, .ts, .js, .py)
+  - Convenience constructors: running_file(), running_file_at_line(), testing(), compiling(), linting()
+  - LiveIterationPanel.set_activity() sets activity, clear_activity() clears it
+  - pass_gate() and fail_gate() automatically clear activity when gate completes
+  - render() only shows activity beneath gates with GateProgress::Running status
+  - render() uses 4-space indent for activity (2 for gate, 2 more for activity beneath)
+---
