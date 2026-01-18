@@ -83,7 +83,10 @@ impl GateProgressUpdate {
 
     /// Check if the gate has completed (Passed or Failed).
     pub fn is_completed(&self) -> bool {
-        matches!(self.state, GateProgressState::Passed | GateProgressState::Failed)
+        matches!(
+            self.state,
+            GateProgressState::Passed | GateProgressState::Failed
+        )
     }
 
     /// Format the duration for display, if available.
@@ -1635,7 +1638,10 @@ error: critical issue
         });
 
         // Should run gates in order: coverage, lint, format, security_audit
-        assert_eq!(gate_names, vec!["coverage", "lint", "format", "security_audit"]);
+        assert_eq!(
+            gate_names,
+            vec!["coverage", "lint", "format", "security_audit"]
+        );
     }
 
     #[test]
@@ -1652,8 +1658,15 @@ error: critical issue
 
         // All completed updates should have duration
         for update in &completed_updates {
-            assert!(update.duration.is_some(), "Gate {} should have duration", update.gate_name);
-            assert!(update.duration.unwrap().as_nanos() > 0, "Duration should be positive");
+            assert!(
+                update.duration.is_some(),
+                "Gate {} should have duration",
+                update.gate_name
+            );
+            assert!(
+                update.duration.unwrap().as_nanos() > 0,
+                "Duration should be positive"
+            );
         }
     }
 
@@ -1694,9 +1707,13 @@ error: critical issue
             let running_pos = update_sequence
                 .iter()
                 .position(|(name, state)| name == gate && *state == GateProgressState::Running);
-            let complete_pos = update_sequence
-                .iter()
-                .position(|(name, state)| name == gate && matches!(*state, GateProgressState::Passed | GateProgressState::Failed));
+            let complete_pos = update_sequence.iter().position(|(name, state)| {
+                name == gate
+                    && matches!(
+                        *state,
+                        GateProgressState::Passed | GateProgressState::Failed
+                    )
+            });
 
             assert!(
                 running_pos.is_some(),

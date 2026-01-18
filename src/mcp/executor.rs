@@ -20,9 +20,7 @@ use crate::ui::{
 #[derive(Debug, Clone)]
 pub enum GateProgressEvent {
     /// Gate is about to start
-    Started {
-        gate_name: String,
-    },
+    Started { gate_name: String },
     /// Gate completed (passed or failed)
     Completed {
         gate_name: String,
@@ -32,10 +30,7 @@ pub enum GateProgressEvent {
         details: Option<String>,
     },
     /// Activity update during gate execution
-    Activity {
-        gate_name: String,
-        activity: String,
-    },
+    Activity { gate_name: String, activity: String },
 }
 
 impl GateProgressEvent {
@@ -197,9 +192,7 @@ impl IterationDisplay {
                         panel.fail_gate(gate_name, *duration);
                     }
                 }
-                GateProgressEvent::Activity {
-                    activity, ..
-                } => {
+                GateProgressEvent::Activity { activity, .. } => {
                     panel.set_activity(ActivityIndicator::running_file(activity.clone()));
                 }
             }
@@ -337,41 +330,57 @@ impl StoryExecutor {
 
         // Run coverage check
         if self.config.profile.testing.coverage_threshold > 0 {
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started("coverage")));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started(
+                "coverage",
+            )));
             let start = Instant::now();
             let result = self.checker.check_coverage();
             let duration = start.elapsed();
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(&result, duration)));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(
+                &result, duration,
+            )));
             results.push(result);
         }
 
         // Run lint check
         if self.config.profile.ci.lint_check {
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started("lint")));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started(
+                "lint",
+            )));
             let start = Instant::now();
             let result = self.checker.check_lint();
             let duration = start.elapsed();
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(&result, duration)));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(
+                &result, duration,
+            )));
             results.push(result);
         }
 
         // Run format check
         if self.config.profile.ci.format_check {
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started("format")));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started(
+                "format",
+            )));
             let start = Instant::now();
             let result = self.checker.check_format();
             let duration = start.elapsed();
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(&result, duration)));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(
+                &result, duration,
+            )));
             results.push(result);
         }
 
         // Run security audit
         if self.config.profile.security.cargo_audit {
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started("security_audit")));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::started(
+                "security_audit",
+            )));
             let start = Instant::now();
             let result = self.checker.check_security_audit();
             let duration = start.elapsed();
-            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(&result, duration)));
+            self.emit(ExecutionEvent::GateProgress(GateProgressEvent::completed(
+                &result, duration,
+            )));
             results.push(result);
         }
 
@@ -446,7 +455,11 @@ impl StoryExecutor {
 
             // Start iteration display
             if self.config.show_ui {
-                display.start_iteration(iteration as u64, self.config.max_iterations as u64, gates.clone());
+                display.start_iteration(
+                    iteration as u64,
+                    self.config.max_iterations as u64,
+                    gates.clone(),
+                );
             }
 
             // Run the iteration
@@ -484,8 +497,8 @@ impl StoryExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use crate::quality::{CiConfig, Profile, SecurityConfig, TestingConfig};
+    use std::sync::{Arc, Mutex};
 
     fn create_minimal_profile() -> Profile {
         Profile {
@@ -555,7 +568,10 @@ mod tests {
     fn test_gate_progress_event_activity() {
         let event = GateProgressEvent::activity("test", "src/lib.rs:42");
         match event {
-            GateProgressEvent::Activity { gate_name, activity } => {
+            GateProgressEvent::Activity {
+                gate_name,
+                activity,
+            } => {
                 assert_eq!(gate_name, "test");
                 assert_eq!(activity, "src/lib.rs:42");
             }
@@ -614,24 +630,23 @@ mod tests {
         let events: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
         let events_clone = events.clone();
 
-        let executor = StoryExecutor::new(config, "/tmp/test")
-            .on_event(Box::new(move |event| {
-                let mut events = events_clone.lock().unwrap();
-                match event {
-                    ExecutionEvent::IterationStarting { iteration, .. } => {
-                        events.push(format!("iteration_{}_start", iteration));
-                    }
-                    ExecutionEvent::IterationCompleted { iteration, .. } => {
-                        events.push(format!("iteration_{}_complete", iteration));
-                    }
-                    ExecutionEvent::GateProgress(_) => {
-                        events.push("gate_progress".to_string());
-                    }
-                    ExecutionEvent::ExecutionFinished { .. } => {
-                        events.push("finished".to_string());
-                    }
+        let executor = StoryExecutor::new(config, "/tmp/test").on_event(Box::new(move |event| {
+            let mut events = events_clone.lock().unwrap();
+            match event {
+                ExecutionEvent::IterationStarting { iteration, .. } => {
+                    events.push(format!("iteration_{}_start", iteration));
                 }
-            }));
+                ExecutionEvent::IterationCompleted { iteration, .. } => {
+                    events.push(format!("iteration_{}_complete", iteration));
+                }
+                ExecutionEvent::GateProgress(_) => {
+                    events.push("gate_progress".to_string());
+                }
+                ExecutionEvent::ExecutionFinished { .. } => {
+                    events.push("finished".to_string());
+                }
+            }
+        }));
 
         // Just verify the executor was created with callback
         assert!(executor.on_event.is_some());
@@ -700,7 +715,7 @@ mod tests {
         // or get default gates which may or may not pass depending on environment
         assert!(duration.as_nanos() > 0);
         assert!(gate_summaries.len() >= 0); // May have default gates
-        // passed state depends on environment
+                                            // passed state depends on environment
         let _ = passed;
     }
 }

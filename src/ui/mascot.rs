@@ -137,11 +137,11 @@ pub const MASCOT_THUMBS_UP: &str = r#"
 
 /// Peek frames for Wiggum mascot (appears from right)
 const PEEK_FRAMES_WIGGUM: [&str; 5] = [
-    "",                           // Empty
-    "          ╭─",               // Top edge peeks
-    "          │◕",               // Eye peeks
-    "          │‿",               // Smile peeks
-    "          ╰─",               // Bottom edge
+    "",             // Empty
+    "          ╭─", // Top edge peeks
+    "          │◕", // Eye peeks
+    "          │‿", // Smile peeks
+    "          ╰─", // Bottom edge
 ];
 
 /// Peek frames for Karate Kid mascot
@@ -154,22 +154,10 @@ const PEEK_FRAMES_KARATE: [&str; 5] = [
 ];
 
 /// Peek frames for peeking eyes
-const PEEK_FRAMES_EYES: [&str; 5] = [
-    "",
-    "         ╭─",
-    "         │👀",
-    "         ╰─",
-    "",
-];
+const PEEK_FRAMES_EYES: [&str; 5] = ["", "         ╭─", "         │👀", "         ╰─", ""];
 
 /// Peek frames for thumbs up
-const PEEK_FRAMES_THUMBS: [&str; 5] = [
-    "",
-    "         ╱",
-    "        👍",
-    "         ╲",
-    "",
-];
+const PEEK_FRAMES_THUMBS: [&str; 5] = ["", "         ╱", "        👍", "         ╲", ""];
 
 // ============================================================================
 // Quotes
@@ -345,7 +333,12 @@ impl PeekAnimation {
         write!(stdout, "\x1b[s")?;
 
         // Move to column and draw frame
-        write!(stdout, "\x1b[{}G{}", at_column, frame.color(self.theme.story_id))?;
+        write!(
+            stdout,
+            "\x1b[{}G{}",
+            at_column,
+            frame.color(self.theme.story_id)
+        )?;
 
         // Restore cursor position
         write!(stdout, "\x1b[u")?;

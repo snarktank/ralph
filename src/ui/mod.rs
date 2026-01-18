@@ -24,7 +24,6 @@ pub use ghostty::{
     TerminalCapabilities, TitleStatus,
 };
 pub use help::{BuildInfo, CommandInfo, HelpRenderer, COMMANDS, GLOBAL_OPTIONS, RALPH_BANNER};
-pub use mascot::{AnimationConfig, Mascot, MascotRenderer, PeekAnimation};
 pub use interrupt::{
     is_globally_interrupted, render_interrupt_panel, reset_global_interrupt, InterruptHandler,
 };
@@ -32,6 +31,7 @@ pub use iteration_view::{
     ActivityIndicator, GateProgress, GateProgressInfo, GateSummary, IterationPreview,
     IterationSummary, IterationSummaryStack, LiveIterationPanel,
 };
+pub use mascot::{AnimationConfig, Mascot, MascotRenderer, PeekAnimation};
 pub use quality_gates::{GateStatus, QualityGateRenderer, QualityGateView};
 pub use spinner::{
     progress_chars, spinner_chars, IterationProgress, ProgressManager, RalphSpinner, SpinnerStyle,

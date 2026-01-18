@@ -176,14 +176,14 @@ pub const GLOBAL_OPTIONS: &[CommandInfo] = &[
         "Disable colors (also respects NO_COLOR env)",
         None,
     ),
-    CommandInfo::new(
-        "--no-animation",
-        "Disable startup animations",
-        None,
-    ),
+    CommandInfo::new("--no-animation", "Disable startup animations", None),
     CommandInfo::new("--quiet, -q", "Suppress all output except errors", None),
     CommandInfo::new("--help, -h", "Print help information", None),
-    CommandInfo::new("--version, -V", "Print version information with mascot", None),
+    CommandInfo::new(
+        "--version, -V",
+        "Print version information with mascot",
+        None,
+    ),
 ];
 
 /// Styled help renderer using Ralph's theme.
@@ -460,7 +460,8 @@ impl HelpRenderer {
         // Add mascot beside version box if animation is enabled
         if self.animate {
             let mascot = Mascot::random();
-            self.mascot_renderer.render_beside_content(&version_box, mascot)
+            self.mascot_renderer
+                .render_beside_content(&version_box, mascot)
         } else {
             version_box
         }

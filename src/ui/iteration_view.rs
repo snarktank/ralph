@@ -51,10 +51,7 @@ impl IterationPreview {
     /// Format: "Will run: build → lint → test"
     pub fn render(&self) -> String {
         if self.gates.is_empty() {
-            return format!(
-                "{} No gates configured\n",
-                "○".color(self.theme.muted)
-            );
+            return format!("{} No gates configured\n", "○".color(self.theme.muted));
         }
 
         let gate_chain = self
@@ -108,10 +105,10 @@ impl GateProgress {
     /// Get the status indicator character for this gate state.
     pub fn indicator(&self) -> &'static str {
         match self {
-            Self::Pending => "○",  // Empty circle
-            Self::Running => "◐",  // Half-filled circle (will animate)
-            Self::Passed => "✓",   // Checkmark
-            Self::Failed => "✗",   // X mark
+            Self::Pending => "○", // Empty circle
+            Self::Running => "◐", // Half-filled circle (will animate)
+            Self::Passed => "✓",  // Checkmark
+            Self::Failed => "✗",  // X mark
         }
     }
 
@@ -178,7 +175,11 @@ impl GateProgressInfo {
     pub fn format_duration(&self) -> Option<String> {
         self.duration.map(|d| {
             if d.as_secs() >= 60 {
-                format!("{}m{:.1}s", d.as_secs() / 60, (d.as_millis() % 60000) as f64 / 1000.0)
+                format!(
+                    "{}m{:.1}s",
+                    d.as_secs() / 60,
+                    (d.as_millis() % 60000) as f64 / 1000.0
+                )
             } else {
                 format!("{:.1}s", d.as_secs_f64())
             }
@@ -486,14 +487,18 @@ impl LiveIterationPanel {
 
     /// Check if any gate has failed.
     pub fn has_failure(&self) -> bool {
-        self.gates.iter().any(|g| g.progress == GateProgress::Failed)
+        self.gates
+            .iter()
+            .any(|g| g.progress == GateProgress::Failed)
     }
 
     /// Render a single gate progress info.
     fn render_gate(&self, gate: &GateProgressInfo) -> String {
         let indicator = match gate.progress {
             GateProgress::Pending => format!("{}", "○".color(self.theme.muted)),
-            GateProgress::Running => format!("{}", self.spinner_char().color(self.theme.in_progress)),
+            GateProgress::Running => {
+                format!("{}", self.spinner_char().color(self.theme.in_progress))
+            }
             GateProgress::Passed => format!("{}", "✓".color(self.theme.success)),
             GateProgress::Failed => format!("{}", "✗".color(self.theme.error)),
         };
@@ -507,7 +512,12 @@ impl LiveIterationPanel {
 
         // Add timing for completed gates
         if let Some(duration_str) = gate.format_duration() {
-            format!("{} {} ({})", indicator, name, duration_str.color(self.theme.muted))
+            format!(
+                "{} {} ({})",
+                indicator,
+                name,
+                duration_str.color(self.theme.muted)
+            )
         } else {
             format!("{} {}", indicator, name)
         }
@@ -554,7 +564,9 @@ impl LiveIterationPanel {
             .map(|g| {
                 let indicator = match g.progress {
                     GateProgress::Pending => format!("{}", "○".color(self.theme.muted)),
-                    GateProgress::Running => format!("{}", self.spinner_char().color(self.theme.in_progress)),
+                    GateProgress::Running => {
+                        format!("{}", self.spinner_char().color(self.theme.in_progress))
+                    }
                     GateProgress::Passed => format!("{}", "✓".color(self.theme.success)),
                     GateProgress::Failed => format!("{}", "✗".color(self.theme.error)),
                 };
@@ -633,8 +645,13 @@ impl LiveIterationPanel {
         let passed = !self.has_failure();
         let total_duration = self.elapsed();
 
-        IterationSummary::new(self.iteration, self.total_iterations, passed, total_duration)
-            .with_gates(gate_results)
+        IterationSummary::new(
+            self.iteration,
+            self.total_iterations,
+            passed,
+            total_duration,
+        )
+        .with_gates(gate_results)
     }
 }
 
@@ -851,10 +868,7 @@ impl IterationSummary {
             if !gate.passed {
                 if let Some(ref error) = gate.error_details {
                     for line in error.lines() {
-                        output.push_str(&format!(
-                            "    {}\n",
-                            line.color(self.theme.error)
-                        ));
+                        output.push_str(&format!("    {}\n", line.color(self.theme.error)));
                     }
                 }
             }
@@ -1300,8 +1314,7 @@ mod tests {
 
     #[test]
     fn test_gate_summary_with_error() {
-        let summary =
-            GateSummary::new("test", false).with_error("assertion failed at line 42");
+        let summary = GateSummary::new("test", false).with_error("assertion failed at line 42");
         assert_eq!(
             summary.error_details,
             Some("assertion failed at line 42".to_string())
@@ -1329,8 +1342,8 @@ mod tests {
 
     #[test]
     fn test_iteration_summary_with_theme() {
-        let summary = IterationSummary::new(1, 5, true, Duration::from_secs(1))
-            .with_theme(Theme::default());
+        let summary =
+            IterationSummary::new(1, 5, true, Duration::from_secs(1)).with_theme(Theme::default());
         assert!(summary.passed());
     }
 
@@ -1427,9 +1440,7 @@ mod tests {
 
     #[test]
     fn test_iteration_summary_render_auto_expand_failed() {
-        let gates = vec![
-            GateSummary::new("build", false).with_error("compilation error"),
-        ];
+        let gates = vec![GateSummary::new("build", false).with_error("compilation error")];
         let summary =
             IterationSummary::new(1, 5, false, Duration::from_secs_f64(1.0)).with_gates(gates);
         let output = summary.render();
@@ -1504,8 +1515,18 @@ mod tests {
     #[test]
     fn test_iteration_summary_stack_format_total_duration() {
         let mut stack = IterationSummaryStack::new();
-        stack.push(IterationSummary::new(1, 3, true, Duration::from_secs_f64(1.5)));
-        stack.push(IterationSummary::new(2, 3, true, Duration::from_secs_f64(2.0)));
+        stack.push(IterationSummary::new(
+            1,
+            3,
+            true,
+            Duration::from_secs_f64(1.5),
+        ));
+        stack.push(IterationSummary::new(
+            2,
+            3,
+            true,
+            Duration::from_secs_f64(2.0),
+        ));
 
         assert_eq!(stack.format_total_duration(), "3.5s");
     }
@@ -1533,14 +1554,10 @@ mod tests {
         let mut stack = IterationSummaryStack::new();
 
         let gates1 = vec![GateSummary::new("build", true)];
-        stack.push(
-            IterationSummary::new(1, 3, true, Duration::from_secs(1)).with_gates(gates1),
-        );
+        stack.push(IterationSummary::new(1, 3, true, Duration::from_secs(1)).with_gates(gates1));
 
         let gates2 = vec![GateSummary::new("build", true)];
-        stack.push(
-            IterationSummary::new(2, 3, true, Duration::from_secs(2)).with_gates(gates2),
-        );
+        stack.push(IterationSummary::new(2, 3, true, Duration::from_secs(2)).with_gates(gates2));
 
         let output = stack.render();
         assert!(output.contains("Iteration"));
@@ -1755,15 +1772,14 @@ mod tests {
     #[test]
     fn test_live_iteration_panel_render_with_activity() {
         let gates = vec!["build".to_string(), "lint".to_string()];
-        let mut panel = LiveIterationPanel::with_capabilities(
-            1,
-            3,
-            gates,
-            TerminalCapabilities::minimal(),
-        );
+        let mut panel =
+            LiveIterationPanel::with_capabilities(1, 3, gates, TerminalCapabilities::minimal());
 
         panel.start_gate("build");
-        panel.set_activity(ActivityIndicator::running_file_at_line("src/tests/auth.rs", 142));
+        panel.set_activity(ActivityIndicator::running_file_at_line(
+            "src/tests/auth.rs",
+            142,
+        ));
 
         let output = panel.render();
 
@@ -1776,12 +1792,8 @@ mod tests {
     #[test]
     fn test_live_iteration_panel_render_no_activity_when_not_running() {
         let gates = vec!["build".to_string()];
-        let mut panel = LiveIterationPanel::with_capabilities(
-            1,
-            1,
-            gates,
-            TerminalCapabilities::minimal(),
-        );
+        let mut panel =
+            LiveIterationPanel::with_capabilities(1, 1, gates, TerminalCapabilities::minimal());
 
         // Set activity but don't start the gate (should not show)
         panel.set_activity(ActivityIndicator::running_file("src/main.rs"));
