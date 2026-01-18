@@ -78,6 +78,10 @@ struct Cli {
     #[arg(long, default_value = "10")]
     max_iterations: u32,
 
+    /// Enable parallel story execution
+    #[arg(long)]
+    parallel: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -98,6 +102,10 @@ enum Commands {
         /// Maximum iterations per story
         #[arg(long, default_value = "10")]
         max_iterations: u32,
+
+        /// Enable parallel story execution
+        #[arg(long)]
+        parallel: bool,
 
         /// Print help information
         #[arg(long, short)]
@@ -165,6 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("  -p, --prd <FILE>         Path to PRD file [default: prd.json]");
             println!("  -d, --dir <DIR>          Working directory");
             println!("  --max-iterations <N>     Max iterations per story [default: 10]");
+            println!("  --parallel               Enable parallel story execution");
             println!("  -h, --help               Print help information");
             return Ok(());
         }
@@ -172,9 +181,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ref prd,
             ref dir,
             max_iterations,
+            parallel,
             help: false,
         }) => {
-            run_stories(&cli, prd.clone(), dir.clone(), max_iterations).await?;
+            run_stories(&cli, prd.clone(), dir.clone(), max_iterations, parallel).await?;
         }
         Some(Commands::Quality { help: true }) => {
             println!("Run quality checks (typecheck, lint, test)");
@@ -241,7 +251,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Check multiple locations: prd.json, ralph/prd.json
             let prd_path = find_prd_file(&cli.prd);
             if let Some(prd) = prd_path {
-                run_stories(&cli, prd, cli.dir.clone(), cli.max_iterations).await?;
+                run_stories(&cli, prd, cli.dir.clone(), cli.max_iterations, cli.parallel).await?;
             } else {
                 print!("{}", help_renderer.render_help());
             }
@@ -279,6 +289,7 @@ async fn run_stories(
     prd: PathBuf,
     dir: Option<PathBuf>,
     max_iterations: u32,
+    parallel: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let working_dir = dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
@@ -293,7 +304,7 @@ async fn run_stories(
         max_total_iterations: 0, // unlimited
         agent_command: None,     // auto-detect
         quiet: cli.quiet,
-        parallel: false,
+        parallel,
         parallel_config: None,
     };
 

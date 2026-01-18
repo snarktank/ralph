@@ -366,7 +366,7 @@
       "description": "As a user, I want to use parallel execution when configured.",
       "id": "US-018",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 18,
       "targetFiles": [
         "src/runner.rs"
