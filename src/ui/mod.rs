@@ -25,16 +25,16 @@ pub use ghostty::{
     TerminalCapabilities, TitleStatus,
 };
 pub use help::{BuildInfo, CommandInfo, HelpRenderer, COMMANDS, GLOBAL_OPTIONS, RALPH_BANNER};
+pub use image_to_ansi::{
+    list_mascot_images, load_mascot_ansi, random_mascot_ansi, CharacterMode, ColorMode,
+    ConversionConfig, ImageConverter,
+};
 pub use interrupt::{
     is_globally_interrupted, render_interrupt_panel, reset_global_interrupt, InterruptHandler,
 };
 pub use iteration_view::{
     ActivityIndicator, GateProgress, GateProgressInfo, GateSummary, IterationPreview,
     IterationSummary, IterationSummaryStack, LiveIterationPanel,
-};
-pub use image_to_ansi::{
-    list_mascot_images, load_mascot_ansi, random_mascot_ansi, CharacterMode, ColorMode,
-    ConversionConfig, ImageConverter,
 };
 pub use mascot::{random_image_mascot, AnimationConfig, Mascot, MascotRenderer, PeekAnimation};
 pub use quality_gates::{GateStatus, QualityGateRenderer, QualityGateView};

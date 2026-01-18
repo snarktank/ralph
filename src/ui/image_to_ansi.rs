@@ -11,7 +11,8 @@ use std::fmt::Write as FmtWrite;
 // ============================================================================
 
 /// ASCII characters sorted by visual density (dark to light)
-const ASCII_CHARS: &str = " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
+const ASCII_CHARS: &str =
+    " `.-':_,^=;><+!rc*/z?sLTv)J7(|Fi{C}fI31tlu[neoZ5Yxjya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@";
 
 /// Shorter gradient for simpler output
 const ASCII_SIMPLE: &str = " .:-=+*#%@";
@@ -272,9 +273,10 @@ impl ImageConverter {
         let aspect = orig_width as f32 / orig_height as f32;
 
         let target_width = self.config.width;
-        let target_height = self.config.height.unwrap_or_else(|| {
-            (target_width as f32 / aspect / self.config.char_ratio) as u32
-        });
+        let target_height = self
+            .config
+            .height
+            .unwrap_or_else(|| (target_width as f32 / aspect / self.config.char_ratio) as u32);
 
         // Resize image to 2x target for pixel grouping
         let resized = img.resize_exact(
@@ -366,7 +368,11 @@ impl ImageConverter {
         };
 
         let ch = self.brightness_to_char(brightness);
-        let fg = if self.config.use_background { light } else { avg };
+        let fg = if self.config.use_background {
+            light
+        } else {
+            avg
+        };
         let bg = dark;
 
         (ch, fg, bg)
