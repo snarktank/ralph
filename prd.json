@@ -468,7 +468,7 @@
       "description": "As a developer, I need different conflict detection strategies.",
       "id": "US-023",
       "notes": "EntityBased requires tree-sitter, implement in later story",
-      "passes": false,
+      "passes": true,
       "priority": 23,
       "targetFiles": [
         "src/parallel/conflict.rs"
