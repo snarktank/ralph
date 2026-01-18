@@ -133,7 +133,8 @@ fn test_no_args_shows_welcome() {
     ralph_cmd()
         .assert()
         .success()
-        .stdout(predicate::str::contains("Ralph"))
+        // Output contains "RALPH" in the ASCII banner or "ralph" in usage
+        .stdout(predicate::str::contains("RALPH").or(predicate::str::contains("ralph")))
         .stdout(predicate::str::contains("--help"));
 }
 

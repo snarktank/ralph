@@ -47,6 +47,10 @@ struct Cli {
     #[arg(long)]
     no_color: bool,
 
+    /// Disable startup animations
+    #[arg(long)]
+    no_animation: bool,
+
     /// Suppress all output except errors
     #[arg(long, short)]
     quiet: bool,
@@ -55,7 +59,7 @@ struct Cli {
     #[arg(long, short)]
     help: bool,
 
-    /// Print version information with build details
+    /// Print version information with build details and mascot
     #[arg(long, short = 'V')]
     version: bool,
 
@@ -99,9 +103,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build display options from CLI flags
     let display_options = build_display_options(&cli);
 
-    // Create help renderer with color settings
-    let help_renderer =
-        HelpRenderer::new().with_color(!cli.no_color && std::env::var("NO_COLOR").is_err());
+    // Create help renderer with color and animation settings
+    let use_color = !cli.no_color && std::env::var("NO_COLOR").is_err();
+    let help_renderer = HelpRenderer::new()
+        .with_color(use_color)
+        .with_animation(!cli.no_animation);
 
     // Handle --help flag with styled output
     if cli.help {
@@ -109,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // Handle --version flag with styled output
+    // Handle --version flag with styled output and mascot
     if cli.version {
         print!("{}", help_renderer.render_version());
         return Ok(());
@@ -177,12 +183,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             service.waiting().await?;
         }
         None => {
-            // Initialize logging to stdout for default mode (unless quiet)
-            if !cli.quiet {
-                tracing_subscriber::fmt::init();
-                println!("Ralph - Enterprise-ready autonomous AI agent framework");
-                println!("Use --help for available commands");
-            }
+            // Default: show styled help with mascot
+            print!("{}", help_renderer.render_help());
         }
     }
 

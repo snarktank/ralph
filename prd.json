@@ -1,107 +1,119 @@
 {
   "project": "Ralph",
-  "branchName": "ralph/mcp-docker-production",
-  "description": "Deploy Ralph MCP server to production using Docker's MCP toolkit, enabling seamless integration with Claude Desktop and other MCP clients via containerized deployment",
+  "branchName": "ralph/mcp-prd-skills",
+  "description": "Add /prd and /ralph skills as MCP tools so Claude Desktop users can generate PRDs and convert them to Ralph's prd.json format directly from the chat interface",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Create optimized multi-stage Dockerfile",
-      "description": "As a DevOps engineer, I need a production-ready Dockerfile that builds Ralph MCP server with minimal image size.",
+      "title": "Add generate_prd MCP tool schema",
+      "description": "As a developer, I need to define the MCP tool schema for PRD generation so Claude Desktop can discover and call it.",
       "acceptanceCriteria": [
-        "Create Dockerfile using multi-stage build pattern",
-        "Use rust:1.75-slim-bookworm as builder stage",
-        "Use debian:bookworm-slim as runtime stage",
-        "Install only necessary runtime dependencies (ca-certificates, libssl3)",
-        "Copy only the ralph binary to runtime stage",
-        "Set ENTRYPOINT to ralph mcp-server command",
-        "Create non-root user 'ralph' for security",
-        "Add MCP-related OCI labels (mcp.server, mcp.transport)",
-        "Dockerfile syntax is valid (docker build --check passes)"
+        "Add `generate_prd` tool registration in `src/mcp/server.rs`",
+        "Tool accepts `description` (required), `questions` (optional object), `output_path` (optional)",
+        "Tool returns `content` (PRD markdown) and `file_path` (if written)",
+        "Schema includes proper descriptions for Claude to understand usage",
+        "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Add Docker build optimization",
-      "description": "As a developer, I need efficient Docker builds with proper caching and small context size.",
+      "title": "Implement generate_prd tool handler",
+      "description": "As a Claude Desktop user, I want to generate a PRD from a feature description so I can plan features without leaving the chat.",
       "acceptanceCriteria": [
-        "Create .dockerignore excluding target/, .git/, docs/, tests/",
-        "Implement dependency caching layer in Dockerfile (copy Cargo.toml first, build deps, then copy src)",
-        "Add ARG instructions for VERSION and COMMIT_SHA build args",
-        "Add LABEL instructions using build args for version tracking",
-        "Document build args usage in Dockerfile comments",
-        "Dockerfile syntax is valid"
+        "Create `src/mcp/tools/generate_prd.rs` module",
+        "Load PRD skill template from embedded resource or skills directory",
+        "Generate PRD markdown following the skill template structure",
+        "If `questions` parameter provided, use those answers instead of defaults",
+        "If `output_path` provided, write file and return path",
+        "Always return generated PRD content in response",
+        "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Create docker-compose for local testing",
-      "description": "As a developer, I need docker-compose configuration for local MCP server testing.",
+      "title": "Add convert_prd_to_json MCP tool schema",
+      "description": "As a developer, I need to define the MCP tool schema for PRD-to-JSON conversion so Claude Desktop can discover and call it.",
       "acceptanceCriteria": [
-        "Create docker-compose.yml with ralph-mcp service",
-        "Configure stdin_open: true and tty: true for stdio transport",
-        "Add volume mounts for PRD files and quality config",
-        "Include RUST_LOG environment variable",
-        "Add profile variant 'with-prd' for preloaded PRD testing",
-        "docker-compose config validates successfully"
+        "Add `convert_prd_to_json` tool registration in `src/mcp/server.rs`",
+        "Tool accepts `prd_content` (string) OR `prd_path` (file path)",
+        "Tool accepts `output_path` (optional, defaults to workspace/prd.json)",
+        "Tool accepts `auto_load` (boolean, default true)",
+        "Schema includes proper descriptions for Claude to understand usage",
+        "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Configure for Docker MCP toolkit",
-      "description": "As an MCP user, I need Ralph configured for Docker's MCP toolkit ecosystem.",
+      "title": "Implement convert_prd_to_json tool handler",
+      "description": "As a Claude Desktop user, I want to convert a PRD to Ralph's JSON format so I can start autonomous execution.",
       "acceptanceCriteria": [
-        "Create examples/mcp-toolkit-config.json with Docker MCP toolkit format",
-        "Config specifies image name ghcr.io/kcirtapfromspace/ralph:latest",
-        "Config includes stdio transport settings",
-        "Add HEALTHCHECK instruction to Dockerfile",
-        "Document config usage in examples/README.md",
-        "JSON config is valid syntax"
+        "Create `src/mcp/tools/convert_prd.rs` module",
+        "Parse PRD markdown and extract user stories, requirements",
+        "Generate valid prd.json with proper structure (project, branchName, userStories)",
+        "Auto-generate `branchName` from project name if not specified",
+        "Set all stories to `passes: false` initially",
+        "Write to `output_path` if provided",
+        "If `auto_load` is true, call internal load_prd logic",
+        "Return JSON content and loaded status in response",
+        "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Add GitHub Container Registry publishing",
-      "description": "As a release manager, I need automated Docker image publishing to GHCR.",
+      "title": "Embed skill templates in binary",
+      "description": "As a developer, I need the skill templates embedded in the binary so the Docker image is self-contained.",
       "acceptanceCriteria": [
-        "Create .github/workflows/docker.yml workflow",
-        "Trigger on push to main branch and v* tags",
-        "Use docker/build-push-action for multi-platform builds",
-        "Build for linux/amd64 and linux/arm64 platforms",
-        "Push to ghcr.io/kcirtapfromspace/ralph",
-        "Tag with version, latest, and git SHA using docker/metadata-action",
-        "Workflow YAML is valid syntax"
+        "Use `include_str!` or similar to embed `skills/prd/SKILL.md` content",
+        "Use `include_str!` or similar to embed `skills/ralph/SKILL.md` content",
+        "Templates accessible at runtime without external file dependencies",
+        "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Document Docker MCP integration",
-      "description": "As a user, I need comprehensive documentation for running Ralph via Docker MCP toolkit.",
+      "title": "Add integration tests for new MCP tools",
+      "description": "As a developer, I need tests to verify the new tools work correctly.",
       "acceptanceCriteria": [
-        "Create docs/guides/docker-mcp-setup.md",
-        "Document Docker and Docker MCP toolkit prerequisites",
-        "Provide step-by-step configuration instructions",
-        "Include example docker run commands",
-        "Add troubleshooting section with common issues",
-        "Add link to guide from README.md",
-        "All markdown links are valid"
+        "Test `generate_prd` with minimal description returns valid markdown",
+        "Test `generate_prd` with questions parameter uses provided answers",
+        "Test `generate_prd` with output_path writes file correctly",
+        "Test `convert_prd_to_json` parses sample PRD correctly",
+        "Test `convert_prd_to_json` with auto_load=true loads the PRD",
+        "Test `convert_prd_to_json` generates valid JSON structure",
+        "All tests pass"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Update documentation for new MCP tools",
+      "description": "As a user, I need documentation on how to use the new MCP tools in Claude Desktop.",
+      "acceptanceCriteria": [
+        "Update `docs/guides/docker-mcp-setup.md` with new tool examples",
+        "Document `generate_prd` parameters and usage",
+        "Document `convert_prd_to_json` parameters and usage",
+        "Add example conversation flows",
+        "All markdown links valid"
+      ],
+      "priority": 7,
+      "passes": false,
       "notes": ""
     }
   ]

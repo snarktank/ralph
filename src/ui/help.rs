@@ -1,13 +1,16 @@
 //! Styled CLI help and version display.
 //!
 //! Provides themed help output with ASCII art banner,
-//! colored command lists, and build information.
+//! colored command lists, build information, and mascot animations.
 
 #![allow(dead_code)]
+
+use std::io::{self, Write};
 
 use owo_colors::OwoColorize;
 
 use super::colors::Theme;
+use super::mascot::{AnimationConfig, Mascot, MascotRenderer, PeekAnimation};
 
 /// ASCII art banner for Ralph CLI help.
 pub const RALPH_BANNER: &str = r#"
@@ -173,15 +176,24 @@ pub const GLOBAL_OPTIONS: &[CommandInfo] = &[
         "Disable colors (also respects NO_COLOR env)",
         None,
     ),
+    CommandInfo::new("--no-animation", "Disable startup animations", None),
     CommandInfo::new("--quiet, -q", "Suppress all output except errors", None),
     CommandInfo::new("--help, -h", "Print help information", None),
-    CommandInfo::new("--version, -V", "Print version information", None),
+    CommandInfo::new(
+        "--version, -V",
+        "Print version information with mascot",
+        None,
+    ),
 ];
 
 /// Styled help renderer using Ralph's theme.
 pub struct HelpRenderer {
     theme: Theme,
     use_color: bool,
+    /// Whether to play startup animations
+    animate: bool,
+    /// Mascot renderer for peek animations
+    mascot_renderer: MascotRenderer,
 }
 
 impl Default for HelpRenderer {
@@ -196,6 +208,8 @@ impl HelpRenderer {
         Self {
             theme: Theme::default(),
             use_color: true,
+            animate: true,
+            mascot_renderer: MascotRenderer::new(),
         }
     }
 
@@ -204,6 +218,8 @@ impl HelpRenderer {
         Self {
             theme: Theme::default(),
             use_color: false,
+            animate: true,
+            mascot_renderer: MascotRenderer::new(),
         }
     }
 
@@ -211,6 +227,20 @@ impl HelpRenderer {
     pub fn with_color(mut self, use_color: bool) -> Self {
         self.use_color = use_color;
         self
+    }
+
+    /// Set whether to play animations.
+    pub fn with_animation(mut self, animate: bool) -> Self {
+        self.animate = animate;
+        if !animate {
+            self.mascot_renderer = MascotRenderer::without_animation();
+        }
+        self
+    }
+
+    /// Check if animations are enabled.
+    pub fn animation_enabled(&self) -> bool {
+        self.animate
     }
 
     /// Render the ASCII art banner with theme colors.
@@ -343,17 +373,24 @@ impl HelpRenderer {
             output.push_str("  Learn more: https://github.com/kcirtapfromspace/ralph\n");
         }
 
+        // Add mascot with quote if animation is enabled
+        if self.animate {
+            let mascot = Mascot::random();
+            output.push('\n');
+            output.push_str(&self.mascot_renderer.render_with_quote(mascot));
+        }
+
         output
     }
 
     /// Render styled version output.
     pub fn render_version(&self) -> String {
         let build_info = BuildInfo::new();
-        let mut output = String::new();
+        let mut version_box = String::new();
 
         // Compact banner
-        output.push_str(&self.render_compact_banner());
-        output.push_str("\n│\n");
+        version_box.push_str(&self.render_compact_banner());
+        version_box.push_str("\n│\n");
 
         // Version info
         let version_label = if self.use_color {
@@ -372,7 +409,7 @@ impl HelpRenderer {
             build_info.version.to_string()
         };
 
-        output.push_str(&format!("│  {} {}\n", version_label, version_value));
+        version_box.push_str(&format!("│  {} {}\n", version_label, version_value));
 
         // Git hash if available
         if let Some(hash) = build_info.git_hash {
@@ -386,7 +423,7 @@ impl HelpRenderer {
             } else {
                 hash.to_string()
             };
-            output.push_str(&format!("│  {} {}\n", hash_label, hash_value));
+            version_box.push_str(&format!("│  {} {}\n", hash_label, hash_value));
         }
 
         // Build date if available
@@ -396,7 +433,7 @@ impl HelpRenderer {
             } else {
                 "Built:".to_string()
             };
-            output.push_str(&format!("│  {} {}\n", date_label, date));
+            version_box.push_str(&format!("│  {} {}\n", date_label, date));
         }
 
         // Target
@@ -405,7 +442,7 @@ impl HelpRenderer {
         } else {
             "Target:".to_string()
         };
-        output.push_str(&format!("│  {} {}\n", target_label, BuildInfo::target()));
+        version_box.push_str(&format!("│  {} {}\n", target_label, BuildInfo::target()));
 
         // Rustc version if available
         if let Some(rustc) = build_info.rustc_version {
@@ -414,13 +451,20 @@ impl HelpRenderer {
             } else {
                 "Rustc:".to_string()
             };
-            output.push_str(&format!("│  {} {}\n", rustc_label, rustc));
+            version_box.push_str(&format!("│  {} {}\n", rustc_label, rustc));
         }
 
-        output.push_str("│\n");
-        output.push_str("╰──────────────────────────────────────────────╯\n");
+        version_box.push_str("│\n");
+        version_box.push_str("╰──────────────────────────────────────────────╯\n");
 
-        output
+        // Add mascot beside version box if animation is enabled
+        if self.animate {
+            let mascot = Mascot::random();
+            self.mascot_renderer
+                .render_beside_content(&version_box, mascot)
+        } else {
+            version_box
+        }
     }
 }
 
