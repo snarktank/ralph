@@ -58,6 +58,10 @@ ctrlc = "3.4"
 indicatif = "0.17"
 owo-colors = "4"
 
+# Image-to-ANSI conversion
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+rust-embed = { version = "8", features = ["include-exclude"] }
+
 [dev-dependencies]
 assert_cmd = "2"
 predicates = "3"

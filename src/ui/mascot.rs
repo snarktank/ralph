@@ -3,6 +3,8 @@
 //! Provides fun personality through randomly selected mascots that
 //! "peek" into the terminal during startup. Optimized for Ghostty
 //! with synchronized output for flicker-free animation.
+//!
+//! Supports both static ASCII art and dynamic image-to-ANSI conversion.
 
 #![allow(dead_code)]
 
@@ -13,6 +15,7 @@ use owo_colors::OwoColorize;
 
 use crate::ui::colors::Theme;
 use crate::ui::ghostty::TerminalCapabilities;
+use crate::ui::image_to_ansi::{self, ConversionConfig};
 
 // ============================================================================
 // Mascot Definitions
@@ -94,6 +97,32 @@ impl Mascot {
             Mascot::ThumbsUp => &QUOTES_THUMBS,
         }
     }
+
+    /// Get the embedded image filename for this mascot.
+    pub fn image_name(&self) -> &'static str {
+        match self {
+            Mascot::Wiggum => "ralph_wiggum.png",
+            Mascot::KarateKid => "karate_kid.png",
+            _ => "ralph_wiggum.png", // Fallback for mascots without images
+        }
+    }
+
+    /// Get image-based ANSI art for this mascot.
+    ///
+    /// Returns the mascot rendered from its embedded image, or falls back
+    /// to static ASCII art if the image is not available.
+    pub fn image_art(&self, config: Option<ConversionConfig>) -> String {
+        image_to_ansi::load_mascot_ansi(self.image_name(), config)
+            .unwrap_or_else(|| self.art().to_string())
+    }
+}
+
+/// Get a random image-based mascot as ANSI art.
+///
+/// This will randomly select from available mascot images and convert
+/// to ANSI art with the specified configuration.
+pub fn random_image_mascot(config: Option<ConversionConfig>) -> Option<String> {
+    image_to_ansi::random_mascot_ansi(config)
 }
 
 // ============================================================================
