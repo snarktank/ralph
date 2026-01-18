@@ -153,6 +153,11 @@ impl CommandInfo {
 /// Available Ralph commands.
 pub const COMMANDS: &[CommandInfo] = &[
     CommandInfo::new(
+        "run",
+        "Run all stories until complete (default if prd.json exists)",
+        Some("[-p <FILE>] [-d <DIR>]"),
+    ),
+    CommandInfo::new(
         "mcp-server",
         "Start MCP server mode for integration with AI assistants",
         Some("[--prd <FILE>]"),
@@ -523,6 +528,7 @@ mod tests {
     #[test]
     fn test_commands_defined() {
         assert!(!COMMANDS.is_empty());
+        assert!(COMMANDS.iter().any(|c| c.name == "run"));
         assert!(COMMANDS.iter().any(|c| c.name == "mcp-server"));
         assert!(COMMANDS.iter().any(|c| c.name == "quality"));
     }
@@ -611,6 +617,7 @@ mod tests {
         assert!(help.contains("USAGE:"));
         assert!(help.contains("COMMANDS:"));
         assert!(help.contains("OPTIONS:"));
+        assert!(help.contains("run"));
         assert!(help.contains("mcp-server"));
         assert!(help.contains("quality"));
         assert!(help.contains("--help"));

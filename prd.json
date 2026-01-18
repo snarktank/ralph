@@ -1,10 +1,27 @@
 {
   "project": "Ralph",
   "branchName": "ralph/mcp-prd-skills",
-  "description": "Add /prd and /ralph skills as MCP tools so Claude Desktop users can generate PRDs and convert them to Ralph's prd.json format directly from the chat interface",
+  "description": "Ensure default terminal experience works (run `ralph` with no args to iterate through all stories until complete) and add /prd and /ralph skills as MCP tools for Claude Desktop users",
   "userStories": [
     {
       "id": "US-001",
+      "title": "Verify and fix default terminal iteration behavior",
+      "description": "As a terminal user, I want to run `ralph` with no arguments and have it automatically iterate through all stories until all pass.",
+      "acceptanceCriteria": [
+        "Running `ralph` with no args in a directory with prd.json starts execution",
+        "Picks highest priority story where `passes: false`",
+        "Continues iterating until all stories have `passes: true`",
+        "If a story fails, retries on next iteration (doesn't get stuck)",
+        "Supports large PRDs (40+ stories) across unlimited iterations",
+        "Outputs `<promise>COMPLETE</promise>` when all stories pass",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "This is the core Ralph experience - must work reliably"
+    },
+    {
+      "id": "US-002",
       "title": "Add generate_prd MCP tool schema",
       "description": "As a developer, I need to define the MCP tool schema for PRD generation so Claude Desktop can discover and call it.",
       "acceptanceCriteria": [
@@ -14,12 +31,12 @@
         "Schema includes proper descriptions for Claude to understand usage",
         "Typecheck passes"
       ],
-      "priority": 1,
+      "priority": 2,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-002",
+      "id": "US-003",
       "title": "Implement generate_prd tool handler",
       "description": "As a Claude Desktop user, I want to generate a PRD from a feature description so I can plan features without leaving the chat.",
       "acceptanceCriteria": [
@@ -31,12 +48,12 @@
         "Always return generated PRD content in response",
         "Typecheck passes"
       ],
-      "priority": 2,
+      "priority": 3,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-003",
+      "id": "US-004",
       "title": "Add convert_prd_to_json MCP tool schema",
       "description": "As a developer, I need to define the MCP tool schema for PRD-to-JSON conversion so Claude Desktop can discover and call it.",
       "acceptanceCriteria": [
@@ -47,12 +64,12 @@
         "Schema includes proper descriptions for Claude to understand usage",
         "Typecheck passes"
       ],
-      "priority": 3,
+      "priority": 4,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-004",
+      "id": "US-005",
       "title": "Implement convert_prd_to_json tool handler",
       "description": "As a Claude Desktop user, I want to convert a PRD to Ralph's JSON format so I can start autonomous execution.",
       "acceptanceCriteria": [
@@ -66,12 +83,12 @@
         "Return JSON content and loaded status in response",
         "Typecheck passes"
       ],
-      "priority": 4,
+      "priority": 5,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-005",
+      "id": "US-006",
       "title": "Embed skill templates in binary",
       "description": "As a developer, I need the skill templates embedded in the binary so the Docker image is self-contained.",
       "acceptanceCriteria": [
@@ -80,12 +97,12 @@
         "Templates accessible at runtime without external file dependencies",
         "Typecheck passes"
       ],
-      "priority": 5,
+      "priority": 6,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-006",
+      "id": "US-007",
       "title": "Add integration tests for new MCP tools",
       "description": "As a developer, I need tests to verify the new tools work correctly.",
       "acceptanceCriteria": [
@@ -97,12 +114,12 @@
         "Test `convert_prd_to_json` generates valid JSON structure",
         "All tests pass"
       ],
-      "priority": 6,
+      "priority": 7,
       "passes": false,
       "notes": ""
     },
     {
-      "id": "US-007",
+      "id": "US-008",
       "title": "Update documentation for new MCP tools",
       "description": "As a user, I need documentation on how to use the new MCP tools in Claude Desktop.",
       "acceptanceCriteria": [
@@ -112,7 +129,7 @@
         "Add example conversation flows",
         "All markdown links valid"
       ],
-      "priority": 7,
+      "priority": 8,
       "passes": false,
       "notes": ""
     }

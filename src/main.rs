@@ -5,9 +5,11 @@ use std::path::PathBuf;
 mod integrations;
 mod mcp;
 mod quality;
+mod runner;
 mod ui;
 
 use mcp::RalphMcpServer;
+use runner::{Runner, RunnerConfig};
 use ui::{DisplayOptions, HelpRenderer, UiMode};
 
 /// UI mode for terminal display
@@ -63,6 +65,18 @@ struct Cli {
     #[arg(long, short = 'V')]
     version: bool,
 
+    /// Path to PRD file (for default run mode)
+    #[arg(long, short, default_value = "prd.json")]
+    prd: PathBuf,
+
+    /// Working directory
+    #[arg(long, short = 'd')]
+    dir: Option<PathBuf>,
+
+    /// Maximum iterations per story
+    #[arg(long, default_value = "10")]
+    max_iterations: u32,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -70,6 +84,24 @@ struct Cli {
 #[derive(clap::Subcommand, Debug)]
 #[command(subcommand_negates_reqs = true)]
 enum Commands {
+    /// Run all stories until complete (default behavior if no command given)
+    Run {
+        /// Path to PRD file
+        #[arg(long, short, default_value = "prd.json")]
+        prd: PathBuf,
+
+        /// Working directory
+        #[arg(long, short = 'd')]
+        dir: Option<PathBuf>,
+
+        /// Maximum iterations per story
+        #[arg(long, default_value = "10")]
+        max_iterations: u32,
+
+        /// Print help information
+        #[arg(long, short)]
+        help: bool,
+    },
     /// Run quality checks
     Quality {
         /// Print help information
@@ -122,6 +154,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     match cli.command {
+        Some(Commands::Run { help: true, .. }) => {
+            println!("Run all stories from PRD until complete");
+            println!();
+            println!("Usage: ralph run [OPTIONS]");
+            println!("       ralph [OPTIONS]  (default if no command given)");
+            println!();
+            println!("Options:");
+            println!("  -p, --prd <FILE>         Path to PRD file [default: prd.json]");
+            println!("  -d, --dir <DIR>          Working directory");
+            println!("  --max-iterations <N>     Max iterations per story [default: 10]");
+            println!("  -h, --help               Print help information");
+            return Ok(());
+        }
+        Some(Commands::Run {
+            ref prd,
+            ref dir,
+            max_iterations,
+            help: false,
+        }) => {
+            run_stories(&cli, prd.clone(), dir.clone(), max_iterations).await?;
+        }
         Some(Commands::Quality { help: true }) => {
             println!("Run quality checks (typecheck, lint, test)");
             println!();
@@ -183,10 +236,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             service.waiting().await?;
         }
         None => {
-            // Default: show styled help with mascot
-            print!("{}", help_renderer.render_help());
+            // Default: run stories if prd.json exists, otherwise show help
+            if cli.prd.exists() {
+                run_stories(&cli, cli.prd.clone(), cli.dir.clone(), cli.max_iterations).await?;
+            } else {
+                print!("{}", help_renderer.render_help());
+            }
         }
     }
 
     Ok(())
+}
+
+/// Run stories from the PRD until all pass
+async fn run_stories(
+    cli: &Cli,
+    prd: PathBuf,
+    dir: Option<PathBuf>,
+    max_iterations: u32,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let working_dir = dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    let config = RunnerConfig {
+        prd_path: if prd.is_absolute() {
+            prd
+        } else {
+            working_dir.join(&prd)
+        },
+        working_dir: working_dir.clone(),
+        max_iterations_per_story: max_iterations,
+        max_total_iterations: 0, // unlimited
+        agent_command: None,     // auto-detect
+        quiet: cli.quiet,
+    };
+
+    let runner = Runner::new(config);
+    let result = runner.run().await;
+
+    if result.all_passed {
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed: {}/{} stories passed. {}",
+            result.stories_passed,
+            result.total_stories,
+            result.error.unwrap_or_default()
+        )
+        .into())
+    }
 }

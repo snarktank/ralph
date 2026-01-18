@@ -129,13 +129,47 @@ fn test_mcp_server_help() {
 // ============================================================================
 
 #[test]
-fn test_no_args_shows_welcome() {
+fn test_no_args_shows_help_without_prd() {
+    // Run in a temp directory without prd.json - should show help
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
     ralph_cmd()
+        .current_dir(temp_dir.path())
         .assert()
         .success()
         // Output contains "RALPH" in the ASCII banner or "ralph" in usage
         .stdout(predicate::str::contains("RALPH").or(predicate::str::contains("ralph")))
         .stdout(predicate::str::contains("--help"));
+}
+
+#[test]
+fn test_no_args_with_prd_starts_running() {
+    // Run in a temp directory with prd.json - should start executing
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+    let prd_content = r#"{
+        "project": "Test",
+        "branchName": "test/branch",
+        "description": "Test PRD",
+        "userStories": [
+            {
+                "id": "US-001",
+                "title": "Test story",
+                "description": "Test",
+                "acceptanceCriteria": ["AC1"],
+                "priority": 1,
+                "passes": true
+            }
+        ]
+    }"#;
+    std::fs::write(temp_dir.path().join("prd.json"), prd_content)
+        .expect("Failed to write prd.json");
+
+    // With all stories passing, should output COMPLETE
+    ralph_cmd()
+        .current_dir(temp_dir.path())
+        .timeout(std::time::Duration::from_secs(5))
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("COMPLETE"));
 }
 
 // ============================================================================
