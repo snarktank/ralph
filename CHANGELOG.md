@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/kcirtapfromspace/ralph/compare/v0.1.0...v0.1.1) (2026-01-18)
+
+
+### Bug Fixes
+
+* **ci:** Use cross for aarch64-linux cross-compilation ([3fb4152](https://github.com/kcirtapfromspace/ralph/commit/3fb4152a7e182142f575fd499009c058cada75f5))
+* **deps:** Switch to rustls to eliminate OpenSSL dependency ([1e22ba1](https://github.com/kcirtapfromspace/ralph/commit/1e22ba1f19d95c16b826f3244a59cf0b72b3da7c))
+
 ## 0.1.0 (2026-01-18)
 
 

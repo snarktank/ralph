@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "ralphmacchio"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 description = "Enterprise-ready autonomous AI agent framework with MCP server, quality gates, and rich terminal UI"
