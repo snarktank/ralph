@@ -115,7 +115,7 @@
       "description": "As a developer, I need a DAG data structure to hold story dependencies.",
       "id": "US-006",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 6,
       "targetFiles": [
         "src/parallel/dependency.rs"
