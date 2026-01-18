@@ -613,7 +613,7 @@
       "description": "As a PRD author, I want to configure parallelism in prd.json.",
       "id": "US-030",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 30,
       "targetFiles": [
         "src/mcp/tools/load_prd.rs"

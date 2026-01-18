@@ -308,6 +308,71 @@ mod tests {
     }
 
     #[test]
+    fn test_from_stories_simple_3_story_dag() {
+        // Create a simple 3-story DAG:
+        //
+        //   US-001 (no deps)
+        //      |
+        //   US-002 (depends on US-001)
+        //      |
+        //   US-003 (depends on US-002)
+        //
+        let stories = vec![
+            make_story("US-001", vec![]),
+            make_story("US-002", vec!["US-001"]),
+            make_story("US-003", vec!["US-002"]),
+        ];
+
+        let graph = DependencyGraph::from_stories(&stories);
+
+        // Verify node count
+        assert_eq!(graph.node_count(), 3, "Should have 3 nodes");
+
+        // Verify edge count (2 edges: US-002->US-001, US-003->US-002)
+        assert_eq!(graph.edge_count(), 2, "Should have 2 edges");
+
+        // Verify all nodes are accessible by ID
+        assert!(graph.get_node_index("US-001").is_some());
+        assert!(graph.get_node_index("US-002").is_some());
+        assert!(graph.get_node_index("US-003").is_some());
+
+        // Verify node contents
+        let node1 = graph.get_story("US-001").unwrap();
+        assert_eq!(node1.id, "US-001");
+        assert!(node1.depends_on.is_empty());
+
+        let node2 = graph.get_story("US-002").unwrap();
+        assert_eq!(node2.id, "US-002");
+        assert_eq!(node2.depends_on, vec!["US-001"]);
+
+        let node3 = graph.get_story("US-003").unwrap();
+        assert_eq!(node3.id, "US-003");
+        assert_eq!(node3.depends_on, vec!["US-002"]);
+
+        // Verify edges are correctly formed
+        let us002_idx = graph.get_node_index("US-002").unwrap();
+        let us001_idx = graph.get_node_index("US-001").unwrap();
+        let us003_idx = graph.get_node_index("US-003").unwrap();
+
+        // US-002 should have an edge to US-001 (dependency)
+        let us002_has_edge_to_us001 = graph
+            .graph()
+            .edges(us002_idx)
+            .any(|e| e.target() == us001_idx);
+        assert!(us002_has_edge_to_us001, "US-002 should depend on US-001");
+
+        // US-003 should have an edge to US-002 (dependency)
+        let us003_has_edge_to_us002 = graph
+            .graph()
+            .edges(us003_idx)
+            .any(|e| e.target() == us002_idx);
+        assert!(us003_has_edge_to_us002, "US-003 should depend on US-002");
+
+        // The graph should be a valid DAG
+        assert!(graph.validate().is_ok(), "Graph should be a valid DAG");
+    }
+
+    #[test]
     fn test_validate_cyclic_dependencies_fails() {
         // Create a cycle: US-001 -> US-002 -> US-003 -> US-001
         let stories = vec![
