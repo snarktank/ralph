@@ -94,7 +94,7 @@
       "description": "As a developer, I need a struct to represent stories in the dependency graph.",
       "id": "US-005",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 5,
       "targetFiles": [
         "src/parallel/dependency.rs"
