@@ -1,204 +1,108 @@
 {
   "project": "Ralph",
-  "branchName": "ralph/terminal-ux-enhancement",
-  "description": "Create a best-in-class terminal UX experience for Ralph leveraging Ghostty features including 24-bit color, progress indicators, hyperlinks, and rich status displays",
+  "branchName": "ralph/mcp-docker-production",
+  "description": "Deploy Ralph MCP server to production using Docker's MCP toolkit, enabling seamless integration with Claude Desktop and other MCP clients via containerized deployment",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Create UI module foundation",
-      "description": "As a developer, I need the foundational UI module with dependencies and color theme for terminal output.",
+      "title": "Create optimized multi-stage Dockerfile",
+      "description": "As a DevOps engineer, I need a production-ready Dockerfile that builds Ralph MCP server with minimal image size.",
       "acceptanceCriteria": [
-        "Add indicatif = \"0.17\" to Cargo.toml",
-        "Add console = \"0.15\" to Cargo.toml",
-        "Add owo-colors = \"4\" to Cargo.toml",
-        "Add crossterm = \"0.27\" to Cargo.toml",
-        "Create src/ui/mod.rs with module exports",
-        "Create src/ui/colors.rs with 24-bit RGB Theme struct",
-        "Implement Default for Theme with success/error/warning/in_progress/muted/story_id colors",
-        "Create RalphDisplay struct skeleton in src/ui/display.rs",
-        "Export ui module from src/lib.rs",
-        "Typecheck passes"
+        "Create Dockerfile using multi-stage build pattern",
+        "Use rust:1.75-slim-bookworm as builder stage",
+        "Use debian:bookworm-slim as runtime stage",
+        "Install only necessary runtime dependencies (ca-certificates, libssl3)",
+        "Copy only the ralph binary to runtime stage",
+        "Set ENTRYPOINT to ralph mcp-server command",
+        "Create non-root user 'ralph' for security",
+        "Add MCP-related OCI labels (mcp.server, mcp.transport)",
+        "Dockerfile syntax is valid (docker build --check passes)"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Implemented on ralph/terminal-ux-enhancement-v2 branch (PRD specifies ralph/terminal-ux-enhancement but that branch had issues). Note: PRD mentions src/lib.rs but Ralph uses main.rs as the root - ui module exported from main.rs."
+      "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Implement story display panels",
-      "description": "As a user, I want to see the current story and next story in visually distinct panels.",
+      "title": "Add Docker build optimization",
+      "description": "As a developer, I need efficient Docker builds with proper caching and small context size.",
       "acceptanceCriteria": [
-        "Create src/ui/story_view.rs with StoryInfo struct (id, title, priority, passes, acceptance_criteria)",
-        "Create StoryViewState enum (Pending, InProgress, Completed, Failed)",
-        "Implement current story panel with Unicode box drawing characters",
-        "Display story ID in cyan, title, priority, and status",
-        "Render acceptance criteria as checklist with circle markers",
-        "Implement next story preview panel with lighter styling",
-        "Use owo-colors for 24-bit RGB coloring",
-        "Typecheck passes"
+        "Create .dockerignore excluding target/, .git/, docs/, tests/",
+        "Implement dependency caching layer in Dockerfile (copy Cargo.toml first, build deps, then copy src)",
+        "Add ARG instructions for VERSION and COMMIT_SHA build args",
+        "Add LABEL instructions using build args for version tracking",
+        "Document build args usage in Dockerfile comments",
+        "Dockerfile syntax is valid"
       ],
       "priority": 2,
       "passes": true,
-      "notes": "Implemented StoryView with render_current_story() and render_next_story() methods. Uses rounded corners (╭╮╰╯) for panels, ○/● for criteria markers, and status-appropriate coloring."
+      "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Add progress spinners and iteration bar",
-      "description": "As a user, I want animated progress indicators during story execution.",
+      "title": "Create docker-compose for local testing",
+      "description": "As a developer, I need docker-compose configuration for local MCP server testing.",
       "acceptanceCriteria": [
-        "Create src/ui/spinner.rs with custom spinner styles",
-        "Implement iteration progress bar showing X/Y iterations with percentage",
-        "Use filled/empty block characters for progress visualization",
-        "Add elapsed time tracking to spinners",
-        "Support indicatif MultiProgress for parallel operations",
-        "Implement start_spinner() and stop_spinner() methods on RalphDisplay",
-        "Spinner shows current action message",
-        "Typecheck passes"
+        "Create docker-compose.yml with ralph-mcp service",
+        "Configure stdin_open: true and tty: true for stdio transport",
+        "Add volume mounts for PRD files and quality config",
+        "Include RUST_LOG environment variable",
+        "Add profile variant 'with-prd' for preloaded PRD testing",
+        "docker-compose config validates successfully"
       ],
       "priority": 3,
       "passes": true,
-      "notes": "Implemented spinner.rs with RalphSpinner, IterationProgress, and ProgressManager. Uses braille characters for spinners, block characters (█▓░) for progress bars. Added start_spinner(), stop_spinner(), stop_spinner_with_success(), stop_spinner_with_error() methods to RalphDisplay, plus iteration progress management."
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Implement quality gate visualization",
-      "description": "As a user, I want to see quality gate status with clear pass/fail indicators.",
+      "title": "Configure for Docker MCP toolkit",
+      "description": "As an MCP user, I need Ralph configured for Docker's MCP toolkit ecosystem.",
       "acceptanceCriteria": [
-        "Create src/ui/quality_gates.rs",
-        "Implement GateStatus enum (Pending, Running, Passed, Failed, Skipped)",
-        "Create QualityGateView struct with name, status, details fields",
-        "Render gate list with status icons: checkmark for passed, X for failed, spinner for running, circle for pending",
-        "Show error details indented below failed gates",
-        "Display summary bar (X/Y gates passed)",
-        "Integrate with existing GateResult from src/quality/gates.rs",
-        "Typecheck passes"
+        "Create examples/mcp-toolkit-config.json with Docker MCP toolkit format",
+        "Config specifies image name ghcr.io/kcirtapfromspace/ralph:latest",
+        "Config includes stdio transport settings",
+        "Add HEALTHCHECK instruction to Dockerfile",
+        "Document config usage in examples/README.md",
+        "JSON config is valid syntax"
       ],
       "priority": 4,
       "passes": true,
-      "notes": "Implemented QualityGateRenderer with render_gate(), render_gates(), render_summary_bar(), and render_from_results() methods. GateStatus uses icons: ✓ passed, ✗ failed, ◉ running, ○ pending, ⊘ skipped. QualityGateView can be created from GateResult for integration. 18 tests added."
+      "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Add interruption handling UI",
-      "description": "As a user, I want graceful Ctrl+C handling with visual feedback.",
+      "title": "Add GitHub Container Registry publishing",
+      "description": "As a release manager, I need automated Docker image publishing to GHCR.",
       "acceptanceCriteria": [
-        "Create src/ui/interrupt.rs",
-        "Implement Ctrl+C signal handling using crossterm",
-        "Show interruption notification panel with warning styling",
-        "Display current story ID that will be retried on next run",
-        "Show cleanup progress message",
-        "Ensure state is saved before exit",
-        "Panel uses yellow/warning color scheme",
-        "Typecheck passes"
+        "Create .github/workflows/docker.yml workflow",
+        "Trigger on push to main branch and v* tags",
+        "Use docker/build-push-action for multi-platform builds",
+        "Build for linux/amd64 and linux/arm64 platforms",
+        "Push to ghcr.io/kcirtapfromspace/ralph",
+        "Tag with version, latest, and git SHA using docker/metadata-action",
+        "Workflow YAML is valid syntax"
       ],
       "priority": 5,
       "passes": true,
-      "notes": "Implemented InterruptHandler with ctrlc crate for signal handling, render_interrupt_panel() with warning-styled box, story retry info display, cleanup progress messages, and state save indication. Added 14 tests. Integrated into RalphDisplay with install_interrupt_handler(), is_interrupted(), cancel_flag(), display_interrupt(), and display_cleanup_step() methods."
+      "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Add Ghostty-specific terminal features",
-      "description": "As a Ghostty user, I want to leverage advanced terminal features like hyperlinks and title updates.",
+      "title": "Document Docker MCP integration",
+      "description": "As a user, I need comprehensive documentation for running Ralph via Docker MCP toolkit.",
       "acceptanceCriteria": [
-        "Create src/ui/ghostty.rs",
-        "Implement OSC 8 hyperlink support for file paths in error messages",
-        "Add terminal title update function using escape sequences",
-        "Title format: Ralph | [story_id] | Iter X/Y | status_indicator",
-        "Implement synchronized output (DCS sequences) for flicker-free updates",
-        "Detect terminal capabilities before using advanced features",
-        "Fallback gracefully for non-Ghostty terminals",
-        "Typecheck passes"
+        "Create docs/guides/docker-mcp-setup.md",
+        "Document Docker and Docker MCP toolkit prerequisites",
+        "Provide step-by-step configuration instructions",
+        "Include example docker run commands",
+        "Add troubleshooting section with common issues",
+        "Add link to guide from README.md",
+        "All markdown links are valid"
       ],
       "priority": 6,
       "passes": true,
-      "notes": "Implemented TerminalCapabilities for feature detection (Ghostty, iTerm, WezTerm, Alacritty, kitty, vscode), hyperlink(), file_hyperlink(), file_hyperlink_with_line() for OSC 8 links, TitleStatus enum with indicators, build_title()/set_title()/update_title() for title management, begin_sync()/end_sync()/with_sync()/SyncGuard for synchronized output. GhosttyFeatures provides unified API with auto-detection and graceful fallbacks. 17 tests added."
-    },
-    {
-      "id": "US-007",
-      "title": "Add completion summary view",
-      "description": "As a user, I want a comprehensive summary when all stories complete.",
-      "acceptanceCriteria": [
-        "Create src/ui/summary.rs",
-        "Implement ExecutionSummary struct with stories completed, iterations, duration, commits",
-        "Render story results table with iteration counts per story",
-        "Show quality gate aggregate statistics (pass rates)",
-        "Display total duration in human-readable format",
-        "Show commit count and tip about progress.txt",
-        "Use success green color for completion banner",
-        "Typecheck passes"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "Implemented SummaryRenderer with render_completion_banner(), render_story_table(), render_gate_statistics(), render_execution_metrics(), and render_progress_tip() methods. ExecutionSummary holds story results, iterations, duration, commits, and GateStatistics. StoryResult tracks individual story outcomes. Human-readable duration formatting (Xh Xm Xs). 21 tests added."
-    },
-    {
-      "id": "US-008",
-      "title": "Wire UI to execution state changes",
-      "description": "As a developer, I need the UI to update automatically as execution state changes.",
-      "acceptanceCriteria": [
-        "Add RalphDisplay to RalphMcpServer struct",
-        "Implement update_from_state() method that reacts to ExecutionState changes",
-        "Update spinner and panels when state transitions",
-        "Show quality gates during gate checking phase",
-        "Trigger summary view on completion",
-        "Wire to existing state change points in server.rs",
-        "Typecheck passes"
-      ],
-      "priority": 8,
-      "passes": true,
-      "notes": "Added RalphDisplay (wrapped in Arc<RwLock>) to RalphMcpServer. Implemented update_from_state() with StateTransition enum for detecting Idle->Running, Running->Running (iteration), Running->Completed, Running->Failed, Any->Idle transitions. Added display(), display_mut(), update_display(), update_display_with_story() methods. RalphDisplay now handles: spinners/progress bars on state change, story panel display, quality gate rendering, completion summary, terminal title updates via GhosttyFeatures."
-    },
-    {
-      "id": "US-009",
-      "title": "Add CLI flags for UI control",
-      "description": "As a user, I want CLI flags to control the terminal UI behavior.",
-      "acceptanceCriteria": [
-        "Add --ui flag to enable rich terminal display (default: auto-detect)",
-        "Add --no-color flag to disable colors for CI/piped output",
-        "Add --quiet flag to suppress all output except errors",
-        "Update main.rs with new clap arguments",
-        "Initialize RalphDisplay based on flags",
-        "Respect NO_COLOR environment variable",
-        "Typecheck passes"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": "Implemented UiMode enum (Auto/Enabled/Disabled) and DisplayOptions struct with builder pattern. Added --ui, --no-color, and --quiet/-q flags to Cli struct. DisplayOptions respects NO_COLOR env var via should_enable_colors(). RalphDisplay.with_options() and RalphMcpServer.with_display()/with_prd_and_display() constructors added. All 403 tests pass."
-    },
-    {
-      "id": "US-010",
-      "title": "Add styled CLI help and version",
-      "description": "As a user, I want the CLI help and version to match the visual style.",
-      "acceptanceCriteria": [
-        "Implement styled --help output with colors",
-        "Add --version command with build info",
-        "Show available commands in formatted list",
-        "Use consistent color scheme from Theme",
-        "Include Ralph ASCII art banner for help",
-        "Typecheck passes"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": "Implemented HelpRenderer with render_help() and render_version() methods. ASCII art banner with box drawing characters (╭╮╰╯). BuildInfo provides version, target arch/os via cfg attributes. Custom --help/-h and --version/-V flags replace clap defaults for styled output. Theme colors: success (green) for commands, in_progress (blue) for options, warning (yellow) for headers, muted (gray) for secondary text, story_id (cyan) for banner. 21 tests added."
-    },
-    {
-      "id": "US-011",
-      "title": "Implement story execution engine",
-      "description": "As a developer, I need the run_story tool to actually execute stories end-to-end.",
-      "acceptanceCriteria": [
-        "Complete run_story tool implementation in src/mcp/tools/run_story.rs",
-        "Spawn Claude Code or Amp CLI to implement the story",
-        "Integrate with quality gate checker after story implementation",
-        "Update PRD file (passes: true) on successful completion",
-        "Append to progress.txt with learnings and implementation details",
-        "Create git commit with format: feat: [ID] - [Title]",
-        "Wire cancellation token for graceful stop via stop_execution",
-        "Update ExecutionState throughout execution lifecycle",
-        "Typecheck passes"
-      ],
-      "priority": 11,
-      "passes": true,
-      "notes": "Implemented StoryExecutor in src/mcp/tools/executor.rs with execute_story() async method. Features: detect_agent() for Claude/Amp CLI auto-detection, run_agent() spawns async process with prompt, iteration loop with cancellation support via watch channel, QualityGateChecker integration, update_prd_passes() updates JSON preserving structure, append_progress() adds timestamped entries, create_commit() with 'feat: [ID] - [Title]' format. Server integration: run_story() spawns background task, on_iteration callback updates ExecutionState iteration count, state transitions to Completed/Failed based on result. Added chrono dependency for timestamps. 432 tests pass."
+      "notes": ""
     }
   ]
 }

@@ -1,0 +1,45 @@
+# Build artifacts
+target/
+*.rs.bk
+
+# Git
+.git/
+.gitignore
+
+# Documentation and non-essential files
+docs/
+flowchart/
+tasks/
+*.md
+!README.md
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Tests directory
+tests/
+
+# Temporary files
+*.tmp
+*.log
+
+# CI/CD
+.github/
+
+# Local configuration
+.env
+.env.*
+*.local
+
+# Docker files (don't include in context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore

@@ -1,0 +1,43 @@
+# Docker Compose for local testing of Ralph MCP Server
+# Usage: docker compose up --build
+#
+# NOTE: The quality directory is baked into the Docker image from the Ralph source.
+# Only the prd.json needs to be mounted from host for testing.
+
+services:
+  ralph-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ralph-mcp:latest
+    container_name: ralph-mcp-server
+    # MCP uses stdio - stdin/stdout for communication
+    stdin_open: true
+    tty: true
+    # Mount PRD file from host for testing (quality config is in the image)
+    volumes:
+      - ./prd.json:/app/prd.json:ro
+    # Optional: preload a PRD on startup
+    # command: ["--prd", "/app/prd.json"]
+    environment:
+      - RUST_LOG=info
+    labels:
+      - "mcp.server=true"
+      - "mcp.transport=stdio"
+
+  # Alternative: Run with a specific PRD preloaded
+  ralph-mcp-with-prd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ralph-mcp:latest
+    container_name: ralph-mcp-server-prd
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./prd.json:/app/prd.json:ro
+    command: ["--prd", "/app/prd.json"]
+    environment:
+      - RUST_LOG=info
+    profiles:
+      - with-prd
