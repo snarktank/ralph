@@ -286,7 +286,18 @@ impl ParallelRunner {
             state.completed = initially_passing.clone();
         }
 
-        // Detect agent
+        // Check if all stories already pass - no agent needed in this case
+        if initially_passing.len() == total_stories {
+            return RunResult {
+                all_passed: true,
+                stories_passed: total_stories,
+                total_stories,
+                total_iterations: 0,
+                error: None,
+            };
+        }
+
+        // Detect agent (only needed if there are failing stories)
         let agent = match self.base_config.agent_command.clone().or_else(detect_agent) {
             Some(a) => a,
             None => {
@@ -299,17 +310,6 @@ impl ParallelRunner {
                 };
             }
         };
-
-        // Check if all stories already pass
-        if initially_passing.len() == total_stories {
-            return RunResult {
-                all_passed: true,
-                stories_passed: total_stories,
-                total_stories,
-                total_iterations: 0,
-                error: None,
-            };
-        }
 
         let mut total_iterations: u32 = 0;
 
