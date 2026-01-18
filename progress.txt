@@ -136,3 +136,14 @@ Feature: Parallel Story Execution
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
+
+## 2026-01-18 11:07 - US-012
+- **What was implemented**: Integrate inferred dependencies into DependencyGraph
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/parallel/dependency.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---

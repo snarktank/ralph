@@ -239,7 +239,7 @@
       "description": "As a developer, I need inferred dependencies added to the graph.",
       "id": "US-012",
       "notes": "",
-      "passes": false,
+      "passes": true,
       "priority": 12,
       "targetFiles": [
         "src/parallel/dependency.rs",
