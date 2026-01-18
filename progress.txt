@@ -67,3 +67,18 @@ Started: Sat Jan 17 21:41:00 MST 2026
   - Empty gates list handled gracefully with "No gates configured" message
   - Follow the quality_gates.rs pattern: struct with Theme, constructor methods, and render methods
 ---
+
+## 2026-01-17 - US-005
+- What was implemented: Added live gate progress display for real-time iteration tracking
+- Files changed:
+  - src/ui/iteration_view.rs: Added GateProgress enum, GateProgressInfo struct, and LiveIterationPanel with 24 new tests
+  - src/ui/mod.rs: Exported new types (GateProgress, GateProgressInfo, LiveIterationPanel)
+- **Learnings for future iterations:**
+  - There's already a GateStatus enum in quality_gates.rs - named new struct GateProgressInfo to avoid conflict
+  - Use spinner_chars::BRAILLE from spinner.rs for animated progress indicators
+  - ghostty::begin_sync() and ghostty::end_sync() wrap output for flicker-free rendering
+  - LiveIterationPanel tracks: iteration number, gate statuses with timing, elapsed time, spinner frame
+  - render() produces multi-line output, render_inline() produces single-line summary
+  - ANSI escape codes `\x1b[1A\x1b[2K` for clearing previous output (move up 1 line, clear line)
+  - Duration formatting: seconds use `{:.1}s`, minutes use `{}m{:.1}s`
+---
