@@ -26,26 +26,31 @@ jobs:
             os: ubuntu-latest
             artifact_name: ralph
             asset_name: ralph-linux-x86_64
+            use_cross: false
 
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             artifact_name: ralph
             asset_name: ralph-linux-aarch64
+            use_cross: true
 
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact_name: ralph
             asset_name: ralph-macos-x86_64
+            use_cross: false
 
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact_name: ralph
             asset_name: ralph-macos-aarch64
+            use_cross: false
 
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             artifact_name: ralph.exe
             asset_name: ralph-windows-x86_64.exe
+            use_cross: false
 
     steps:
       - name: Checkout
@@ -58,11 +63,9 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cross-compilation tools (Linux aarch64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -75,11 +78,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ matrix.target }}-cargo-release-
 
-      - name: Build release binary
+      - name: Build release binary (cross)
+        if: matrix.use_cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build release binary (cargo)
+        if: ${{ !matrix.use_cross }}
         run: cargo build --release --target ${{ matrix.target }}
-        env:
-          # This env var only affects aarch64-unknown-linux-gnu builds; harmless for other targets
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -88,7 +93,7 @@ jobs:
           path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
 
   release:
-    name: Create Release
+    name: Upload Release Assets
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -122,10 +127,9 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: release/*
           # Don't generate notes - release-please already created the release with changelog
           generate_release_notes: false
-          # Append to existing release created by release-please
-          append_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
