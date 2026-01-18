@@ -13,6 +13,6 @@ pub use blog_generator::{slugify, BlogContext, BlogGenerator, BlogGeneratorError
 pub use gates::{GateProgressState, GateProgressUpdate, GateResult, QualityGateChecker};
 #[allow(unused_imports)]
 pub use profiles::{
-    BlogConfig, CiConfig, DocumentationConfig, Profile, ProfileLevel, QualityConfig,
-    QualityConfigError, SecurityConfig, TestingConfig,
+    AuditConfig, AuditSections, BlogConfig, CiConfig, DocumentationConfig, Profile, ProfileLevel,
+    QualityConfig, QualityConfigError, SecurityConfig, TestingConfig,
 };

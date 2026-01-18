@@ -3,9 +3,21 @@
 
 #![allow(dead_code)]
 
+use crate::audit::prd_converter::{PrdConverter, PrdConverterConfig};
+use crate::audit::prd_generator::{PrdGenerator, PrdGeneratorConfig};
 use crate::mcp::resources::{
     list_ralph_resources, read_prd_resource, read_status_resource, ResourceError, PRD_RESOURCE_URI,
     STATUS_RESOURCE_URI,
+};
+use crate::mcp::tools::audit::{
+    all_sections, create_error_response as create_audit_error_response,
+    create_generate_prd_error_response, create_generate_prd_success_response,
+    create_results_error_response, create_results_success_response, create_status_error_response,
+    create_status_success_response, create_success_response as create_audit_success_response,
+    generate_audit_id, get_audit_status_from_state, resolve_audit_path, AuditOutputFormat,
+    AuditState, AuditStatus, GeneratePrdFromAuditError, GeneratePrdFromAuditRequest,
+    GetAuditResultsError, GetAuditResultsRequest, GetAuditStatusError, GetAuditStatusRequest,
+    StartAuditError, StartAuditRequest,
 };
 use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::get_status::{GetStatusRequest, GetStatusResponse};
@@ -32,6 +44,7 @@ use rmcp::model::{
 use rmcp::service::{RequestContext, RoleServer};
 use rmcp::ErrorData as McpError;
 use rmcp::{tool, tool_handler, tool_router, ServerHandler};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
@@ -79,6 +92,8 @@ pub struct ServerState {
     pub prd_path: Option<PathBuf>,
     /// Current execution state
     pub execution_state: ExecutionState,
+    /// Audit states indexed by audit ID
+    pub audit_states: HashMap<String, AuditState>,
 }
 
 impl Default for ServerState {
@@ -86,6 +101,7 @@ impl Default for ServerState {
         Self {
             prd_path: None,
             execution_state: ExecutionState::Idle,
+            audit_states: HashMap::new(),
         }
     }
 }
@@ -125,7 +141,7 @@ impl RalphMcpServer {
     /// # Examples
     ///
     /// ```
-    /// use ralph::mcp::RalphMcpServer;
+    /// use ralphmacchio::mcp::RalphMcpServer;
     ///
     /// let server = RalphMcpServer::new();
     /// ```
@@ -169,7 +185,7 @@ impl RalphMcpServer {
     /// # Examples
     ///
     /// ```
-    /// use ralph::mcp::RalphMcpServer;
+    /// use ralphmacchio::mcp::RalphMcpServer;
     /// use std::path::PathBuf;
     ///
     /// let server = RalphMcpServer::with_prd(PathBuf::from("prd.json"));
@@ -180,6 +196,7 @@ impl RalphMcpServer {
             state: Arc::new(RwLock::new(ServerState {
                 prd_path: Some(prd_path),
                 execution_state: ExecutionState::Idle,
+                audit_states: HashMap::new(),
             })),
             config: Arc::new(None),
             cancel_sender: Arc::new(cancel_sender),
@@ -200,8 +217,8 @@ impl RalphMcpServer {
     /// # Examples
     ///
     /// ```no_run
-    /// use ralph::mcp::RalphMcpServer;
-    /// use ralph::quality::QualityConfig;
+    /// use ralphmacchio::mcp::RalphMcpServer;
+    /// use ralphmacchio::quality::QualityConfig;
     ///
     /// let config = QualityConfig::load("quality/ralph-quality.toml").unwrap();
     /// let server = RalphMcpServer::with_config(config);
@@ -229,8 +246,8 @@ impl RalphMcpServer {
     /// # Examples
     ///
     /// ```
-    /// use ralph::mcp::RalphMcpServer;
-    /// use ralph::ui::{DisplayOptions, UiMode};
+    /// use ralphmacchio::mcp::RalphMcpServer;
+    /// use ralphmacchio::ui::{DisplayOptions, UiMode};
     ///
     /// let options = DisplayOptions::new()
     ///     .with_ui_mode(UiMode::Enabled)
@@ -262,8 +279,8 @@ impl RalphMcpServer {
     /// # Examples
     ///
     /// ```
-    /// use ralph::mcp::RalphMcpServer;
-    /// use ralph::ui::{DisplayOptions, UiMode};
+    /// use ralphmacchio::mcp::RalphMcpServer;
+    /// use ralphmacchio::ui::{DisplayOptions, UiMode};
     /// use std::path::PathBuf;
     ///
     /// let options = DisplayOptions::new().with_quiet(true);
@@ -275,6 +292,7 @@ impl RalphMcpServer {
             state: Arc::new(RwLock::new(ServerState {
                 prd_path: Some(prd_path),
                 execution_state: ExecutionState::Idle,
+                audit_states: HashMap::new(),
             })),
             config: Arc::new(None),
             cancel_sender: Arc::new(cancel_sender),
@@ -798,6 +816,434 @@ impl RalphMcpServer {
             serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
                 format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
             })
+        }
+    }
+
+    /// Start a codebase audit.
+    ///
+    /// This tool initiates an audit of the codebase, analyzing various aspects
+    /// such as file structure, dependencies, architecture patterns, and more.
+    ///
+    /// # Parameters
+    ///
+    /// * `path` - Optional path to the directory to audit. Defaults to the PRD directory
+    ///   if a PRD is loaded, otherwise uses the current working directory.
+    /// * `sections` - Optional list of sections to analyze. If not provided, all sections
+    ///   are analyzed. Valid sections: inventory, dependencies, architecture, testing,
+    ///   documentation, api, tech_debt, opportunities.
+    /// * `format` - Optional output format: json (default), markdown, or agent_context.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `success`: Whether the audit was started successfully
+    /// - `audit_id`: Unique identifier for checking audit status
+    /// - `path`: The directory being audited
+    /// - `sections`: List of sections being analyzed
+    /// - `format`: The output format
+    /// - `message`: Status message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified path does not exist
+    /// - The specified path is not a directory
+    /// - Audit initialization fails
+    #[tool(
+        name = "start_audit",
+        description = "Start a codebase audit. Analyzes file structure, dependencies, architecture patterns, testing, documentation, and identifies opportunities. Returns an audit_id for status checking."
+    )]
+    pub async fn start_audit(&self, Parameters(req): Parameters<StartAuditRequest>) -> String {
+        // Get the PRD path from state for path resolution
+        let prd_path = {
+            let state = self.state.read().await;
+            state.prd_path.clone()
+        };
+
+        // Resolve the audit path
+        let audit_path = match resolve_audit_path(req.path.as_deref(), prd_path.as_ref()) {
+            Ok(path) => path,
+            Err(e) => {
+                let response = create_audit_error_response(&e);
+                return serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                });
+            }
+        };
+
+        // Determine sections to analyze
+        let sections = req.sections.unwrap_or_else(all_sections);
+
+        // Determine output format
+        let format = req.format.unwrap_or(AuditOutputFormat::Json);
+
+        // Generate audit ID
+        let audit_id = generate_audit_id();
+
+        // Create audit state
+        let audit_state = AuditState {
+            audit_id: audit_id.clone(),
+            path: audit_path,
+            sections,
+            format,
+            started_at: crate::mcp::tools::audit::current_timestamp(),
+            completed: false,
+            error: None,
+            progress: 0,
+            report: None,
+        };
+
+        // Store the audit state
+        {
+            let mut state = self.state.write().await;
+            state
+                .audit_states
+                .insert(audit_id.clone(), audit_state.clone());
+        }
+
+        // Create success response
+        let response = create_audit_success_response(&audit_state);
+        serde_json::to_string_pretty(&response)
+            .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize response: {}\"}}", e))
+    }
+
+    /// Get the status of a codebase audit.
+    ///
+    /// This tool returns the current status and progress of an audit started with start_audit.
+    ///
+    /// # Parameters
+    ///
+    /// * `audit_id` - The audit ID returned from start_audit.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `success`: Whether the request was successful
+    /// - `audit_id`: The audit ID
+    /// - `status`: Current status: pending, running, completed, failed
+    /// - `progress`: Progress percentage (0-100) if running
+    /// - `error`: Error message if failed
+    /// - `message`: Status message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The audit ID is not found
+    #[tool(
+        name = "get_audit_status",
+        description = "Get the status of a codebase audit. Returns status (pending, running, completed, failed) and progress percentage if running."
+    )]
+    pub async fn get_audit_status(
+        &self,
+        Parameters(req): Parameters<GetAuditStatusRequest>,
+    ) -> String {
+        // Get the audit state from server state
+        let audit_state = {
+            let state = self.state.read().await;
+            state.audit_states.get(&req.audit_id).cloned()
+        };
+
+        match audit_state {
+            Some(state) => {
+                let response = create_status_success_response(&state);
+                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                })
+            }
+            None => {
+                let error = GetAuditStatusError::AuditNotFound(req.audit_id);
+                let response = create_status_error_response(&error);
+                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                })
+            }
+        }
+    }
+
+    /// Get the results of a completed codebase audit.
+    ///
+    /// This tool returns the full audit report for a completed audit.
+    /// The audit must be complete before results can be retrieved.
+    ///
+    /// # Parameters
+    ///
+    /// * `audit_id` - The audit ID returned from start_audit.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `success`: Whether the request was successful
+    /// - `audit_id`: The audit ID
+    /// - `report`: The full AuditReport object (if completed)
+    /// - `error`: Error message if failed
+    /// - `message`: Status message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The audit ID is not found
+    /// - The audit is not yet complete (pending or running)
+    /// - The audit failed
+    #[tool(
+        name = "get_audit_results",
+        description = "Get the results of a completed codebase audit. Returns the full AuditReport as JSON. Returns an error if the audit is not complete."
+    )]
+    pub async fn get_audit_results(
+        &self,
+        Parameters(req): Parameters<GetAuditResultsRequest>,
+    ) -> String {
+        // Get the audit state from server state
+        let audit_state = {
+            let state = self.state.read().await;
+            state.audit_states.get(&req.audit_id).cloned()
+        };
+
+        match audit_state {
+            Some(state) => {
+                let status = get_audit_status_from_state(&state);
+
+                match status {
+                    AuditStatus::Completed => {
+                        // Return the report if available
+                        match state.report {
+                            Some(report) => {
+                                let response =
+                                    create_results_success_response(&state.audit_id, report);
+                                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                                    format!(
+                                        "{{\"error\": \"Failed to serialize response: {}\"}}",
+                                        e
+                                    )
+                                })
+                            }
+                            None => {
+                                // Audit completed but no report (shouldn't happen normally)
+                                let error = GetAuditResultsError::AuditFailed(
+                                    req.audit_id,
+                                    "Audit completed but no report available".to_string(),
+                                );
+                                let response = create_results_error_response(&error);
+                                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                                    format!(
+                                        "{{\"error\": \"Failed to serialize response: {}\"}}",
+                                        e
+                                    )
+                                })
+                            }
+                        }
+                    }
+                    AuditStatus::Failed => {
+                        let error = GetAuditResultsError::AuditFailed(
+                            req.audit_id,
+                            state.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        );
+                        let response = create_results_error_response(&error);
+                        serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                        })
+                    }
+                    _ => {
+                        // Audit is pending or running
+                        let error = GetAuditResultsError::AuditNotComplete(req.audit_id, status);
+                        let response = create_results_error_response(&error);
+                        serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                        })
+                    }
+                }
+            }
+            None => {
+                let error = GetAuditResultsError::AuditNotFound(req.audit_id);
+                let response = create_results_error_response(&error);
+                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                })
+            }
+        }
+    }
+
+    /// Generate a PRD from completed audit results.
+    ///
+    /// This tool generates a Product Requirements Document (PRD) in both markdown
+    /// and prd.json formats from a completed audit. The generated PRD can be used
+    /// directly with Ralph to implement the improvements identified by the audit.
+    ///
+    /// # Parameters
+    ///
+    /// * `audit_id` - The audit ID returned from start_audit. The audit must be completed.
+    /// * `user_answers` - Optional user answers from the interactive Q&A session.
+    /// * `project_name` - Optional project name override.
+    /// * `output_dir` - Optional output directory for generated files.
+    ///
+    /// # Returns
+    ///
+    /// JSON object containing:
+    /// - `success`: Whether the generation was successful
+    /// - `audit_id`: The audit ID
+    /// - `prd_markdown_path`: Path to the generated PRD markdown file
+    /// - `prd_json_path`: Path to the generated prd.json file
+    /// - `story_count`: Number of user stories generated
+    /// - `error`: Error message if failed
+    /// - `message`: Status message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The audit ID is not found
+    /// - The audit is not yet complete (pending or running)
+    /// - The audit failed
+    /// - PRD generation fails
+    /// - PRD conversion fails
+    #[tool(
+        name = "generate_prd_from_audit",
+        description = "Generate a PRD from completed audit results. Creates both markdown and prd.json files that can be used with Ralph to implement improvements. The audit must be completed before calling this tool."
+    )]
+    pub async fn generate_prd_from_audit(
+        &self,
+        Parameters(req): Parameters<GeneratePrdFromAuditRequest>,
+    ) -> String {
+        // Get the audit state from server state
+        let audit_state = {
+            let state = self.state.read().await;
+            state.audit_states.get(&req.audit_id).cloned()
+        };
+
+        match audit_state {
+            Some(state) => {
+                let status = get_audit_status_from_state(&state);
+
+                match status {
+                    AuditStatus::Completed => {
+                        // Get the report
+                        match state.report {
+                            Some(report) => {
+                                // Determine output directory
+                                let output_dir = req
+                                    .output_dir
+                                    .map(PathBuf::from)
+                                    .unwrap_or_else(|| state.path.clone());
+
+                                // Create tasks directory if it doesn't exist
+                                let tasks_dir = output_dir.join("tasks");
+
+                                // Configure PRD generator
+                                let mut generator_config = PrdGeneratorConfig::new()
+                                    .with_skip_prompt(true)
+                                    .with_output_dir(tasks_dir.clone());
+
+                                if let Some(project_name) = req.project_name.clone() {
+                                    generator_config =
+                                        generator_config.with_project_name(project_name);
+                                }
+
+                                // Generate PRD markdown
+                                let generator = PrdGenerator::with_config(generator_config);
+                                let prd_result = match generator.generate(&report) {
+                                    Ok(result) => result,
+                                    Err(e) => {
+                                        let error = GeneratePrdFromAuditError::GenerationFailed(
+                                            e.to_string(),
+                                        );
+                                        let response = create_generate_prd_error_response(&error);
+                                        return serde_json::to_string_pretty(&response)
+                                            .unwrap_or_else(|e| {
+                                                format!(
+                                                "{{\"error\": \"Failed to serialize response: {}\"}}",
+                                                e
+                                            )
+                                            });
+                                    }
+                                };
+
+                                // Configure PRD converter
+                                let mut converter_config = PrdConverterConfig::new()
+                                    .with_skip_prompt(true)
+                                    .with_output_dir(output_dir.clone());
+
+                                if let Some(project_name) = req.project_name {
+                                    converter_config =
+                                        converter_config.with_project_name(project_name);
+                                }
+
+                                // Convert PRD to prd.json
+                                let converter = PrdConverter::with_config(converter_config);
+                                let conversion_result = match converter
+                                    .convert(&prd_result.prd_path)
+                                {
+                                    Ok(result) => result,
+                                    Err(e) => {
+                                        let error = GeneratePrdFromAuditError::ConversionFailed(
+                                            e.to_string(),
+                                        );
+                                        let response = create_generate_prd_error_response(&error);
+                                        return serde_json::to_string_pretty(&response)
+                                                .unwrap_or_else(|e| {
+                                                    format!(
+                                                "{{\"error\": \"Failed to serialize response: {}\"}}",
+                                                e
+                                            )
+                                                });
+                                    }
+                                };
+
+                                // Create success response
+                                let response = create_generate_prd_success_response(
+                                    &req.audit_id,
+                                    &prd_result.prd_path,
+                                    &conversion_result.prd_json_path,
+                                    conversion_result.story_count,
+                                );
+                                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                                    format!(
+                                        "{{\"error\": \"Failed to serialize response: {}\"}}",
+                                        e
+                                    )
+                                })
+                            }
+                            None => {
+                                // Audit completed but no report
+                                let error = GeneratePrdFromAuditError::AuditFailed(
+                                    req.audit_id,
+                                    "Audit completed but no report available".to_string(),
+                                );
+                                let response = create_generate_prd_error_response(&error);
+                                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                                    format!(
+                                        "{{\"error\": \"Failed to serialize response: {}\"}}",
+                                        e
+                                    )
+                                })
+                            }
+                        }
+                    }
+                    AuditStatus::Failed => {
+                        let error = GeneratePrdFromAuditError::AuditFailed(
+                            req.audit_id,
+                            state.error.unwrap_or_else(|| "Unknown error".to_string()),
+                        );
+                        let response = create_generate_prd_error_response(&error);
+                        serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                        })
+                    }
+                    _ => {
+                        // Audit is pending or running
+                        let error =
+                            GeneratePrdFromAuditError::AuditNotComplete(req.audit_id, status);
+                        let response = create_generate_prd_error_response(&error);
+                        serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                            format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                        })
+                    }
+                }
+            }
+            None => {
+                let error = GeneratePrdFromAuditError::AuditNotFound(req.audit_id);
+                let response = create_generate_prd_error_response(&error);
+                serde_json::to_string_pretty(&response).unwrap_or_else(|e| {
+                    format!("{{\"error\": \"Failed to serialize response: {}\"}}", e)
+                })
+            }
         }
     }
 }
@@ -1911,6 +2357,456 @@ mod tests {
                 assert_eq!(text, prd_content);
             }
             _ => panic!("Expected TextResourceContents"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_with_path() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert!(json["audit_id"].as_str().unwrap().starts_with("audit-"));
+        assert!(json["path"]
+            .as_str()
+            .unwrap()
+            .contains(temp_dir.path().to_str().unwrap()));
+        assert!(json["sections"].is_array());
+        assert_eq!(json["format"], "json");
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_with_sections() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        use crate::mcp::tools::audit::AuditSection;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: Some(vec![AuditSection::Inventory, AuditSection::Dependencies]),
+                format: None,
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        let sections = json["sections"].as_array().unwrap();
+        assert_eq!(sections.len(), 2);
+        assert!(sections.contains(&serde_json::json!("inventory")));
+        assert!(sections.contains(&serde_json::json!("dependencies")));
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_with_format() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        use crate::mcp::tools::audit::AuditOutputFormat;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: Some(AuditOutputFormat::Markdown),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["format"], "markdown");
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_invalid_path() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some("/nonexistent/path/to/directory".to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["message"].as_str().unwrap().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_uses_prd_directory() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let prd_path = temp_dir.path().join("prd.json");
+
+        // Create a PRD file
+        let mut file = std::fs::File::create(&prd_path).unwrap();
+        file.write_all(
+            br#"{"project": "Test", "branchName": "main", "userStories": [{"id": "US-001", "title": "Test", "priority": 1, "passes": false}]}"#,
+        )
+        .unwrap();
+
+        // Create server with PRD
+        let server = RalphMcpServer::with_prd(prd_path);
+
+        // Start audit without specifying path
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: None,
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        // Path should be the temp directory (parent of PRD)
+        assert!(json["path"]
+            .as_str()
+            .unwrap()
+            .contains(temp_dir.path().to_str().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_fallback_to_cwd() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        // Start audit without path or PRD - should use current directory
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: None,
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        // Should use current working directory
+        let cwd = std::env::current_dir().unwrap();
+        assert!(json["path"]
+            .as_str()
+            .unwrap()
+            .contains(cwd.to_str().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_all_sections_by_default() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        let sections = json["sections"].as_array().unwrap();
+        // Should have all 8 sections
+        assert_eq!(sections.len(), 8);
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_unique_ids() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        // Start two audits
+        let result1 = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        let result2 = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        // Parse results
+        let json1: serde_json::Value = serde_json::from_str(&result1).unwrap();
+        let json2: serde_json::Value = serde_json::from_str(&result2).unwrap();
+
+        // IDs should be different
+        assert_ne!(json1["audit_id"], json2["audit_id"]);
+    }
+
+    #[tokio::test]
+    async fn test_get_audit_status_not_found() {
+        use rmcp::handler::server::wrapper::Parameters;
+
+        let server = RalphMcpServer::new();
+
+        let result = server
+            .get_audit_status(Parameters(GetAuditStatusRequest {
+                audit_id: "audit-nonexistent".to_string(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], false);
+        assert!(json["message"].as_str().unwrap().contains("not found"));
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("audit-nonexistent"));
+    }
+
+    #[tokio::test]
+    async fn test_get_audit_status_pending() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        // Start an audit
+        let start_result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        let start_json: serde_json::Value = serde_json::from_str(&start_result).unwrap();
+        let audit_id = start_json["audit_id"].as_str().unwrap().to_string();
+
+        // Get the status
+        let result = server
+            .get_audit_status(Parameters(GetAuditStatusRequest {
+                audit_id: audit_id.clone(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["audit_id"], audit_id);
+        assert_eq!(json["status"], "pending");
+        assert!(json.get("progress").is_none()); // Progress not shown for pending
+        assert!(json["message"].as_str().unwrap().contains("pending"));
+    }
+
+    #[tokio::test]
+    async fn test_get_audit_status_running() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        use crate::mcp::tools::audit::AuditSection;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        // Start an audit
+        let start_result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        let start_json: serde_json::Value = serde_json::from_str(&start_result).unwrap();
+        let audit_id = start_json["audit_id"].as_str().unwrap().to_string();
+
+        // Update the audit state to running with progress
+        {
+            let mut state = server.state_mut().await;
+            if let Some(audit_state) = state.audit_states.get_mut(&audit_id) {
+                audit_state.progress = 50;
+            }
+        }
+
+        // Get the status
+        let result = server
+            .get_audit_status(Parameters(GetAuditStatusRequest {
+                audit_id: audit_id.clone(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["audit_id"], audit_id);
+        assert_eq!(json["status"], "running");
+        assert_eq!(json["progress"], 50);
+        assert!(json["message"].as_str().unwrap().contains("running"));
+        assert!(json["message"].as_str().unwrap().contains("50%"));
+    }
+
+    #[tokio::test]
+    async fn test_get_audit_status_completed() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        // Start an audit
+        let start_result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        let start_json: serde_json::Value = serde_json::from_str(&start_result).unwrap();
+        let audit_id = start_json["audit_id"].as_str().unwrap().to_string();
+
+        // Update the audit state to completed
+        {
+            let mut state = server.state_mut().await;
+            if let Some(audit_state) = state.audit_states.get_mut(&audit_id) {
+                audit_state.completed = true;
+                audit_state.progress = 100;
+            }
+        }
+
+        // Get the status
+        let result = server
+            .get_audit_status(Parameters(GetAuditStatusRequest {
+                audit_id: audit_id.clone(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["audit_id"], audit_id);
+        assert_eq!(json["status"], "completed");
+        assert!(json.get("progress").is_none()); // Progress not shown for completed
+        assert!(json["message"].as_str().unwrap().contains("completed"));
+    }
+
+    #[tokio::test]
+    async fn test_get_audit_status_failed() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        // Start an audit
+        let start_result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        let start_json: serde_json::Value = serde_json::from_str(&start_result).unwrap();
+        let audit_id = start_json["audit_id"].as_str().unwrap().to_string();
+
+        // Update the audit state to failed
+        {
+            let mut state = server.state_mut().await;
+            if let Some(audit_state) = state.audit_states.get_mut(&audit_id) {
+                audit_state.error = Some("Test error message".to_string());
+            }
+        }
+
+        // Get the status
+        let result = server
+            .get_audit_status(Parameters(GetAuditStatusRequest {
+                audit_id: audit_id.clone(),
+            }))
+            .await;
+
+        // Parse the result as JSON
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(json["success"], true);
+        assert_eq!(json["audit_id"], audit_id);
+        assert_eq!(json["status"], "failed");
+        assert_eq!(json["error"], "Test error message");
+        assert!(json["message"].as_str().unwrap().contains("failed"));
+        assert!(json["message"]
+            .as_str()
+            .unwrap()
+            .contains("Test error message"));
+    }
+
+    #[tokio::test]
+    async fn test_start_audit_stores_state() {
+        use rmcp::handler::server::wrapper::Parameters;
+        use tempfile::TempDir;
+
+        let server = RalphMcpServer::new();
+        let temp_dir = TempDir::new().unwrap();
+
+        // Start an audit
+        let result = server
+            .start_audit(Parameters(StartAuditRequest {
+                path: Some(temp_dir.path().to_string_lossy().to_string()),
+                sections: None,
+                format: None,
+            }))
+            .await;
+
+        let json: serde_json::Value = serde_json::from_str(&result).unwrap();
+        let audit_id = json["audit_id"].as_str().unwrap().to_string();
+
+        // Verify state was stored
+        {
+            let state = server.state().await;
+            assert!(state.audit_states.contains_key(&audit_id));
+            let audit_state = state.audit_states.get(&audit_id).unwrap();
+            assert_eq!(audit_state.audit_id, audit_id);
+            assert_eq!(audit_state.progress, 0);
+            assert!(!audit_state.completed);
+            assert!(audit_state.error.is_none());
         }
     }
 }

@@ -29,6 +29,20 @@ sast = false
 [profiles.test_minimal.blog]
 generate = false
 
+[profiles.test_minimal.audit]
+enabled = false
+max_critical_findings = 0
+max_high_findings = 10
+
+[profiles.test_minimal.audit.sections]
+structure = true
+patterns = true
+api = false
+deps = false
+tests = false
+docs = false
+arch = false
+
 
 [profiles.test_standard]
 description = "Test standard profile with moderate requirements"
@@ -55,6 +69,20 @@ sast = false
 
 [profiles.test_standard.blog]
 generate = false
+
+[profiles.test_standard.audit]
+enabled = true
+max_critical_findings = 0
+max_high_findings = 5
+
+[profiles.test_standard.audit.sections]
+structure = true
+patterns = true
+api = true
+deps = true
+tests = true
+docs = false
+arch = false
 
 
 [profiles.test_comprehensive]
@@ -83,3 +111,17 @@ sast = true
 [profiles.test_comprehensive.blog]
 generate = true
 template = "feature-release"
+
+[profiles.test_comprehensive.audit]
+enabled = true
+max_critical_findings = 0
+max_high_findings = 0
+
+[profiles.test_comprehensive.audit.sections]
+structure = true
+patterns = true
+api = true
+deps = true
+tests = true
+docs = true
+arch = true

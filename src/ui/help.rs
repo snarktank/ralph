@@ -532,7 +532,8 @@ mod tests {
 
     #[test]
     fn test_commands_defined() {
-        assert!(!COMMANDS.is_empty());
+        // Verify COMMANDS has expected entries (at least 3: run, mcp-server, quality)
+        assert!(COMMANDS.len() >= 3);
         assert!(COMMANDS.iter().any(|c| c.name == "run"));
         assert!(COMMANDS.iter().any(|c| c.name == "mcp-server"));
         assert!(COMMANDS.iter().any(|c| c.name == "quality"));
@@ -540,7 +541,8 @@ mod tests {
 
     #[test]
     fn test_global_options_defined() {
-        assert!(!GLOBAL_OPTIONS.is_empty());
+        // Verify GLOBAL_OPTIONS has expected entries (at least 2: help, version)
+        assert!(GLOBAL_OPTIONS.len() >= 2);
         assert!(GLOBAL_OPTIONS.iter().any(|o| o.name.contains("--help")));
         assert!(GLOBAL_OPTIONS.iter().any(|o| o.name.contains("--version")));
     }

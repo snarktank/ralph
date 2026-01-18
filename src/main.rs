@@ -2,16 +2,10 @@ use clap::{ArgAction, Parser, ValueEnum};
 use rmcp::{transport::stdio, ServiceExt};
 use std::path::PathBuf;
 
-mod integrations;
-mod mcp;
-mod parallel;
-mod quality;
-mod runner;
-mod ui;
-
-use mcp::RalphMcpServer;
-use runner::{Runner, RunnerConfig};
-use ui::{DisplayOptions, HelpRenderer, UiMode};
+use ralphmacchio::audit;
+use ralphmacchio::mcp::RalphMcpServer;
+use ralphmacchio::runner::{Runner, RunnerConfig};
+use ralphmacchio::ui::{DisplayOptions, HelpRenderer, UiMode};
 
 /// UI mode for terminal display
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
@@ -33,6 +27,20 @@ impl From<CliUiMode> for UiMode {
             CliUiMode::Disabled => UiMode::Disabled,
         }
     }
+}
+
+/// Output format for audit reports
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum AuditOutputFormat {
+    /// JSON structured output
+    #[default]
+    Json,
+    /// Human-readable markdown report
+    Markdown,
+    /// Agent context format for AI assistants
+    Context,
+    /// Generate all output formats
+    All,
 }
 
 #[derive(Parser, Debug)]
@@ -134,6 +142,40 @@ enum Commands {
         /// Path to PRD file to preload (optional)
         #[arg(long)]
         prd: Option<PathBuf>,
+
+        /// Print help information
+        #[arg(long, short)]
+        help: bool,
+    },
+    /// Audit a codebase for structure, patterns, and opportunities
+    Audit {
+        /// Target directory to audit
+        #[arg(long, short = 'd', default_value = ".")]
+        dir: PathBuf,
+
+        /// Output format (json, markdown, context, all)
+        #[arg(long, short = 'f', default_value = "json", value_enum)]
+        format: AuditOutputFormat,
+
+        /// Output file path (defaults to stdout for single format, or audit-report.{ext} for 'all')
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+
+        /// Quality profile for analysis thresholds
+        #[arg(long, default_value = "default")]
+        profile: String,
+
+        /// Enable smart Q&A mode for interactive analysis
+        #[arg(long)]
+        smart: bool,
+
+        /// Skip interactive Q&A prompts
+        #[arg(long)]
+        no_interactive: bool,
+
+        /// Auto-generate PRD from audit findings
+        #[arg(long)]
+        generate_prd: bool,
 
         /// Print help information
         #[arg(long, short)]
@@ -273,6 +315,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Wait for the service to complete
             service.waiting().await?;
         }
+        Some(Commands::Audit { help: true, .. }) => {
+            println!("Audit a codebase for structure, patterns, and opportunities");
+            println!();
+            println!("Usage: ralph audit [OPTIONS]");
+            println!();
+            println!("Options:");
+            println!("  -d, --dir <DIR>        Target directory to audit [default: .]");
+            println!("  -f, --format <FORMAT>  Output format: json, markdown, context, all [default: json]");
+            println!("  -o, --output <FILE>    Output file path (stdout if not specified)");
+            println!("  --profile <NAME>       Quality profile for analysis [default: default]");
+            println!("  --smart                Enable smart Q&A mode for interactive analysis");
+            println!("  --no-interactive       Skip interactive Q&A prompts");
+            println!("  --generate-prd         Auto-generate PRD from audit findings");
+            println!("  -h, --help             Print help information");
+            return Ok(());
+        }
+        Some(Commands::Audit {
+            ref dir,
+            format,
+            ref output,
+            ref profile,
+            smart,
+            no_interactive,
+            generate_prd,
+            help: false,
+        }) => {
+            run_audit(
+                &cli,
+                dir.clone(),
+                format,
+                output.clone(),
+                profile.clone(),
+                smart,
+                no_interactive,
+                generate_prd,
+            )
+            .await?;
+        }
         None => {
             // Default: run stories if prd.json exists, otherwise show help
             // Check multiple locations: prd.json, ralph/prd.json
@@ -327,7 +407,7 @@ async fn run_stories(
     parallel: bool,
     max_concurrency: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::parallel::scheduler::ParallelRunnerConfig;
+    use ralphmacchio::parallel::scheduler::ParallelRunnerConfig;
 
     let working_dir = dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
     let display_options = build_display_options(cli);
@@ -372,4 +452,202 @@ async fn run_stories(
         )
         .into())
     }
+}
+
+/// Run the codebase audit
+#[allow(clippy::too_many_arguments)]
+async fn run_audit(
+    cli: &Cli,
+    dir: PathBuf,
+    format: AuditOutputFormat,
+    output: Option<PathBuf>,
+    _profile: String,
+    _smart: bool,
+    _no_interactive: bool,
+    generate_prd: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use audit::{
+        AgentContext, AgentContextWriter, AuditReport, InventoryScanner, JsonReportWriter,
+        MarkdownReportWriter, PrdConverter, PrdConverterConfig, PrdGenerator, PrdGeneratorConfig,
+    };
+    use std::time::Instant;
+
+    let start_time = Instant::now();
+
+    // Resolve the target directory
+    let target_dir = if dir.is_absolute() {
+        dir
+    } else {
+        std::env::current_dir()?.join(&dir)
+    };
+
+    if !target_dir.exists() {
+        return Err(format!("Directory not found: {}", target_dir.display()).into());
+    }
+
+    if !cli.quiet {
+        eprintln!("Auditing codebase at: {}", target_dir.display());
+    }
+
+    // Create the audit report
+    let mut report = AuditReport::new(target_dir.clone());
+
+    // Run inventory scan
+    let scanner = InventoryScanner::new(target_dir.clone());
+    report.inventory = scanner.scan()?;
+
+    // Update metadata with duration
+    report.metadata.duration_ms = start_time.elapsed().as_millis() as u64;
+
+    // Generate output based on format
+    match format {
+        AuditOutputFormat::Json => {
+            let json_output = JsonReportWriter::to_json_string(&report)?;
+            write_output(&output, &json_output)?;
+        }
+        AuditOutputFormat::Markdown => {
+            let md_output = MarkdownReportWriter::to_markdown_string(&report);
+            write_output(&output, &md_output)?;
+        }
+        AuditOutputFormat::Context => {
+            // Create a minimal AgentContext from the report
+            let context = AgentContext::new();
+            let ctx_output = AgentContextWriter::generate_patterns_section(&context);
+            write_output(&output, &ctx_output)?;
+        }
+        AuditOutputFormat::All => {
+            // For 'all' format, write to files with appropriate extensions
+            let base_path = output.unwrap_or_else(|| PathBuf::from("audit-report"));
+            let base_stem = base_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("audit-report");
+            let base_dir = base_path.parent().unwrap_or(std::path::Path::new("."));
+
+            // Write JSON
+            let json_path = base_dir.join(format!("{}.json", base_stem));
+            let json_output = JsonReportWriter::to_json_string(&report)?;
+            std::fs::write(&json_path, &json_output)?;
+            if !cli.quiet {
+                eprintln!("Wrote JSON report to: {}", json_path.display());
+            }
+
+            // Write Markdown
+            let md_path = base_dir.join(format!("{}.md", base_stem));
+            let md_output = MarkdownReportWriter::to_markdown_string(&report);
+            std::fs::write(&md_path, &md_output)?;
+            if !cli.quiet {
+                eprintln!("Wrote Markdown report to: {}", md_path.display());
+            }
+
+            // Write Context
+            let ctx_path = base_dir.join(format!("{}.context.md", base_stem));
+            let context = AgentContext::new();
+            let ctx_output = AgentContextWriter::generate_patterns_section(&context);
+            std::fs::write(&ctx_path, &ctx_output)?;
+            if !cli.quiet {
+                eprintln!("Wrote agent context to: {}", ctx_path.display());
+            }
+        }
+    }
+
+    if !cli.quiet {
+        eprintln!("Audit completed in {}ms", start_time.elapsed().as_millis());
+    }
+
+    // Handle PRD generation
+    if generate_prd || should_prompt_for_prd(&report, cli.quiet) {
+        let prd_config = PrdGeneratorConfig::new()
+            .with_skip_prompt(generate_prd) // Skip prompt if --generate-prd flag is set
+            .with_output_dir(target_dir.join("tasks"));
+
+        let generator = PrdGenerator::with_config(prd_config);
+
+        // Prompt user unless --generate-prd flag is set
+        let should_generate = if generate_prd {
+            true
+        } else {
+            generator.prompt_user_confirmation()?
+        };
+
+        if should_generate {
+            let result = generator.generate(&report)?;
+            if !cli.quiet {
+                eprintln!(
+                    "Generated PRD with {} user stories at: {}",
+                    result.story_count,
+                    result.prd_path.display()
+                );
+                eprintln!(
+                    "  - {} from findings, {} from opportunities",
+                    result.findings_converted, result.opportunities_converted
+                );
+            }
+
+            // Convert PRD to prd.json
+            let converter_config = PrdConverterConfig::new()
+                .with_skip_prompt(generate_prd) // Skip prompt if --generate-prd flag is set
+                .with_output_dir(target_dir.clone());
+
+            let converter = PrdConverter::with_config(converter_config);
+
+            // Prompt user unless --generate-prd flag is set
+            let should_convert = if generate_prd {
+                true
+            } else {
+                converter.prompt_user_confirmation()?
+            };
+
+            if should_convert {
+                let convert_result = converter.convert(&result.prd_path)?;
+                if !cli.quiet {
+                    eprintln!(
+                        "Converted PRD to prd.json with {} stories at: {}",
+                        convert_result.story_count,
+                        convert_result.prd_json_path.display()
+                    );
+                    eprintln!(
+                        "  - Project: {}, Branch: {}",
+                        convert_result.project_name, convert_result.branch_name
+                    );
+                    eprintln!("You can now run 'ralph run' to execute the user stories.");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Determine if we should prompt the user about PRD generation
+fn should_prompt_for_prd(report: &audit::AuditReport, quiet: bool) -> bool {
+    // Don't prompt in quiet mode
+    if quiet {
+        return false;
+    }
+
+    // Prompt if there are actionable findings or opportunities
+    let has_findings = report
+        .findings
+        .iter()
+        .any(|f| f.severity >= audit::Severity::Medium);
+    let has_opportunities = !report.opportunities.is_empty();
+
+    has_findings || has_opportunities
+}
+
+/// Write output to file or stdout
+fn write_output(path: &Option<PathBuf>, content: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Write;
+    match path {
+        Some(p) => {
+            std::fs::write(p, content)?;
+        }
+        None => {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            handle.write_all(content.as_bytes())?;
+        }
+    }
+    Ok(())
 }

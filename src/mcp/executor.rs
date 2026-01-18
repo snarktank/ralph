@@ -605,7 +605,7 @@ mod tests {
         let executor = StoryExecutor::new(config, "/tmp/test");
         let gates = executor.gate_names();
         // With minimal profile, should get default gates
-        assert!(gates.contains(&"build".to_string()) || gates.len() >= 1);
+        assert!(gates.contains(&"build".to_string()) || !gates.is_empty());
     }
 
     #[test]
@@ -709,13 +709,12 @@ mod tests {
 
         let mut executor = StoryExecutor::new(config, std::env::current_dir().unwrap());
 
-        let (passed, gate_summaries, duration) = executor.run_iteration(1);
+        let (passed, _gate_summaries, duration) = executor.run_iteration(1);
 
         // With minimal profile (all gates disabled), should pass
         // or get default gates which may or may not pass depending on environment
         assert!(duration.as_nanos() > 0);
-        assert!(gate_summaries.len() >= 0); // May have default gates
-                                            // passed state depends on environment
+        // passed state depends on environment
         let _ = passed;
     }
 }

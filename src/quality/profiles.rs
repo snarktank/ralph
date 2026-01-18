@@ -92,6 +92,86 @@ pub struct BlogConfig {
     pub template: Option<String>,
 }
 
+/// Audit section toggles for a profile.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuditSections {
+    /// Whether to audit code structure
+    #[serde(default = "default_true")]
+    pub structure: bool,
+    /// Whether to audit code patterns
+    #[serde(default = "default_true")]
+    pub patterns: bool,
+    /// Whether to audit API design
+    #[serde(default = "default_true")]
+    pub api: bool,
+    /// Whether to audit dependencies
+    #[serde(default = "default_true")]
+    pub deps: bool,
+    /// Whether to audit tests
+    #[serde(default = "default_true")]
+    pub tests: bool,
+    /// Whether to audit documentation
+    #[serde(default = "default_true")]
+    pub docs: bool,
+    /// Whether to audit architecture
+    #[serde(default = "default_true")]
+    pub arch: bool,
+}
+
+impl Default for AuditSections {
+    fn default() -> Self {
+        Self {
+            structure: true,
+            patterns: true,
+            api: true,
+            deps: true,
+            tests: true,
+            docs: true,
+            arch: true,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Audit configuration for a profile.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AuditConfig {
+    /// Whether auditing is enabled for this profile
+    #[serde(default)]
+    pub enabled: bool,
+    /// Maximum number of critical findings allowed before failing
+    #[serde(default = "default_max_critical")]
+    pub max_critical_findings: u32,
+    /// Maximum number of high-severity findings allowed before failing
+    #[serde(default = "default_max_high")]
+    pub max_high_findings: u32,
+    /// Section toggles for the audit
+    #[serde(default)]
+    pub sections: AuditSections,
+}
+
+impl Default for AuditConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_critical_findings: 0,
+            max_high_findings: 5,
+            sections: AuditSections::default(),
+        }
+    }
+}
+
+fn default_max_critical() -> u32 {
+    0
+}
+
+fn default_max_high() -> u32 {
+    5
+}
+
 /// A quality profile containing all configuration sections.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Profile {
@@ -113,6 +193,9 @@ pub struct Profile {
     /// Blog generation configuration
     #[serde(default)]
     pub blog: BlogConfig,
+    /// Audit configuration
+    #[serde(default)]
+    pub audit: AuditConfig,
 }
 
 /// Errors that can occur when loading quality configuration.
@@ -160,10 +243,10 @@ impl QualityConfig {
     /// # Examples
     ///
     /// ```no_run
-    /// use ralph::quality::QualityConfig;
+    /// use ralphmacchio::quality::QualityConfig;
     ///
     /// let config = QualityConfig::load("quality/ralph-quality.toml")?;
-    /// # Ok::<(), ralph::quality::profiles::QualityConfigError>(())
+    /// # Ok::<(), ralphmacchio::quality::profiles::QualityConfigError>(())
     /// ```
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, QualityConfigError> {
         let path = path.as_ref();
@@ -300,5 +383,154 @@ mod tests {
 
         let err = QualityConfigError::InvalidPath("invalid/path".to_string());
         assert_eq!(err.to_string(), "invalid configuration path: invalid/path");
+    }
+
+    #[test]
+    fn test_audit_config_defaults() {
+        let audit = AuditConfig::default();
+        assert!(!audit.enabled);
+        assert_eq!(audit.max_critical_findings, 0);
+        assert_eq!(audit.max_high_findings, 5);
+
+        // All sections should be enabled by default
+        assert!(audit.sections.structure);
+        assert!(audit.sections.patterns);
+        assert!(audit.sections.api);
+        assert!(audit.sections.deps);
+        assert!(audit.sections.tests);
+        assert!(audit.sections.docs);
+        assert!(audit.sections.arch);
+    }
+
+    #[test]
+    fn test_audit_sections_defaults() {
+        let sections = AuditSections::default();
+        assert!(sections.structure);
+        assert!(sections.patterns);
+        assert!(sections.api);
+        assert!(sections.deps);
+        assert!(sections.tests);
+        assert!(sections.docs);
+        assert!(sections.arch);
+    }
+
+    #[test]
+    fn test_deserialize_audit_config() {
+        let toml_str = r#"
+            [profiles.test]
+            description = "Test profile with audit"
+
+            [profiles.test.audit]
+            enabled = true
+            max_critical_findings = 2
+            max_high_findings = 10
+
+            [profiles.test.audit.sections]
+            structure = true
+            patterns = true
+            api = false
+            deps = true
+            tests = false
+            docs = false
+            arch = true
+        "#;
+
+        let config: QualityConfig = toml::from_str(toml_str).unwrap();
+        let profile = config.get_profile_by_name("test").unwrap();
+
+        assert!(profile.audit.enabled);
+        assert_eq!(profile.audit.max_critical_findings, 2);
+        assert_eq!(profile.audit.max_high_findings, 10);
+
+        assert!(profile.audit.sections.structure);
+        assert!(profile.audit.sections.patterns);
+        assert!(!profile.audit.sections.api);
+        assert!(profile.audit.sections.deps);
+        assert!(!profile.audit.sections.tests);
+        assert!(!profile.audit.sections.docs);
+        assert!(profile.audit.sections.arch);
+    }
+
+    #[test]
+    fn test_load_audit_from_actual_config() {
+        let result = QualityConfig::load("quality/ralph-quality.toml");
+        assert!(result.is_ok(), "Failed to load config: {:?}", result);
+
+        let config = result.unwrap();
+
+        // Verify minimal profile audit settings
+        let minimal = config.get_profile(ProfileLevel::Minimal).unwrap();
+        assert!(!minimal.audit.enabled);
+        assert_eq!(minimal.audit.max_critical_findings, 0);
+        assert_eq!(minimal.audit.max_high_findings, 10);
+        assert!(minimal.audit.sections.structure);
+        assert!(minimal.audit.sections.patterns);
+        assert!(!minimal.audit.sections.api);
+
+        // Verify standard profile audit settings
+        let standard = config.get_profile(ProfileLevel::Standard).unwrap();
+        assert!(standard.audit.enabled);
+        assert_eq!(standard.audit.max_critical_findings, 0);
+        assert_eq!(standard.audit.max_high_findings, 5);
+        assert!(standard.audit.sections.structure);
+        assert!(standard.audit.sections.tests);
+        assert!(!standard.audit.sections.docs);
+
+        // Verify comprehensive profile audit settings
+        let comprehensive = config.get_profile(ProfileLevel::Comprehensive).unwrap();
+        assert!(comprehensive.audit.enabled);
+        assert_eq!(comprehensive.audit.max_critical_findings, 0);
+        assert_eq!(comprehensive.audit.max_high_findings, 0);
+        assert!(comprehensive.audit.sections.structure);
+        assert!(comprehensive.audit.sections.docs);
+        assert!(comprehensive.audit.sections.arch);
+    }
+
+    #[test]
+    fn test_audit_config_without_sections_uses_defaults() {
+        let toml_str = r#"
+            [profiles.test]
+            description = "Test profile with audit but no sections"
+
+            [profiles.test.audit]
+            enabled = true
+            max_critical_findings = 1
+            max_high_findings = 3
+        "#;
+
+        let config: QualityConfig = toml::from_str(toml_str).unwrap();
+        let profile = config.get_profile_by_name("test").unwrap();
+
+        assert!(profile.audit.enabled);
+        assert_eq!(profile.audit.max_critical_findings, 1);
+        assert_eq!(profile.audit.max_high_findings, 3);
+
+        // Sections should use defaults (all true)
+        assert!(profile.audit.sections.structure);
+        assert!(profile.audit.sections.patterns);
+        assert!(profile.audit.sections.api);
+        assert!(profile.audit.sections.deps);
+        assert!(profile.audit.sections.tests);
+        assert!(profile.audit.sections.docs);
+        assert!(profile.audit.sections.arch);
+    }
+
+    #[test]
+    fn test_profile_without_audit_uses_defaults() {
+        let toml_str = r#"
+            [profiles.test]
+            description = "Test profile without audit section"
+
+            [profiles.test.documentation]
+            required = true
+        "#;
+
+        let config: QualityConfig = toml::from_str(toml_str).unwrap();
+        let profile = config.get_profile_by_name("test").unwrap();
+
+        // Audit should use defaults
+        assert!(!profile.audit.enabled);
+        assert_eq!(profile.audit.max_critical_findings, 0);
+        assert_eq!(profile.audit.max_high_findings, 5);
     }
 }

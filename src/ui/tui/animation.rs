@@ -415,6 +415,6 @@ mod tests {
     fn test_pulse() {
         let state = AnimationState::new(60);
         let pulse = state.pulse(60);
-        assert!(pulse >= 0.0 && pulse <= 1.0);
+        assert!((0.0..=1.0).contains(&pulse));
     }
 }
