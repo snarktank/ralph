@@ -10,6 +10,97 @@ use crate::quality::Profile;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::{Duration, Instant};
+
+/// Progress state for a quality gate.
+///
+/// Used in progress callbacks to report gate status changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateProgressState {
+    /// Gate is currently running
+    Running,
+    /// Gate completed successfully
+    Passed,
+    /// Gate failed
+    Failed,
+}
+
+/// Progress update for a quality gate.
+///
+/// Contains information about a gate's current state and duration.
+#[derive(Debug, Clone)]
+pub struct GateProgressUpdate {
+    /// Name of the quality gate
+    pub gate_name: String,
+    /// Current progress state
+    pub state: GateProgressState,
+    /// Duration of the gate execution (only set for Passed/Failed states)
+    pub duration: Option<Duration>,
+}
+
+impl GateProgressUpdate {
+    /// Create a new Running progress update.
+    pub fn running(gate_name: impl Into<String>) -> Self {
+        Self {
+            gate_name: gate_name.into(),
+            state: GateProgressState::Running,
+            duration: None,
+        }
+    }
+
+    /// Create a new Passed progress update with duration.
+    pub fn passed(gate_name: impl Into<String>, duration: Duration) -> Self {
+        Self {
+            gate_name: gate_name.into(),
+            state: GateProgressState::Passed,
+            duration: Some(duration),
+        }
+    }
+
+    /// Create a new Failed progress update with duration.
+    pub fn failed(gate_name: impl Into<String>, duration: Duration) -> Self {
+        Self {
+            gate_name: gate_name.into(),
+            state: GateProgressState::Failed,
+            duration: Some(duration),
+        }
+    }
+
+    /// Check if this is a Running state.
+    pub fn is_running(&self) -> bool {
+        self.state == GateProgressState::Running
+    }
+
+    /// Check if this is a Passed state.
+    pub fn is_passed(&self) -> bool {
+        self.state == GateProgressState::Passed
+    }
+
+    /// Check if this is a Failed state.
+    pub fn is_failed(&self) -> bool {
+        self.state == GateProgressState::Failed
+    }
+
+    /// Check if the gate has completed (Passed or Failed).
+    pub fn is_completed(&self) -> bool {
+        matches!(self.state, GateProgressState::Passed | GateProgressState::Failed)
+    }
+
+    /// Format the duration for display, if available.
+    pub fn format_duration(&self) -> Option<String> {
+        self.duration.map(|d| {
+            if d.as_secs() >= 60 {
+                format!(
+                    "{}m{:.1}s",
+                    d.as_secs() / 60,
+                    (d.as_millis() % 60000) as f64 / 1000.0
+                )
+            } else {
+                format!("{:.1}s", d.as_secs_f64())
+            }
+        })
+    }
+}
 
 /// The result of running a single quality gate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -706,6 +797,94 @@ impl QualityGateChecker {
         ]
     }
 
+    /// Run all quality gates with progress callbacks.
+    ///
+    /// This method runs all configured quality gates and calls the progress
+    /// callback before and after each gate execution:
+    ///
+    /// - Emits `Running` state before each gate starts
+    /// - Emits `Passed` or `Failed` state after each gate completes, with duration
+    ///
+    /// # Arguments
+    ///
+    /// * `callback` - A mutable callback that receives progress updates.
+    ///   The callback signature is `FnMut(&str, GateProgressState)` for simple
+    ///   status tracking, but it also receives duration information via
+    ///   `GateProgressUpdate`.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<GateResult>` containing the results of all gates.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let checker = QualityGateChecker::new(profile, project_root);
+    /// let results = checker.run_all_gates_with_progress(|update| {
+    ///     match update.state {
+    ///         GateProgressState::Running => println!("Starting: {}", update.gate_name),
+    ///         GateProgressState::Passed => println!("Passed: {} ({:?})", update.gate_name, update.duration),
+    ///         GateProgressState::Failed => println!("Failed: {} ({:?})", update.gate_name, update.duration),
+    ///     }
+    /// });
+    /// ```
+    pub fn run_all_gates_with_progress<F>(&self, mut callback: F) -> Vec<GateResult>
+    where
+        F: FnMut(GateProgressUpdate),
+    {
+        let mut results = Vec::new();
+
+        // Run coverage check
+        callback(GateProgressUpdate::running("coverage"));
+        let start = Instant::now();
+        let result = self.check_coverage();
+        let duration = start.elapsed();
+        if result.passed {
+            callback(GateProgressUpdate::passed("coverage", duration));
+        } else {
+            callback(GateProgressUpdate::failed("coverage", duration));
+        }
+        results.push(result);
+
+        // Run lint check
+        callback(GateProgressUpdate::running("lint"));
+        let start = Instant::now();
+        let result = self.check_lint();
+        let duration = start.elapsed();
+        if result.passed {
+            callback(GateProgressUpdate::passed("lint", duration));
+        } else {
+            callback(GateProgressUpdate::failed("lint", duration));
+        }
+        results.push(result);
+
+        // Run format check
+        callback(GateProgressUpdate::running("format"));
+        let start = Instant::now();
+        let result = self.check_format();
+        let duration = start.elapsed();
+        if result.passed {
+            callback(GateProgressUpdate::passed("format", duration));
+        } else {
+            callback(GateProgressUpdate::failed("format", duration));
+        }
+        results.push(result);
+
+        // Run security audit
+        callback(GateProgressUpdate::running("security_audit"));
+        let start = Instant::now();
+        let result = self.check_security_audit();
+        let duration = start.elapsed();
+        if result.passed {
+            callback(GateProgressUpdate::passed("security_audit", duration));
+        } else {
+            callback(GateProgressUpdate::failed("security_audit", duration));
+        }
+        results.push(result);
+
+        results
+    }
+
     /// Check if all gates passed.
     pub fn all_passed(results: &[GateResult]) -> bool {
         results.iter().all(|r| r.passed)
@@ -1339,5 +1518,245 @@ error: critical issue
         assert!(details.contains("unsafe-crate"));
         assert!(details.contains("v3.0.0"));
         assert!(details.contains("high"));
+    }
+
+    // ========================================================================
+    // GateProgressState Tests
+    // ========================================================================
+
+    #[test]
+    fn test_gate_progress_state_equality() {
+        assert_eq!(GateProgressState::Running, GateProgressState::Running);
+        assert_eq!(GateProgressState::Passed, GateProgressState::Passed);
+        assert_eq!(GateProgressState::Failed, GateProgressState::Failed);
+        assert_ne!(GateProgressState::Running, GateProgressState::Passed);
+        assert_ne!(GateProgressState::Passed, GateProgressState::Failed);
+    }
+
+    // ========================================================================
+    // GateProgressUpdate Tests
+    // ========================================================================
+
+    #[test]
+    fn test_gate_progress_update_running() {
+        let update = GateProgressUpdate::running("lint");
+        assert_eq!(update.gate_name, "lint");
+        assert_eq!(update.state, GateProgressState::Running);
+        assert!(update.duration.is_none());
+        assert!(update.is_running());
+        assert!(!update.is_passed());
+        assert!(!update.is_failed());
+        assert!(!update.is_completed());
+    }
+
+    #[test]
+    fn test_gate_progress_update_passed() {
+        let duration = Duration::from_secs_f64(1.5);
+        let update = GateProgressUpdate::passed("format", duration);
+        assert_eq!(update.gate_name, "format");
+        assert_eq!(update.state, GateProgressState::Passed);
+        assert_eq!(update.duration, Some(duration));
+        assert!(!update.is_running());
+        assert!(update.is_passed());
+        assert!(!update.is_failed());
+        assert!(update.is_completed());
+    }
+
+    #[test]
+    fn test_gate_progress_update_failed() {
+        let duration = Duration::from_secs_f64(2.3);
+        let update = GateProgressUpdate::failed("coverage", duration);
+        assert_eq!(update.gate_name, "coverage");
+        assert_eq!(update.state, GateProgressState::Failed);
+        assert_eq!(update.duration, Some(duration));
+        assert!(!update.is_running());
+        assert!(!update.is_passed());
+        assert!(update.is_failed());
+        assert!(update.is_completed());
+    }
+
+    #[test]
+    fn test_gate_progress_update_format_duration_none() {
+        let update = GateProgressUpdate::running("test");
+        assert!(update.format_duration().is_none());
+    }
+
+    #[test]
+    fn test_gate_progress_update_format_duration_seconds() {
+        let update = GateProgressUpdate::passed("test", Duration::from_secs_f64(1.234));
+        let formatted = update.format_duration().unwrap();
+        assert!(formatted.contains("1.2"));
+        assert!(formatted.ends_with('s'));
+    }
+
+    #[test]
+    fn test_gate_progress_update_format_duration_minutes() {
+        let update = GateProgressUpdate::passed("test", Duration::from_secs(125));
+        let formatted = update.format_duration().unwrap();
+        assert!(formatted.contains("2m"));
+    }
+
+    // ========================================================================
+    // run_all_gates_with_progress Tests
+    // ========================================================================
+
+    #[test]
+    fn test_run_all_gates_with_progress_emits_running_first() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        let mut updates: Vec<GateProgressUpdate> = Vec::new();
+        checker.run_all_gates_with_progress(|update| {
+            updates.push(update);
+        });
+
+        // Should have 8 updates (Running + Passed/Failed for each of 4 gates)
+        assert_eq!(updates.len(), 8);
+
+        // First update should be Running for coverage
+        assert!(updates[0].is_running());
+        assert_eq!(updates[0].gate_name, "coverage");
+
+        // Second update should be completed for coverage
+        assert!(updates[1].is_completed());
+        assert_eq!(updates[1].gate_name, "coverage");
+    }
+
+    #[test]
+    fn test_run_all_gates_with_progress_correct_gate_order() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        let mut gate_names: Vec<String> = Vec::new();
+        checker.run_all_gates_with_progress(|update| {
+            if update.is_running() {
+                gate_names.push(update.gate_name.clone());
+            }
+        });
+
+        // Should run gates in order: coverage, lint, format, security_audit
+        assert_eq!(gate_names, vec!["coverage", "lint", "format", "security_audit"]);
+    }
+
+    #[test]
+    fn test_run_all_gates_with_progress_includes_duration() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        let mut completed_updates: Vec<GateProgressUpdate> = Vec::new();
+        checker.run_all_gates_with_progress(|update| {
+            if update.is_completed() {
+                completed_updates.push(update);
+            }
+        });
+
+        // All completed updates should have duration
+        for update in &completed_updates {
+            assert!(update.duration.is_some(), "Gate {} should have duration", update.gate_name);
+            assert!(update.duration.unwrap().as_nanos() > 0, "Duration should be positive");
+        }
+    }
+
+    #[test]
+    fn test_run_all_gates_with_progress_returns_results() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        let mut callback_count = 0;
+        let results = checker.run_all_gates_with_progress(|_| {
+            callback_count += 1;
+        });
+
+        // Should return 4 gate results
+        assert_eq!(results.len(), 4);
+        assert_eq!(results[0].gate_name, "coverage");
+        assert_eq!(results[1].gate_name, "lint");
+        assert_eq!(results[2].gate_name, "format");
+        assert_eq!(results[3].gate_name, "security_audit");
+
+        // Callback should be called 8 times (2 per gate)
+        assert_eq!(callback_count, 8);
+    }
+
+    #[test]
+    fn test_run_all_gates_with_progress_running_before_complete() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        let mut update_sequence: Vec<(String, GateProgressState)> = Vec::new();
+        checker.run_all_gates_with_progress(|update| {
+            update_sequence.push((update.gate_name.clone(), update.state));
+        });
+
+        // For each gate, Running should come before Passed/Failed
+        let gate_order = ["coverage", "lint", "format", "security_audit"];
+        for gate in gate_order {
+            let running_pos = update_sequence
+                .iter()
+                .position(|(name, state)| name == gate && *state == GateProgressState::Running);
+            let complete_pos = update_sequence
+                .iter()
+                .position(|(name, state)| name == gate && matches!(*state, GateProgressState::Passed | GateProgressState::Failed));
+
+            assert!(
+                running_pos.is_some(),
+                "Gate {} should have Running update",
+                gate
+            );
+            assert!(
+                complete_pos.is_some(),
+                "Gate {} should have completed update",
+                gate
+            );
+            assert!(
+                running_pos.unwrap() < complete_pos.unwrap(),
+                "Gate {} Running should come before completed",
+                gate
+            );
+        }
+    }
+
+    #[test]
+    fn test_run_all_gates_with_progress_matches_run_all_results() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        // Get results from run_all
+        let run_all_results = checker.run_all();
+
+        // Get results from run_all_gates_with_progress
+        let progress_results = checker.run_all_gates_with_progress(|_| {});
+
+        // Results should match (same gate names and pass/fail status)
+        assert_eq!(run_all_results.len(), progress_results.len());
+        for (ra, pr) in run_all_results.iter().zip(progress_results.iter()) {
+            assert_eq!(ra.gate_name, pr.gate_name);
+            assert_eq!(ra.passed, pr.passed);
+        }
+    }
+
+    #[test]
+    fn test_run_all_gates_with_progress_state_matches_result() {
+        let profile = create_test_profile(0, false, false, false);
+        let checker = QualityGateChecker::new(profile, "/tmp/test");
+
+        let mut completed_states: std::collections::HashMap<String, GateProgressState> =
+            std::collections::HashMap::new();
+
+        let results = checker.run_all_gates_with_progress(|update| {
+            if update.is_completed() {
+                completed_states.insert(update.gate_name.clone(), update.state);
+            }
+        });
+
+        // Verify that progress state matches result
+        for result in results {
+            let state = completed_states.get(&result.gate_name).unwrap();
+            if result.passed {
+                assert_eq!(*state, GateProgressState::Passed);
+            } else {
+                assert_eq!(*state, GateProgressState::Failed);
+            }
+        }
     }
 }
