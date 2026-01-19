@@ -57,6 +57,8 @@ allow = [
     "MPL-2.0",
     "Unicode-DFS-2016",
     "Unicode-3.0",
+    # CDLA-Permissive-2.0 is used by webpki-roots for root certificate data
+    "CDLA-Permissive-2.0",
 ]
 # License exceptions for specific crates (document why each is needed)
 [[licenses.clarify]]
