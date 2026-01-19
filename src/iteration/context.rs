@@ -165,6 +165,95 @@ impl ApproachHint {
     }
 }
 
+/// User-provided steering guidance for a failing story.
+///
+/// This allows users to provide additional context and instructions
+/// when the system detects that a story is stuck or failing repeatedly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SteeringGuidance {
+    /// Additional context or instructions from the user
+    pub guidance_text: String,
+    /// Optional modified acceptance criteria
+    pub modified_acceptance_criteria: Option<Vec<String>>,
+    /// Files to focus on
+    pub focus_files: Vec<String>,
+    /// Files to avoid modifying
+    pub avoid_files: Vec<String>,
+    /// Quality gates to temporarily relax
+    pub relaxed_gates: Vec<String>,
+    /// When this guidance was provided
+    pub provided_at_iteration: u32,
+}
+
+impl SteeringGuidance {
+    /// Create new steering guidance with just text.
+    pub fn new(guidance_text: impl Into<String>, iteration: u32) -> Self {
+        Self {
+            guidance_text: guidance_text.into(),
+            modified_acceptance_criteria: None,
+            focus_files: Vec::new(),
+            avoid_files: Vec::new(),
+            relaxed_gates: Vec::new(),
+            provided_at_iteration: iteration,
+        }
+    }
+
+    /// Add files to focus on.
+    pub fn with_focus_files(mut self, files: Vec<String>) -> Self {
+        self.focus_files = files;
+        self
+    }
+
+    /// Add files to avoid.
+    pub fn with_avoid_files(mut self, files: Vec<String>) -> Self {
+        self.avoid_files = files;
+        self
+    }
+
+    /// Add gates to relax.
+    pub fn with_relaxed_gates(mut self, gates: Vec<String>) -> Self {
+        self.relaxed_gates = gates;
+        self
+    }
+
+    /// Build a prompt section for this guidance.
+    pub fn build_prompt_section(&self) -> String {
+        let mut section = String::from("\n## User Steering Guidance\n\n");
+        section.push_str(&format!(
+            "The user has reviewed the errors and provided the following guidance:\n\n{}\n\n",
+            self.guidance_text
+        ));
+
+        if let Some(ref criteria) = self.modified_acceptance_criteria {
+            section.push_str("### Updated Acceptance Criteria\n");
+            for (i, criterion) in criteria.iter().enumerate() {
+                section.push_str(&format!("{}. {}\n", i + 1, criterion));
+            }
+            section.push('\n');
+        }
+
+        if !self.focus_files.is_empty() {
+            section.push_str("### Files to Focus On\n");
+            for file in &self.focus_files {
+                section.push_str(&format!("- {}\n", file));
+            }
+            section.push('\n');
+        }
+
+        if !self.avoid_files.is_empty() {
+            section.push_str("### Files to Avoid Modifying\n");
+            for file in &self.avoid_files {
+                section.push_str(&format!("- {}\n", file));
+            }
+            section.push('\n');
+        }
+
+        section.push_str("**IMPORTANT**: Follow the user's guidance carefully and address the specific issues mentioned.\n");
+
+        section
+    }
+}
+
 /// Context that accumulates across iterations to help learning.
 ///
 /// This struct is passed between iterations and accumulates information
@@ -184,6 +273,8 @@ pub struct IterationContext {
     pub max_iterations: u32,
     /// Story ID being executed
     pub story_id: String,
+    /// User-provided steering guidance (if any)
+    pub steering_guidance: Option<SteeringGuidance>,
 }
 
 impl IterationContext {
@@ -196,6 +287,7 @@ impl IterationContext {
             current_iteration: 0,
             max_iterations,
             story_id: story_id.into(),
+            steering_guidance: None,
         }
     }
 
@@ -220,6 +312,11 @@ impl IterationContext {
     /// Add an approach hint.
     pub fn add_hint(&mut self, hint: ApproachHint) {
         self.approach_hints.push(hint);
+    }
+
+    /// Set steering guidance from the user.
+    pub fn set_steering_guidance(&mut self, guidance: SteeringGuidance) {
+        self.steering_guidance = Some(guidance);
     }
 
     /// Get the count of errors by category.
@@ -310,6 +407,11 @@ impl IterationContext {
                     ));
                 }
             }
+        }
+
+        // Add steering guidance if provided
+        if let Some(ref guidance) = self.steering_guidance {
+            context.push_str(&guidance.build_prompt_section());
         }
 
         context.push_str(&format!(

@@ -7,6 +7,7 @@ pub mod audit;
 pub mod checkpoint;
 pub mod error;
 pub mod integrations;
+pub mod interactive_guidance;
 pub mod iteration;
 pub mod logging;
 pub mod mcp;

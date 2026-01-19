@@ -1,363 +1,392 @@
 {
-  "branchName": "feature/error-recovery-system",
-  "description": "Robust error handling, checkpoint/resume, and graceful degradation system for Ralph to handle API rate limits, usage quotas, timeouts, and stalled executions",
   "project": "Ralph",
+  "branchName": "ralph/advanced-scheduling",
+  "description": "Advanced parallel scheduling with soft dependencies, critical path optimization, work-stealing, and speculative execution",
   "userStories": [
     {
-      "acceptanceCriteria": [
-        "Create src/error/mod.rs with module exports",
-        "Create src/error/classification.rs with ErrorCategory enum (Transient, UsageLimit, Fatal, Timeout)",
-        "Define TransientReason, UsageLimitReason, FatalReason, TimeoutReason sub-enums",
-        "Define RecoveryHint enum (RetryNow, RetryAfter, WaitForUser, StopExecution, ResumeFromCheckpoint)",
-        "Define ClassifiedError struct with category, message, recovery_hint, context",
-        "Add pub mod error; to src/lib.rs",
-        "Unit tests for classification types",
-        "Typecheck passes"
-      ],
-      "description": "As a developer, I need error classification types to categorize errors into actionable recovery strategies.",
       "id": "US-001",
-      "notes": "Foundation module - other recovery features depend on this",
-      "passes": true,
+      "title": "Define dependency strength types",
+      "description": "As a developer, I need dependency strength types so that Ralph can classify dependencies by their blocking behavior.",
+      "acceptanceCriteria": [
+        "Create src/parallel/dependency_types.rs module",
+        "Define DependencyStrength enum: Hard, Soft { risk_level: RiskLevel }, Preferred, Optional",
+        "Define RiskLevel enum: Low, Medium, High",
+        "Implement Default for DependencyStrength (returns Hard)",
+        "Implement Display for DependencyStrength and RiskLevel",
+        "Add Serialize/Deserialize derives for all types",
+        "Unit tests for all enum variants",
+        "Typecheck passes"
+      ],
       "priority": 1,
-      "title": "Error classification types and module structure"
+      "passes": false,
+      "notes": "Foundation for soft dependency support"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/error/detector.rs",
-        "Define ErrorPattern struct with regex pattern, category, recovery_hint",
-        "Define ErrorDetector with pre-configured patterns for Claude Code errors",
-        "Detect rate limit patterns: '429', 'rate limit', 'too many requests'",
-        "Detect usage limit patterns: 'plan limit', 'usage limit', 'quota exceeded'",
-        "Detect auth errors: 'unauthorized', 'authentication failed', 'invalid token'",
-        "Implement classify_error() that returns ClassifiedError from text",
-        "Implement classify_exit_code() for timeout detection",
-        "Unit tests for all pattern matching scenarios",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need to detect and classify errors from agent output using pattern matching.",
       "id": "US-002",
-      "notes": "Uses case-insensitive regex matching",
-      "passes": true,
+      "title": "Add strength field to DependencyEdge",
+      "description": "As a developer, I need the dependency graph to store edge strength so that scheduling can use this information.",
+      "acceptanceCriteria": [
+        "Add strength: DependencyStrength field to DependencyEdge in src/parallel/dependency.rs",
+        "Update DependencyEdge::new() to accept optional strength parameter",
+        "Default to Hard when strength not specified",
+        "Update add_dependency() to pass strength through",
+        "Update from_stories() to use Hard for all existing dependencies",
+        "Unit tests for edge strength storage",
+        "Typecheck passes"
+      ],
       "priority": 2,
-      "title": "Error pattern detector for Claude Code errors"
+      "passes": false,
+      "notes": "Backward compatible - existing code defaults to Hard"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/checkpoint/mod.rs with module exports",
-        "Define Checkpoint struct with version, created_at, current_story, pause_reason, uncommitted_files",
-        "Define StoryCheckpoint with story_id, iteration, max_iterations",
-        "Define PauseReason enum (UsageLimitExceeded, RateLimited, UserRequested, Timeout, Error)",
-        "Implement Serialize/Deserialize for all types",
-        "Add pub mod checkpoint; to src/lib.rs",
-        "Unit tests for serialization roundtrip",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want execution state saved to checkpoint file so I can resume after interruptions.",
       "id": "US-003",
-      "notes": "Uses serde_json for persistence",
-      "passes": true,
+      "title": "Extend PRD schema for dependency strength",
+      "description": "As a PRD author, I want to specify dependency strength so that I can express nuanced relationships.",
+      "acceptanceCriteria": [
+        "Update PrdUserStory in src/prd.rs to support dependsOn as Vec<DependencySpec>",
+        "Define DependencySpec enum: Simple(String) for 'US-001', Complex { story, strength, risk } for objects",
+        "Implement custom Deserialize to support both string and object formats",
+        "Validate strength values during parsing",
+        "Update dependency graph builder to extract strength from DependencySpec",
+        "Unit tests for parsing both simple and complex dependency formats",
+        "Typecheck passes"
+      ],
       "priority": 3,
-      "title": "Checkpoint types and save/load functionality"
+      "passes": false,
+      "notes": "String format backward compatible, object format adds strength"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/checkpoint/manager.rs",
-        "Define CheckpointManager with checkpoint_path field",
-        "Implement new() that creates .ralph directory if missing",
-        "Implement save() that writes atomically (temp file then rename)",
-        "Implement load() that reads and deserializes checkpoint",
-        "Implement clear() that removes checkpoint file",
-        "Implement exists() to check for checkpoint presence",
-        "Implement verify() that validates checkpoint version and data",
-        "Handle file not found gracefully in load()",
-        "Unit tests for all operations",
-        "Typecheck passes"
-      ],
-      "description": "As a developer, I need a checkpoint manager to coordinate saving and loading execution state atomically.",
       "id": "US-004",
-      "notes": "Atomic writes prevent corruption on crash",
-      "passes": true,
+      "title": "Implement soft dependency scheduler logic",
+      "description": "As a user, I want Ralph to proceed with soft dependencies so that execution is faster when risk is acceptable.",
+      "acceptanceCriteria": [
+        "Modify get_ready_stories() in src/parallel/dependency.rs",
+        "Hard dependencies block until satisfied",
+        "Soft dependencies allow story to be returned as ready",
+        "Add get_unsatisfied_soft_deps() to return soft deps still in progress",
+        "Preferred dependencies influence sort order but don't block",
+        "Optional dependencies are ignored for scheduling",
+        "Unit tests for each dependency strength behavior",
+        "Typecheck passes"
+      ],
       "priority": 4,
-      "title": "Checkpoint manager with atomic saves"
+      "passes": false,
+      "notes": "Core soft dependency scheduling logic"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/timeout/mod.rs with module exports",
-        "Define TimeoutConfig struct with agent_timeout, iteration_timeout, heartbeat_interval, missed_heartbeats_threshold",
-        "Default agent_timeout: 600 seconds (10 minutes)",
-        "Default iteration_timeout: 900 seconds (15 minutes)",
-        "Default heartbeat_interval: 30 seconds",
-        "Default missed_heartbeats_threshold: 3",
-        "Implement TimeoutConfig::default() with these values",
-        "Add pub mod timeout; to src/lib.rs",
-        "Unit tests for config defaults",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need to timeout agent execution that exceeds time limits.",
       "id": "US-005",
-      "notes": "Configurable via CLI flags",
-      "passes": true,
+      "title": "Track stories with pending soft dependencies",
+      "description": "As a developer, I need to track which stories ran with unsatisfied soft dependencies so that reconciliation knows what to check.",
+      "acceptanceCriteria": [
+        "Add soft_dep_executions: HashMap<String, Vec<String>> to ParallelExecutionState",
+        "Key is story_id, value is list of unsatisfied soft dependency story_ids",
+        "Populate when story starts with pending soft deps",
+        "Clear entry when soft dep completes without conflict",
+        "Provide get_stories_needing_reconciliation() method",
+        "Unit tests for tracking logic",
+        "Typecheck passes"
+      ],
       "priority": 5,
-      "title": "Timeout configuration and wrapper"
+      "passes": false,
+      "notes": "Enables targeted reconciliation after soft dep completion"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/timeout/heartbeat.rs",
-        "Define HeartbeatMonitor struct with config, last_heartbeat, sender/receiver channels",
-        "Implement new() that initializes monitor with TimeoutConfig",
-        "Implement pulse() that updates last_heartbeat timestamp",
-        "Implement start_monitoring() that spawns background task",
-        "Background task checks elapsed time since last heartbeat",
-        "Send warning after missed_heartbeats_threshold - 1 missed beats",
-        "Send stall detection after missed_heartbeats_threshold missed beats",
-        "Implement stop() that terminates background task",
-        "Unit tests for heartbeat detection",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need to detect stalled agents via heartbeat monitoring.",
       "id": "US-006",
-      "notes": "Uses tokio::sync::watch for signaling",
-      "passes": true,
+      "title": "Implement soft dependency reconciliation",
+      "description": "As a user, I want Ralph to reconcile changes when soft dependencies complete so that conflicts are detected.",
+      "acceptanceCriteria": [
+        "Add reconcile_soft_dependency() method to ParallelRunner",
+        "When soft dep story completes, check for file conflicts with dependent stories",
+        "If conflict detected, mark dependent story for re-execution",
+        "If no conflict, continue normally",
+        "Log reconciliation decisions with story IDs",
+        "Add --no-soft-deps CLI flag to disable soft dependency parallelism",
+        "Unit tests for reconciliation scenarios",
+        "Typecheck passes"
+      ],
       "priority": 6,
-      "title": "Heartbeat monitor for stall detection"
+      "passes": false,
+      "notes": "Ensures correctness when soft deps have conflicts"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/pause/mod.rs with module exports",
-        "Define RetryStrategy struct with base_delay, max_delay, max_attempts, jitter_percent",
-        "Implement calculate_delay() with exponential backoff formula",
-        "Default base_delay: 1 second, max_delay: 60 seconds, jitter: 10%",
-        "Implement should_retry() based on attempt count and error category",
-        "Only retry Transient category errors",
-        "Add pub mod pause; to src/lib.rs",
-        "Unit tests for delay calculation and retry logic",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need to retry transient errors with exponential backoff.",
       "id": "US-007",
-      "notes": "Jitter prevents thundering herd",
-      "passes": true,
+      "title": "Create critical path analyzer module",
+      "description": "As a developer, I need critical path analysis to identify the longest execution chain.",
+      "acceptanceCriteria": [
+        "Create src/parallel/critical_path.rs module",
+        "Define CriticalPathAnalyzer struct with reference to DependencyGraph",
+        "Implement calculate_earliest_start() using forward pass",
+        "Implement calculate_latest_start() using backward pass",
+        "Implement calculate_slack() as latest - earliest",
+        "Add pub mod critical_path to src/parallel/mod.rs",
+        "Unit tests for each calculation method",
+        "Typecheck passes"
+      ],
       "priority": 7,
-      "title": "Retry strategy with exponential backoff"
+      "passes": false,
+      "notes": "Foundation for critical path optimization"
     },
     {
-      "acceptanceCriteria": [
-        "Add PauseController struct to src/pause/mod.rs",
-        "Define PauseState enum (Running, PauseRequested, Paused)",
-        "Implement request_pause() that sets PauseRequested state",
-        "Implement is_pause_requested() to check for pending pause",
-        "Implement execute_pause() that transitions to Paused",
-        "Implement resume() that transitions back to Running",
-        "Use Arc<RwLock<PauseState>> for thread-safe access",
-        "Unit tests for state transitions",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want to manually pause execution and resume later.",
       "id": "US-008",
-      "notes": "Pause happens between iterations, not mid-execution",
-      "passes": true,
+      "title": "Implement critical path identification",
+      "description": "As a user, I want to see which stories are on the critical path so that I understand execution bottlenecks.",
+      "acceptanceCriteria": [
+        "Implement get_critical_path() returning Vec<String> of story IDs with zero slack",
+        "Handle graphs with multiple critical paths",
+        "Implement is_critical() to check if specific story is on critical path",
+        "Use default weight of 1.0 for all stories initially",
+        "Add get_path_length() to calculate total critical path duration",
+        "Unit tests for critical path identification",
+        "Typecheck passes"
+      ],
       "priority": 8,
-      "title": "Pause controller for pause/resume state"
+      "passes": false,
+      "notes": "Zero slack stories form the critical path"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/notification/mod.rs with module exports",
-        "Define Notification enum (RateLimited, UsageLimitExceeded, Timeout, Retrying, Paused, Resuming)",
-        "Each variant includes relevant data (countdown, attempt, reason)",
-        "Add pub mod notification; to src/lib.rs",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want clear notifications about errors and recovery actions.",
       "id": "US-009",
-      "notes": "Notifications displayed via RalphDisplay",
-      "passes": true,
+      "title": "Integrate critical path into scheduler priority",
+      "description": "As a user, I want critical path stories prioritized so that total execution time is minimized.",
+      "acceptanceCriteria": [
+        "Calculate critical path in ParallelRunner::run() before execution loop",
+        "Modify story selection in execute_next() to prioritize critical path",
+        "Primary sort: is_critical (true first)",
+        "Secondary sort: explicit priority field",
+        "Tertiary sort: story order in PRD",
+        "Log critical path stories at execution start",
+        "Unit tests for priority ordering",
+        "Typecheck passes"
+      ],
       "priority": 9,
-      "title": "Notification types and renderer"
+      "passes": false,
+      "notes": "Critical path stories should never wait for non-critical"
     },
     {
-      "acceptanceCriteria": [
-        "Create src/notification/renderer.rs",
-        "Define NotificationRenderer with reference to RalphDisplay",
-        "Implement render_rate_limit() with countdown timer display",
-        "Implement render_usage_limit() with action required message",
-        "Implement render_timeout() with checkpoint confirmation",
-        "Implement render_retry() with attempt number and delay",
-        "Implement render_paused() with resume instructions",
-        "Use existing color scheme from src/ui/colors.rs",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want themed notification panels for different error states.",
       "id": "US-010",
-      "notes": "Reuses existing RalphDisplay and color utilities",
-      "passes": true,
+      "title": "Add --show-critical-path CLI flag",
+      "description": "As a user, I want to see critical path analysis without running execution.",
+      "acceptanceCriteria": [
+        "Add --show-critical-path flag to parallel run command",
+        "Display critical path story IDs in order",
+        "Show slack for each story",
+        "Show estimated total duration",
+        "Exit without executing when flag is set",
+        "Typecheck passes"
+      ],
       "priority": 10,
-      "title": "Notification renderer with themed panels"
+      "passes": false,
+      "notes": "Useful for understanding PRD structure"
     },
     {
-      "acceptanceCriteria": [
-        "Add Paused variant to ExecutionState in src/mcp/server.rs",
-        "Paused includes story_id, paused_at, pause_reason",
-        "Add WaitingForRetry variant to ExecutionState",
-        "WaitingForRetry includes story_id, retry_at, attempt, max_attempts",
-        "Update GetStatusResponse to handle new states",
-        "Update state_description() for new states",
-        "Update display.update_from_state() for new states",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need new execution states to represent pause and retry conditions.",
       "id": "US-011",
-      "notes": "Minimal changes to existing state machine",
-      "passes": true,
+      "title": "Create work-stealing scheduler types",
+      "description": "As a developer, I need work-stealing data structures for efficient task distribution.",
+      "acceptanceCriteria": [
+        "Create src/parallel/work_stealing.rs module",
+        "Add crossbeam-deque dependency to Cargo.toml",
+        "Define WorkerQueue using crossbeam_deque::Worker<StoryTask>",
+        "Define StealerHandle using crossbeam_deque::Stealer<StoryTask>",
+        "Define StoryTask struct with story_id and priority",
+        "Define WorkStealingScheduler with worker_count and queues",
+        "Unit tests for queue creation",
+        "Typecheck passes"
+      ],
       "priority": 11,
-      "title": "Extend ExecutionState with Paused and WaitingForRetry"
+      "passes": false,
+      "notes": "Uses crossbeam-deque for lock-free work-stealing"
     },
     {
-      "acceptanceCriteria": [
-        "Add --resume flag to run command in main.rs",
-        "Add --no-resume flag to skip checkpoint prompt",
-        "Add --timeout <seconds> flag for agent timeout override",
-        "Add --no-checkpoint flag to disable checkpointing",
-        "Update run command help text",
-        "Parse flags and pass to runner",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want CLI flags to control resume and timeout behavior.",
       "id": "US-012",
-      "notes": "Follow existing CLI patterns in main.rs",
-      "passes": true,
+      "title": "Implement work-stealing task distribution",
+      "description": "As a developer, I need task distribution logic so that workers can steal from each other.",
+      "acceptanceCriteria": [
+        "Implement distribute_initial() to spread ready stories across workers",
+        "Implement push_task() to add new task to least-loaded worker",
+        "Implement pop_local() for worker to take from own queue (LIFO)",
+        "Implement steal_from() to take from another worker's queue (FIFO)",
+        "Implement try_steal_any() to attempt stealing from random worker",
+        "Add backoff on failed steal attempts",
+        "Unit tests for distribution and stealing",
+        "Typecheck passes"
+      ],
       "priority": 12,
-      "title": "Add --resume and --timeout CLI flags"
+      "passes": false,
+      "notes": "LIFO local, FIFO stealing for cache efficiency"
     },
     {
-      "acceptanceCriteria": [
-        "Add 'status' subcommand to CLI in main.rs",
-        "Display current/last execution state",
-        "Display checkpoint info if present (story, iteration, pause reason, age)",
-        "Display suggested action based on state",
-        "Exit code 0 for idle, 1 for failed, 75 for paused",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want a status command to check execution state without starting a run.",
       "id": "US-013",
-      "notes": "Exit code 75 = EX_TEMPFAIL for temporary failure",
-      "passes": true,
+      "title": "Implement work-stealing worker loop",
+      "description": "As a developer, I need worker tasks that execute stories from their queues.",
+      "acceptanceCriteria": [
+        "Implement spawn_workers() to create tokio tasks for each worker",
+        "Worker loop: pop_local -> try_steal_any -> sleep with backoff",
+        "Pass executor to each worker for story execution",
+        "Handle story completion by notifying dependency tracker",
+        "Implement graceful shutdown via cancellation token",
+        "Unit tests for worker lifecycle",
+        "Typecheck passes"
+      ],
       "priority": 13,
-      "title": "Add ralph status command"
+      "passes": false,
+      "notes": "Workers run until all stories complete or cancelled"
     },
     {
-      "acceptanceCriteria": [
-        "Update runner.rs to accept CheckpointManager",
-        "Save checkpoint before each iteration starts",
-        "Save checkpoint after quality gates complete",
-        "Save checkpoint on any pause or error condition",
-        "Clear checkpoint on successful story completion",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want checkpoints saved automatically during execution.",
       "id": "US-014",
-      "notes": "Checkpoint saved at safe points only",
-      "passes": true,
+      "title": "Integrate work-stealing into parallel runner",
+      "description": "As a user, I want work-stealing scheduling for better performance.",
+      "acceptanceCriteria": [
+        "Add --work-stealing flag to parallel run command",
+        "Add workStealing: bool to prd.json parallel config",
+        "When enabled, use WorkStealingScheduler instead of semaphore",
+        "Default to false for backward compatibility",
+        "Fall back to semaphore if work-stealing initialization fails",
+        "Integration test for work-stealing execution",
+        "Typecheck passes"
+      ],
       "priority": 14,
-      "title": "Integrate checkpoint save into runner loop"
+      "passes": false,
+      "notes": "Opt-in feature, semaphore remains default"
     },
     {
-      "acceptanceCriteria": [
-        "Check for checkpoint in .ralph/checkpoint.json on run command",
-        "Display checkpoint summary (story, iteration, reason, age)",
-        "Prompt user: Resume / Discard / View details",
-        "If --resume flag, auto-resume without prompt",
-        "If --no-resume flag, discard without prompt",
-        "Resume sets execution to continue from checkpoint iteration",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want Ralph to prompt for resume when checkpoint exists.",
       "id": "US-015",
-      "notes": "Interactive prompt using dialoguer or similar",
-      "passes": true,
+      "title": "Implement work-stealing metrics",
+      "description": "As a user, I want to see work-stealing statistics to understand scheduling efficiency.",
+      "acceptanceCriteria": [
+        "Track tasks_executed per worker",
+        "Track steal_attempts and steal_successes",
+        "Calculate steal_ratio (successes / attempts)",
+        "Calculate load_balance (std dev of tasks per worker)",
+        "Display metrics in execution summary when work-stealing enabled",
+        "Log detailed per-worker stats when --verbose",
+        "Unit tests for metrics calculation",
+        "Typecheck passes"
+      ],
       "priority": 15,
-      "title": "Integrate checkpoint resume into runner startup"
+      "passes": false,
+      "notes": "Helps tune worker count"
     },
     {
-      "acceptanceCriteria": [
-        "Update StoryExecutor in src/mcp/tools/executor.rs",
-        "Accept TimeoutConfig in ExecutorConfig",
-        "Wrap execute_agent() with tokio::time::timeout()",
-        "On timeout, save checkpoint before returning error",
-        "Classify timeout as ErrorCategory::Timeout",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need agent execution wrapped with timeout.",
       "id": "US-016",
-      "notes": "Hard timeout prevents infinite hangs",
-      "passes": true,
+      "title": "Create speculative execution types",
+      "description": "As a developer, I need speculative execution types for probabilistic parallelism.",
+      "acceptanceCriteria": [
+        "Create src/parallel/speculative.rs module",
+        "Define IndependenceProbability as f64 wrapper (0.0 to 1.0)",
+        "Define SpeculativeTask with story_id, blocking_story_id, probability",
+        "Define SpeculationOutcome enum: Confirmed, Conflicted, Cancelled",
+        "Define SpeculativeConfig with threshold (default 0.8) and max_concurrent (default 1)",
+        "Unit tests for speculative types",
+        "Typecheck passes"
+      ],
       "priority": 16,
-      "title": "Integrate timeout wrapper into agent executor"
+      "passes": false,
+      "notes": "Foundation for speculative execution"
     },
     {
-      "acceptanceCriteria": [
-        "Start HeartbeatMonitor before agent execution",
-        "Update heartbeat on agent output/activity",
-        "On stall warning, log warning message",
-        "On stall detection, trigger graceful timeout",
-        "Stop monitor after execution completes",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need heartbeat monitoring during agent execution.",
       "id": "US-017",
-      "notes": "Stall detection is softer than hard timeout",
-      "passes": true,
+      "title": "Implement independence probability calculator",
+      "description": "As Ralph, I need to calculate independence probability between story pairs.",
+      "acceptanceCriteria": [
+        "Implement calculate_independence() taking two story IDs",
+        "Factor 1: File pattern overlap (inverse relationship)",
+        "Factor 2: Historical conflict rate between similar stories",
+        "Combine factors with configurable weights (default 0.7 file, 0.3 history)",
+        "Cache probability calculations in HashMap",
+        "Return IndependenceProbability struct",
+        "Unit tests for probability calculation",
+        "Typecheck passes"
+      ],
       "priority": 17,
-      "title": "Integrate heartbeat monitor into agent executor"
+      "passes": false,
+      "notes": "Higher probability = safer to speculate"
     },
     {
-      "acceptanceCriteria": [
-        "After agent execution, classify any error using ErrorDetector",
-        "For Transient errors, apply retry strategy",
-        "For UsageLimit errors, save checkpoint and pause",
-        "For Fatal errors, stop execution with clear message",
-        "For Timeout errors, save checkpoint and report",
-        "Display appropriate notification for each case",
-        "Typecheck passes"
-      ],
-      "description": "As Ralph, I need to classify executor errors and determine recovery action.",
       "id": "US-018",
-      "notes": "Maps classification to recovery action",
-      "passes": true,
-      "priority": 18,
-      "title": "Integrate error classification into executor result handling"
-    },
-    {
+      "title": "Implement speculative execution engine",
+      "description": "As a user, I want Ralph to speculatively execute likely-independent stories.",
       "acceptanceCriteria": [
-        "Add 'p' key handler in src/ui/keyboard.rs",
-        "Call pause_controller.request_pause() on 'p' press",
-        "Display 'Pausing after current iteration...' message",
-        "Ignore 'p' if already paused or pause requested",
-        "Update help display to show 'p' key option",
+        "Implement find_speculative_candidates() to identify high-probability blocked stories",
+        "Implement start_speculative() to begin speculative execution",
+        "Create git stash before speculative execution for rollback",
+        "Track speculative executions in SpeculativeExecutionState",
+        "Implement validate_speculation() called when blocking story completes",
+        "Confirm or rollback based on conflict detection",
+        "Unit tests for speculative execution flow",
         "Typecheck passes"
       ],
-      "description": "As a user, I want to press 'p' to pause execution.",
-      "id": "US-019",
-      "notes": "Pause happens at next safe point, not immediately",
-      "passes": true,
-      "priority": 19,
-      "title": "Add pause key handler to keyboard input"
+      "priority": 18,
+      "passes": false,
+      "notes": "Core speculative execution logic"
     },
     {
+      "id": "US-019",
+      "title": "Implement speculative rollback",
+      "description": "As a developer, I need rollback capability for conflicted speculative work.",
       "acceptanceCriteria": [
-        "Create tests/error_recovery_tests.rs",
-        "Test checkpoint save and load roundtrip",
-        "Test error classification for known patterns",
-        "Test retry backoff calculation",
-        "Test pause controller state transitions",
-        "Test timeout wrapper behavior",
+        "Implement rollback_speculative() method",
+        "Restore from git stash created before speculation",
+        "Clean working directory to pre-speculative state",
+        "Re-queue story for normal execution after dependency",
+        "Log rollback with story IDs and conflict reason",
+        "Handle case where stash apply fails",
+        "Unit tests for rollback scenarios",
+        "Typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "Git stash provides clean rollback mechanism"
+    },
+    {
+      "id": "US-020",
+      "title": "Add speculative execution CLI flags",
+      "description": "As a user, I want CLI control over speculative execution.",
+      "acceptanceCriteria": [
+        "Add --speculative flag to enable speculative execution",
+        "Add --speculation-threshold <0.0-1.0> to set confidence threshold",
+        "Add --max-speculative <N> to limit concurrent speculative tasks",
+        "Add speculativeExecution section to prd.json parallel config",
+        "Document flags in help text",
+        "Typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "Speculative execution is opt-in"
+    },
+    {
+      "id": "US-021",
+      "title": "Implement speculative execution metrics",
+      "description": "As a user, I want to see speculation statistics to understand the risk/reward.",
+      "acceptanceCriteria": [
+        "Track speculations_attempted, confirmed, conflicted, cancelled",
+        "Calculate speculation_success_rate",
+        "Estimate time_saved from successful speculations",
+        "Estimate time_wasted from failed speculations",
+        "Display in execution summary when speculation enabled",
+        "Recommend threshold adjustment if success rate too low/high",
+        "Unit tests for metrics",
+        "Typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": "Helps tune speculation threshold"
+    },
+    {
+      "id": "US-022",
+      "title": "Integration tests for advanced scheduling",
+      "description": "As a developer, I need integration tests to verify all advanced scheduling features work together.",
+      "acceptanceCriteria": [
+        "Create tests/advanced_scheduling_tests.rs",
+        "Test soft dependency allows parallel execution",
+        "Test soft dependency reconciliation on conflict",
+        "Test critical path stories execute first",
+        "Test work-stealing distributes tasks",
+        "Test speculative execution with high probability",
+        "Test speculative rollback on conflict",
         "All tests pass"
       ],
-      "description": "As a developer, I need integration tests to verify the recovery system works end-to-end.",
-      "id": "US-020",
-      "notes": "Uses tests/ directory for integration tests",
-      "passes": true,
-      "priority": 20,
-      "title": "Integration tests for error recovery system"
+      "priority": 22,
+      "passes": false,
+      "notes": "End-to-end validation of all features"
     }
   ]
 }

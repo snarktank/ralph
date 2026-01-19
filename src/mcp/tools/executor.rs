@@ -47,6 +47,8 @@ pub struct ExecutionResult {
     pub futility_verdict: Option<FutilityVerdict>,
     /// Iteration context with error history and learnings
     pub iteration_context: Option<IterationContext>,
+    /// Whether user guidance is needed to continue
+    pub needs_guidance: bool,
 }
 
 /// Error types for story execution
@@ -178,6 +180,41 @@ impl StoryExecutor {
         }
     }
 
+    /// Continue execution of a story with user-provided steering guidance.
+    ///
+    /// This method resumes execution from a previous iteration context,
+    /// incorporating user guidance to help overcome stuck situations.
+    ///
+    /// # Arguments
+    ///
+    /// * `story_id` - The ID of the story to continue
+    /// * `context` - Previous iteration context with error history
+    /// * `guidance` - User-provided steering guidance
+    /// * `cancel_receiver` - Watch channel to check for cancellation
+    /// * `on_iteration` - Callback called after each iteration with (current, max)
+    ///
+    /// # Returns
+    ///
+    /// Result containing the execution result or an error
+    pub async fn continue_with_guidance<F>(
+        &self,
+        story_id: &str,
+        mut context: IterationContext,
+        guidance: crate::iteration::context::SteeringGuidance,
+        cancel_receiver: watch::Receiver<bool>,
+        on_iteration: F,
+    ) -> Result<ExecutionResult, ExecutorError>
+    where
+        F: FnMut(u32, u32),
+    {
+        // Inject the steering guidance into the context
+        context.set_steering_guidance(guidance);
+
+        // Continue execution from current iteration
+        self.execute_story_with_context(story_id, context, cancel_receiver, on_iteration)
+            .await
+    }
+
     /// Execute a single story by ID
     ///
     /// This is the main entry point for story execution. It:
@@ -201,6 +238,26 @@ impl StoryExecutor {
         &self,
         story_id: &str,
         cancel_receiver: watch::Receiver<bool>,
+        on_iteration: F,
+    ) -> Result<ExecutionResult, ExecutorError>
+    where
+        F: FnMut(u32, u32),
+    {
+        // Create new iteration context
+        let iter_context = IterationContext::new(story_id, self.config.max_iterations);
+
+        self.execute_story_with_context(story_id, iter_context, cancel_receiver, on_iteration)
+            .await
+    }
+
+    /// Execute a story with an existing iteration context.
+    ///
+    /// This is the internal method that handles both fresh starts and resumptions.
+    async fn execute_story_with_context<F>(
+        &self,
+        story_id: &str,
+        mut iter_context: IterationContext,
+        cancel_receiver: watch::Receiver<bool>,
         mut on_iteration: F,
     ) -> Result<ExecutionResult, ExecutorError>
     where
@@ -210,8 +267,10 @@ impl StoryExecutor {
         let prd = self.load_prd()?;
         let story = self.find_story(&prd, story_id)?;
 
-        // Initialize iteration context for learning transfer
-        let mut iter_context = IterationContext::new(story_id, self.config.max_iterations);
+        // Update iteration context (may already be initialized if resuming)
+        if iter_context.max_iterations == 0 {
+            iter_context.max_iterations = self.config.max_iterations;
+        }
 
         // Initialize futility detector if enabled
         let futility_detector = if self.config.enable_futility_detection {
@@ -296,13 +355,19 @@ impl StoryExecutor {
                     if let Some(ref detector) = futility_detector {
                         let verdict = detector.analyze(&iter_context);
                         if !verdict.should_continue() {
-                            // Record metrics completion
-                            if let Some(ref collector) = self.config.metrics_collector {
-                                collector.complete_story(
-                                    false,
-                                    execution_start.elapsed(),
-                                    Some(format!("Futile: {:?}", verdict.reason())),
-                                );
+                            // Check if this is a pause for guidance scenario
+                            let needs_guidance =
+                                matches!(verdict, FutilityVerdict::PauseForGuidance { .. });
+
+                            // Record metrics completion (only if not pausing for guidance)
+                            if !needs_guidance {
+                                if let Some(ref collector) = self.config.metrics_collector {
+                                    collector.complete_story(
+                                        false,
+                                        execution_start.elapsed(),
+                                        Some(format!("Futile: {:?}", verdict.reason())),
+                                    );
+                                }
                             }
 
                             return Ok(ExecutionResult {
@@ -312,8 +377,9 @@ impl StoryExecutor {
                                 iterations_used,
                                 gate_results: last_gate_results,
                                 files_changed,
-                                futility_verdict: Some(verdict),
+                                futility_verdict: Some(verdict.clone()),
                                 iteration_context: Some(iter_context),
+                                needs_guidance,
                             });
                         }
                     }
@@ -365,6 +431,7 @@ impl StoryExecutor {
                     files_changed,
                     futility_verdict: None,
                     iteration_context: Some(iter_context),
+                    needs_guidance: false,
                 });
             }
 
@@ -400,13 +467,19 @@ impl StoryExecutor {
             if let Some(ref detector) = futility_detector {
                 let verdict = detector.analyze(&iter_context);
                 if !verdict.should_continue() {
-                    // Record metrics completion
-                    if let Some(ref collector) = self.config.metrics_collector {
-                        collector.complete_story(
-                            false,
-                            execution_start.elapsed(),
-                            Some(format!("Futile: {:?}", verdict.reason())),
-                        );
+                    // Check if this is a pause for guidance scenario
+                    let needs_guidance =
+                        matches!(verdict, FutilityVerdict::PauseForGuidance { .. });
+
+                    // Record metrics completion (only if not pausing for guidance)
+                    if !needs_guidance {
+                        if let Some(ref collector) = self.config.metrics_collector {
+                            collector.complete_story(
+                                false,
+                                execution_start.elapsed(),
+                                Some(format!("Futile: {:?}", verdict.reason())),
+                            );
+                        }
                     }
 
                     return Ok(ExecutionResult {
@@ -416,8 +489,9 @@ impl StoryExecutor {
                         iterations_used,
                         gate_results,
                         files_changed,
-                        futility_verdict: Some(verdict),
+                        futility_verdict: Some(verdict.clone()),
                         iteration_context: Some(iter_context),
+                        needs_guidance,
                     });
                 }
             }
@@ -429,11 +503,141 @@ impl StoryExecutor {
             collector.complete_story(false, execution_start.elapsed(), last_error.clone());
         }
 
-        Err(ExecutorError::AgentError(format!(
-            "Failed after {} iterations. Last error: {}",
+        // Build detailed failure summary
+        let failure_summary = self.build_failure_summary(
+            story_id,
             iterations_used,
-            last_error.unwrap_or_else(|| "Unknown error".to_string())
-        )))
+            &last_error,
+            &iter_context,
+            &last_gate_results,
+        );
+
+        Err(ExecutorError::AgentError(failure_summary))
+    }
+
+    /// Build a detailed failure summary for a story that failed all iterations.
+    ///
+    /// This generates a comprehensive report showing:
+    /// - Overall failure reason
+    /// - Iteration-by-iteration breakdown
+    /// - Error patterns detected
+    /// - Suggested next steps
+    fn build_failure_summary(
+        &self,
+        story_id: &str,
+        iterations_used: u32,
+        last_error: &Option<String>,
+        context: &IterationContext,
+        gate_results: &[GateResult],
+    ) -> String {
+        use crate::iteration::futility::FutileRetryDetector;
+
+        let mut summary = String::new();
+
+        // Header
+        summary.push_str(&format!(
+            "Story {} FAILED after {} iterations\n\n",
+            story_id, iterations_used
+        ));
+
+        // Last error (if available)
+        if let Some(ref err) = last_error {
+            // Strip "Agent execution error:" prefix if present to avoid nesting
+            let clean_error = err.strip_prefix("Agent execution error: ").unwrap_or(err);
+            summary.push_str(&format!("Last Error:\n{}\n\n", clean_error));
+        }
+
+        // Quality gate status
+        if !gate_results.is_empty() {
+            summary.push_str("Quality Gate Results (Last Iteration):\n");
+            for gate in gate_results {
+                let status = if gate.passed { "PASS" } else { "FAIL" };
+                summary.push_str(&format!("  - {}: {}\n", gate.gate_name, status));
+                if !gate.passed {
+                    if let Some(ref details) = gate.details {
+                        // Show first 3 lines of details
+                        let detail_lines: Vec<&str> = details.lines().take(3).collect();
+                        for line in detail_lines {
+                            summary.push_str(&format!("    {}\n", line));
+                        }
+                    }
+                }
+            }
+            summary.push('\n');
+        }
+
+        // Error history breakdown
+        if !context.error_history.is_empty() {
+            summary.push_str("Error History:\n");
+            let error_counts = context.error_count_by_category();
+            for (category, count) in error_counts.iter() {
+                summary.push_str(&format!(
+                    "  - {}: {} occurrence(s)\n",
+                    category.as_str(),
+                    count
+                ));
+            }
+            summary.push('\n');
+
+            // Show last 5 iteration errors
+            summary.push_str("Recent Iteration Errors:\n");
+            for error in context.error_history.iter().rev().take(5).rev() {
+                summary.push_str(&format!(
+                    "  Iteration {}: [{}] {}\n",
+                    error.iteration,
+                    error.category.as_str(),
+                    error.message
+                ));
+                if let Some(ref gate) = error.failed_gate {
+                    summary.push_str(&format!("    Failed gate: {}\n", gate));
+                }
+            }
+            summary.push('\n');
+        }
+
+        // Pattern analysis
+        let detector = FutileRetryDetector::with_config(self.config.futility_config.clone());
+        let pattern_summary = detector.summarize_patterns(context);
+
+        summary.push_str("Pattern Analysis:\n");
+        summary.push_str(&format!(
+            "  - Error rate: {:.0}% ({} errors in {} iterations)\n",
+            pattern_summary.error_rate(),
+            pattern_summary.total_errors,
+            pattern_summary.total_iterations
+        ));
+
+        if let Some((sig, count)) = pattern_summary.most_frequent_error {
+            summary.push_str(&format!("  - Most frequent: '{}' ({} times)\n", sig, count));
+        }
+
+        if pattern_summary.has_oscillation {
+            summary.push_str("  - ⚠ Oscillating errors detected (fixing one breaks another)\n");
+        }
+
+        if pattern_summary.has_stagnation {
+            summary.push_str("  - ⚠ Stagnation detected (same error repeating)\n");
+        }
+
+        summary.push('\n');
+
+        // Suggested next steps
+        summary.push_str("Suggested Next Steps:\n");
+        if pattern_summary.has_oscillation {
+            summary.push_str("  1. Review conflicting requirements that cause oscillation\n");
+            summary.push_str("  2. Address both issues simultaneously rather than sequentially\n");
+        } else if pattern_summary.has_stagnation {
+            summary
+                .push_str("  1. Review the recurring error and provide more specific guidance\n");
+            summary.push_str("  2. Consider breaking down the story into smaller subtasks\n");
+            summary.push_str("  3. Check for missing dependencies or prerequisites\n");
+        } else {
+            summary.push_str("  1. Review the error history to identify root cause\n");
+            summary.push_str("  2. Check if the story requirements are clear and achievable\n");
+            summary.push_str("  3. Consider if quality gates are too strict or misconfigured\n");
+        }
+
+        summary
     }
 
     /// Build an agent prompt that includes iteration context from previous failures.
@@ -560,8 +764,9 @@ impl StoryExecutor {
         let mut stdout_reader = stdout.map(|s| BufReader::new(s).lines());
         let mut stderr_reader = stderr.map(|s| BufReader::new(s).lines());
 
-        // Collect stderr for error reporting
+        // Collect both stdout and stderr for error reporting
         let mut stderr_output = String::new();
+        let mut stdout_output = String::new();
 
         // Track if we received a stall detection
         let mut stall_detected = false;
@@ -609,9 +814,12 @@ impl StoryExecutor {
                     }
                 } => {
                     match line {
-                        Ok(Some(_)) => {
+                        Ok(Some(text)) => {
                             // Activity detected - update heartbeat
                             heartbeat_monitor.pulse().await;
+                            // Collect stdout for error diagnostics
+                            stdout_output.push_str(&text);
+                            stdout_output.push('\n');
                         }
                         Ok(None) => {
                             // EOF on stdout
@@ -657,10 +865,13 @@ impl StoryExecutor {
                             heartbeat_monitor.stop().await;
 
                             if !exit_status.success() {
-                                return Err(ExecutorError::AgentError(format!(
-                                    "{} failed (iteration {}): {}",
-                                    program, iteration, stderr_output.trim()
-                                )));
+                                // Build comprehensive error message from both streams
+                                let error_details = self.build_agent_error_message(
+                                    &stdout_output,
+                                    &stderr_output,
+                                    exit_status.code()
+                                );
+                                return Err(ExecutorError::AgentError(error_details));
                             }
                             // Process completed successfully
                             let files_changed = self.get_changed_files()?;
@@ -704,12 +915,12 @@ impl StoryExecutor {
                         }
 
                         if !exit_status.success() {
-                            return Err(ExecutorError::AgentError(format!(
-                                "{} failed (iteration {}): {}",
-                                program,
-                                iteration,
-                                stderr_output.trim()
-                            )));
+                            let error_details = self.build_agent_error_message(
+                                &stdout_output,
+                                &stderr_output,
+                                exit_status.code(),
+                            );
+                            return Err(ExecutorError::AgentError(error_details));
                         }
 
                         let files_changed = self.get_changed_files()?;
@@ -742,6 +953,84 @@ impl StoryExecutor {
         // Get list of changed files from git
         let files_changed = self.get_changed_files()?;
         Ok(files_changed)
+    }
+
+    /// Build a comprehensive error message from agent output.
+    ///
+    /// Extracts the most relevant error information from stdout and stderr,
+    /// avoiding truncation and providing context.
+    fn build_agent_error_message(
+        &self,
+        stdout: &str,
+        stderr: &str,
+        exit_code: Option<i32>,
+    ) -> String {
+        let mut error_parts = Vec::new();
+
+        // Add exit code
+        if let Some(code) = exit_code {
+            error_parts.push(format!("Exit code: {}", code));
+        }
+
+        // Extract last few lines of stderr (most likely to contain error)
+        let stderr_lines: Vec<&str> = stderr.lines().collect();
+        if !stderr_lines.is_empty() {
+            let relevant_stderr = stderr_lines
+                .iter()
+                .rev()
+                .take(10)
+                .rev()
+                .copied()
+                .collect::<Vec<_>>()
+                .join("\n");
+            if !relevant_stderr.trim().is_empty() {
+                error_parts.push(format!("stderr:\n{}", relevant_stderr.trim()));
+            }
+        }
+
+        // If stderr is empty, check stdout for error indicators
+        if stderr.trim().is_empty() {
+            let stdout_lines: Vec<&str> = stdout.lines().collect();
+            let error_indicators = [
+                "error:", "Error:", "ERROR", "failed", "Failed", "FAILED", "panic",
+            ];
+
+            let relevant_stdout: Vec<&str> = stdout_lines
+                .iter()
+                .rev()
+                .take(20)
+                .rev()
+                .filter(|line| {
+                    error_indicators
+                        .iter()
+                        .any(|indicator| line.contains(indicator))
+                })
+                .copied()
+                .collect();
+
+            if !relevant_stdout.is_empty() {
+                error_parts.push(format!("stdout (errors):\n{}", relevant_stdout.join("\n")));
+            } else if !stdout_lines.is_empty() {
+                // No error indicators, just show last few lines
+                let last_lines = stdout_lines
+                    .iter()
+                    .rev()
+                    .take(5)
+                    .rev()
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                if !last_lines.trim().is_empty() {
+                    error_parts.push(format!("stdout (last lines):\n{}", last_lines.trim()));
+                }
+            }
+        }
+
+        if error_parts.is_empty() {
+            "Agent failed with no output".to_string()
+        } else {
+            error_parts.join("\n\n")
+        }
     }
 
     /// Get the list of files changed according to git

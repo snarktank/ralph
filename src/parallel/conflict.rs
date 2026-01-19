@@ -130,6 +130,7 @@ mod tests {
             files_changed: files.into_iter().map(String::from).collect(),
             futility_verdict: None,
             iteration_context: None,
+            needs_guidance: false,
         }
     }
 
