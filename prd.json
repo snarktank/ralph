@@ -1,12 +1,9 @@
 {
-  "project": "Ralph",
   "branchName": "feature/error-recovery-system",
   "description": "Robust error handling, checkpoint/resume, and graceful degradation system for Ralph to handle API rate limits, usage quotas, timeouts, and stalled executions",
+  "project": "Ralph",
   "userStories": [
     {
-      "id": "US-001",
-      "title": "Error classification types and module structure",
-      "description": "As a developer, I need error classification types to categorize errors into actionable recovery strategies.",
       "acceptanceCriteria": [
         "Create src/error/mod.rs with module exports",
         "Create src/error/classification.rs with ErrorCategory enum (Transient, UsageLimit, Fatal, Timeout)",
@@ -17,14 +14,14 @@
         "Unit tests for classification types",
         "Typecheck passes"
       ],
-      "priority": 1,
+      "description": "As a developer, I need error classification types to categorize errors into actionable recovery strategies.",
+      "id": "US-001",
+      "notes": "Foundation module - other recovery features depend on this",
       "passes": false,
-      "notes": "Foundation module - other recovery features depend on this"
+      "priority": 1,
+      "title": "Error classification types and module structure"
     },
     {
-      "id": "US-002",
-      "title": "Error pattern detector for Claude Code errors",
-      "description": "As Ralph, I need to detect and classify errors from agent output using pattern matching.",
       "acceptanceCriteria": [
         "Create src/error/detector.rs",
         "Define ErrorPattern struct with regex pattern, category, recovery_hint",
@@ -37,14 +34,14 @@
         "Unit tests for all pattern matching scenarios",
         "Typecheck passes"
       ],
-      "priority": 2,
+      "description": "As Ralph, I need to detect and classify errors from agent output using pattern matching.",
+      "id": "US-002",
+      "notes": "Uses case-insensitive regex matching",
       "passes": false,
-      "notes": "Uses case-insensitive regex matching"
+      "priority": 2,
+      "title": "Error pattern detector for Claude Code errors"
     },
     {
-      "id": "US-003",
-      "title": "Checkpoint types and save/load functionality",
-      "description": "As a user, I want execution state saved to checkpoint file so I can resume after interruptions.",
       "acceptanceCriteria": [
         "Create src/checkpoint/mod.rs with module exports",
         "Define Checkpoint struct with version, created_at, current_story, pause_reason, uncommitted_files",
@@ -55,14 +52,14 @@
         "Unit tests for serialization roundtrip",
         "Typecheck passes"
       ],
+      "description": "As a user, I want execution state saved to checkpoint file so I can resume after interruptions.",
+      "id": "US-003",
+      "notes": "Uses serde_json for persistence",
+      "passes": true,
       "priority": 3,
-      "passes": false,
-      "notes": "Uses serde_json for persistence"
+      "title": "Checkpoint types and save/load functionality"
     },
     {
-      "id": "US-004",
-      "title": "Checkpoint manager with atomic saves",
-      "description": "As a developer, I need a checkpoint manager to coordinate saving and loading execution state atomically.",
       "acceptanceCriteria": [
         "Create src/checkpoint/manager.rs",
         "Define CheckpointManager with checkpoint_path field",
@@ -76,14 +73,14 @@
         "Unit tests for all operations",
         "Typecheck passes"
       ],
-      "priority": 4,
+      "description": "As a developer, I need a checkpoint manager to coordinate saving and loading execution state atomically.",
+      "id": "US-004",
+      "notes": "Atomic writes prevent corruption on crash",
       "passes": false,
-      "notes": "Atomic writes prevent corruption on crash"
+      "priority": 4,
+      "title": "Checkpoint manager with atomic saves"
     },
     {
-      "id": "US-005",
-      "title": "Timeout configuration and wrapper",
-      "description": "As Ralph, I need to timeout agent execution that exceeds time limits.",
       "acceptanceCriteria": [
         "Create src/timeout/mod.rs with module exports",
         "Define TimeoutConfig struct with agent_timeout, iteration_timeout, heartbeat_interval, missed_heartbeats_threshold",
@@ -96,14 +93,14 @@
         "Unit tests for config defaults",
         "Typecheck passes"
       ],
-      "priority": 5,
+      "description": "As Ralph, I need to timeout agent execution that exceeds time limits.",
+      "id": "US-005",
+      "notes": "Configurable via CLI flags",
       "passes": false,
-      "notes": "Configurable via CLI flags"
+      "priority": 5,
+      "title": "Timeout configuration and wrapper"
     },
     {
-      "id": "US-006",
-      "title": "Heartbeat monitor for stall detection",
-      "description": "As Ralph, I need to detect stalled agents via heartbeat monitoring.",
       "acceptanceCriteria": [
         "Create src/timeout/heartbeat.rs",
         "Define HeartbeatMonitor struct with config, last_heartbeat, sender/receiver channels",
@@ -117,14 +114,14 @@
         "Unit tests for heartbeat detection",
         "Typecheck passes"
       ],
-      "priority": 6,
+      "description": "As Ralph, I need to detect stalled agents via heartbeat monitoring.",
+      "id": "US-006",
+      "notes": "Uses tokio::sync::watch for signaling",
       "passes": false,
-      "notes": "Uses tokio::sync::watch for signaling"
+      "priority": 6,
+      "title": "Heartbeat monitor for stall detection"
     },
     {
-      "id": "US-007",
-      "title": "Retry strategy with exponential backoff",
-      "description": "As Ralph, I need to retry transient errors with exponential backoff.",
       "acceptanceCriteria": [
         "Create src/pause/mod.rs with module exports",
         "Define RetryStrategy struct with base_delay, max_delay, max_attempts, jitter_percent",
@@ -136,14 +133,14 @@
         "Unit tests for delay calculation and retry logic",
         "Typecheck passes"
       ],
-      "priority": 7,
+      "description": "As Ralph, I need to retry transient errors with exponential backoff.",
+      "id": "US-007",
+      "notes": "Jitter prevents thundering herd",
       "passes": false,
-      "notes": "Jitter prevents thundering herd"
+      "priority": 7,
+      "title": "Retry strategy with exponential backoff"
     },
     {
-      "id": "US-008",
-      "title": "Pause controller for pause/resume state",
-      "description": "As a user, I want to manually pause execution and resume later.",
       "acceptanceCriteria": [
         "Add PauseController struct to src/pause/mod.rs",
         "Define PauseState enum (Running, PauseRequested, Paused)",
@@ -155,14 +152,14 @@
         "Unit tests for state transitions",
         "Typecheck passes"
       ],
-      "priority": 8,
+      "description": "As a user, I want to manually pause execution and resume later.",
+      "id": "US-008",
+      "notes": "Pause happens between iterations, not mid-execution",
       "passes": false,
-      "notes": "Pause happens between iterations, not mid-execution"
+      "priority": 8,
+      "title": "Pause controller for pause/resume state"
     },
     {
-      "id": "US-009",
-      "title": "Notification types and renderer",
-      "description": "As a user, I want clear notifications about errors and recovery actions.",
       "acceptanceCriteria": [
         "Create src/notification/mod.rs with module exports",
         "Define Notification enum (RateLimited, UsageLimitExceeded, Timeout, Retrying, Paused, Resuming)",
@@ -170,14 +167,14 @@
         "Add pub mod notification; to src/lib.rs",
         "Typecheck passes"
       ],
-      "priority": 9,
+      "description": "As a user, I want clear notifications about errors and recovery actions.",
+      "id": "US-009",
+      "notes": "Notifications displayed via RalphDisplay",
       "passes": false,
-      "notes": "Notifications displayed via RalphDisplay"
+      "priority": 9,
+      "title": "Notification types and renderer"
     },
     {
-      "id": "US-010",
-      "title": "Notification renderer with themed panels",
-      "description": "As a user, I want themed notification panels for different error states.",
       "acceptanceCriteria": [
         "Create src/notification/renderer.rs",
         "Define NotificationRenderer with reference to RalphDisplay",
@@ -189,14 +186,14 @@
         "Use existing color scheme from src/ui/colors.rs",
         "Typecheck passes"
       ],
-      "priority": 10,
+      "description": "As a user, I want themed notification panels for different error states.",
+      "id": "US-010",
+      "notes": "Reuses existing RalphDisplay and color utilities",
       "passes": false,
-      "notes": "Reuses existing RalphDisplay and color utilities"
+      "priority": 10,
+      "title": "Notification renderer with themed panels"
     },
     {
-      "id": "US-011",
-      "title": "Extend ExecutionState with Paused and WaitingForRetry",
-      "description": "As Ralph, I need new execution states to represent pause and retry conditions.",
       "acceptanceCriteria": [
         "Add Paused variant to ExecutionState in src/mcp/server.rs",
         "Paused includes story_id, paused_at, pause_reason",
@@ -207,14 +204,14 @@
         "Update display.update_from_state() for new states",
         "Typecheck passes"
       ],
-      "priority": 11,
+      "description": "As Ralph, I need new execution states to represent pause and retry conditions.",
+      "id": "US-011",
+      "notes": "Minimal changes to existing state machine",
       "passes": false,
-      "notes": "Minimal changes to existing state machine"
+      "priority": 11,
+      "title": "Extend ExecutionState with Paused and WaitingForRetry"
     },
     {
-      "id": "US-012",
-      "title": "Add --resume and --timeout CLI flags",
-      "description": "As a user, I want CLI flags to control resume and timeout behavior.",
       "acceptanceCriteria": [
         "Add --resume flag to run command in main.rs",
         "Add --no-resume flag to skip checkpoint prompt",
@@ -224,14 +221,14 @@
         "Parse flags and pass to runner",
         "Typecheck passes"
       ],
-      "priority": 12,
+      "description": "As a user, I want CLI flags to control resume and timeout behavior.",
+      "id": "US-012",
+      "notes": "Follow existing CLI patterns in main.rs",
       "passes": false,
-      "notes": "Follow existing CLI patterns in main.rs"
+      "priority": 12,
+      "title": "Add --resume and --timeout CLI flags"
     },
     {
-      "id": "US-013",
-      "title": "Add ralph status command",
-      "description": "As a user, I want a status command to check execution state without starting a run.",
       "acceptanceCriteria": [
         "Add 'status' subcommand to CLI in main.rs",
         "Display current/last execution state",
@@ -240,14 +237,14 @@
         "Exit code 0 for idle, 1 for failed, 75 for paused",
         "Typecheck passes"
       ],
-      "priority": 13,
+      "description": "As a user, I want a status command to check execution state without starting a run.",
+      "id": "US-013",
+      "notes": "Exit code 75 = EX_TEMPFAIL for temporary failure",
       "passes": false,
-      "notes": "Exit code 75 = EX_TEMPFAIL for temporary failure"
+      "priority": 13,
+      "title": "Add ralph status command"
     },
     {
-      "id": "US-014",
-      "title": "Integrate checkpoint save into runner loop",
-      "description": "As a user, I want checkpoints saved automatically during execution.",
       "acceptanceCriteria": [
         "Update runner.rs to accept CheckpointManager",
         "Save checkpoint before each iteration starts",
@@ -256,14 +253,14 @@
         "Clear checkpoint on successful story completion",
         "Typecheck passes"
       ],
-      "priority": 14,
+      "description": "As a user, I want checkpoints saved automatically during execution.",
+      "id": "US-014",
+      "notes": "Checkpoint saved at safe points only",
       "passes": false,
-      "notes": "Checkpoint saved at safe points only"
+      "priority": 14,
+      "title": "Integrate checkpoint save into runner loop"
     },
     {
-      "id": "US-015",
-      "title": "Integrate checkpoint resume into runner startup",
-      "description": "As a user, I want Ralph to prompt for resume when checkpoint exists.",
       "acceptanceCriteria": [
         "Check for checkpoint in .ralph/checkpoint.json on run command",
         "Display checkpoint summary (story, iteration, reason, age)",
@@ -273,14 +270,14 @@
         "Resume sets execution to continue from checkpoint iteration",
         "Typecheck passes"
       ],
-      "priority": 15,
+      "description": "As a user, I want Ralph to prompt for resume when checkpoint exists.",
+      "id": "US-015",
+      "notes": "Interactive prompt using dialoguer or similar",
       "passes": false,
-      "notes": "Interactive prompt using dialoguer or similar"
+      "priority": 15,
+      "title": "Integrate checkpoint resume into runner startup"
     },
     {
-      "id": "US-016",
-      "title": "Integrate timeout wrapper into agent executor",
-      "description": "As Ralph, I need agent execution wrapped with timeout.",
       "acceptanceCriteria": [
         "Update StoryExecutor in src/mcp/tools/executor.rs",
         "Accept TimeoutConfig in ExecutorConfig",
@@ -289,14 +286,14 @@
         "Classify timeout as ErrorCategory::Timeout",
         "Typecheck passes"
       ],
-      "priority": 16,
+      "description": "As Ralph, I need agent execution wrapped with timeout.",
+      "id": "US-016",
+      "notes": "Hard timeout prevents infinite hangs",
       "passes": false,
-      "notes": "Hard timeout prevents infinite hangs"
+      "priority": 16,
+      "title": "Integrate timeout wrapper into agent executor"
     },
     {
-      "id": "US-017",
-      "title": "Integrate heartbeat monitor into agent executor",
-      "description": "As Ralph, I need heartbeat monitoring during agent execution.",
       "acceptanceCriteria": [
         "Start HeartbeatMonitor before agent execution",
         "Update heartbeat on agent output/activity",
@@ -305,14 +302,14 @@
         "Stop monitor after execution completes",
         "Typecheck passes"
       ],
-      "priority": 17,
+      "description": "As Ralph, I need heartbeat monitoring during agent execution.",
+      "id": "US-017",
+      "notes": "Stall detection is softer than hard timeout",
       "passes": false,
-      "notes": "Stall detection is softer than hard timeout"
+      "priority": 17,
+      "title": "Integrate heartbeat monitor into agent executor"
     },
     {
-      "id": "US-018",
-      "title": "Integrate error classification into executor result handling",
-      "description": "As Ralph, I need to classify executor errors and determine recovery action.",
       "acceptanceCriteria": [
         "After agent execution, classify any error using ErrorDetector",
         "For Transient errors, apply retry strategy",
@@ -322,14 +319,14 @@
         "Display appropriate notification for each case",
         "Typecheck passes"
       ],
-      "priority": 18,
+      "description": "As Ralph, I need to classify executor errors and determine recovery action.",
+      "id": "US-018",
+      "notes": "Maps classification to recovery action",
       "passes": false,
-      "notes": "Maps classification to recovery action"
+      "priority": 18,
+      "title": "Integrate error classification into executor result handling"
     },
     {
-      "id": "US-019",
-      "title": "Add pause key handler to keyboard input",
-      "description": "As a user, I want to press 'p' to pause execution.",
       "acceptanceCriteria": [
         "Add 'p' key handler in src/ui/keyboard.rs",
         "Call pause_controller.request_pause() on 'p' press",
@@ -338,14 +335,14 @@
         "Update help display to show 'p' key option",
         "Typecheck passes"
       ],
-      "priority": 19,
+      "description": "As a user, I want to press 'p' to pause execution.",
+      "id": "US-019",
+      "notes": "Pause happens at next safe point, not immediately",
       "passes": false,
-      "notes": "Pause happens at next safe point, not immediately"
+      "priority": 19,
+      "title": "Add pause key handler to keyboard input"
     },
     {
-      "id": "US-020",
-      "title": "Integration tests for error recovery system",
-      "description": "As a developer, I need integration tests to verify the recovery system works end-to-end.",
       "acceptanceCriteria": [
         "Create tests/error_recovery_tests.rs",
         "Test checkpoint save and load roundtrip",
@@ -355,9 +352,12 @@
         "Test timeout wrapper behavior",
         "All tests pass"
       ],
-      "priority": 20,
+      "description": "As a developer, I need integration tests to verify the recovery system works end-to-end.",
+      "id": "US-020",
+      "notes": "Uses tests/ directory for integration tests",
       "passes": false,
-      "notes": "Uses tests/ directory for integration tests"
+      "priority": 20,
+      "title": "Integration tests for error recovery system"
     }
   ]
 }
