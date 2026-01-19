@@ -207,7 +207,7 @@
       "description": "As Ralph, I need new execution states to represent pause and retry conditions.",
       "id": "US-011",
       "notes": "Minimal changes to existing state machine",
-      "passes": false,
+      "passes": true,
       "priority": 11,
       "title": "Extend ExecutionState with Paused and WaitingForRetry"
     },

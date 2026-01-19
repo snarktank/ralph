@@ -134,3 +134,20 @@ Feature: Error Recovery System
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
+
+## 2026-01-18 21:05 - US-011
+- **What was implemented**: Extend ExecutionState with Paused and WaitingForRetry
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/main.rs
+  - rc/mcp/resources/mod.rs
+  - rc/mcp/server.rs
+  - rc/mcp/tools/get_status.rs
+  - rc/mcp/tools/stop_execution.rs
+  - rc/runner.rs
+  - rc/ui/display.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
