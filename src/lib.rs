@@ -4,12 +4,19 @@
 //! and potential use as a library.
 
 pub mod audit;
+pub mod checkpoint;
+pub mod error;
 pub mod integrations;
+pub mod iteration;
 pub mod logging;
 pub mod mcp;
+pub mod metrics;
+pub mod notification;
 pub mod parallel;
+pub mod pause;
 pub mod quality;
 pub mod runner;
+pub mod timeout;
 pub mod ui;
 
 /// Returns a greeting message.

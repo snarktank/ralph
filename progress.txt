@@ -1,6 +1,6 @@
 # Ralph Progress Log
 Started: Sat Jan 18 2026
-Feature: Codebase Audit
+Feature: Error Recovery System
 ---
 
 ## Codebase Patterns
@@ -9,439 +9,244 @@ Feature: Codebase Audit
 - Error handling uses `thiserror` crate with custom error enums
 - MCP tools follow pattern in `src/mcp/tools/` with JSON schema derive
 - Quality gates defined in `src/quality/` with profile-based configuration
-- Skills are markdown files in `skills/<skill-name>/SKILL.md`
+- Recovery module goes in `src/recovery/` following audit module pattern
+- Checkpoint files stored in `.ralph/` directory
 
 ---
 
 
-## 2026-01-18 11:26 - US-001
-- **What was implemented**: Create audit module structure
+## 2026-01-18 19:45 - US-003
+- **What was implemented**: Checkpoint types and save/load functionality
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/lib.rs
+  - src/checkpoint/
+  - src/error/
+  - tasks/prd-error-recovery-system.md
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 19:45 - US-001
+- **What was implemented**: Error classification types and module structure
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 19:49 - US-002
+- **What was implemented**: Error pattern detector for Claude Code errors
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/error/mod.rs
+  - src/error/detector.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 19:51 - US-005
+- **What was implemented**: Timeout configuration and wrapper
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/lib.rs
+  - src/checkpoint/manager.rs
+  - src/timeout/
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 19:52 - US-004
+- **What was implemented**: Checkpoint manager with atomic saves
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/checkpoint/manager.rs
+  - rc/checkpoint/mod.rs
+  - rc/timeout/mod.rs
+  - src/timeout/heartbeat.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 20:00 - US-008
+- **What was implemented**: Pause controller for pause/resume state
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/lib.rs
+  - src/pause/
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 20:03 - US-007
+- **What was implemented**: Retry strategy with exponential backoff
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/pause/mod.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 20:54 - US-006
+- **What was implemented**: Heartbeat monitor for stall detection
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - src/notification/
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 20:55 - US-009
+- **What was implemented**: Notification types and renderer
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/lib.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 20:59 - US-010
+- **What was implemented**: Notification renderer with themed panels
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/notification/mod.rs
+  - src/notification/renderer.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 21:05 - US-011
+- **What was implemented**: Extend ExecutionState with Paused and WaitingForRetry
 - **Files changed**:
   - rd.json
   - rogress.txt
   - rc/main.rs
-  - src/audit/
-  - tasks/prd-codebase-audit.md
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:30 - US-002
-- **What was implemented**: Implement file inventory scanner
-- **Files changed**:
-  - argo.lock
-  - argo.toml
-  - rd.json
-  - rogress.txt
-  - rc/audit/inventory.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:33 - US-003
-- **What was implemented**: Implement language detection
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/languages.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:36 - US-004
-- **What was implemented**: Implement dependency parser
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/dependencies.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:40 - US-005
-- **What was implemented**: Implement code pattern detection
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/patterns.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:44 - US-006
-- **What was implemented**: Implement architecture analysis
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/architecture.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:50 - US-007
-- **What was implemented**: Implement API inventory
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/api.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 11:54 - US-008
-- **What was implemented**: Implement test coverage analysis
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/testing.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:00 - US-009
-- **What was implemented**: Implement documentation gap detection
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/documentation.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:07 - US-010
-- **What was implemented**: Implement architecture gap detector
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/detectors/
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:11 - US-011
-- **What was implemented**: Implement opportunity detector
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/detectors/mod.rs
-  - rc/audit/mod.rs
-  - src/audit/detectors/opportunities.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:16 - US-012
-- **What was implemented**: Implement technical debt detector
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/detectors/mod.rs
-  - rc/audit/mod.rs
-  - src/audit/detectors/tech_debt.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:19 - US-013
-- **What was implemented**: Implement JSON report output
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/output/
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:22 - US-014
-- **What was implemented**: Implement markdown report output
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - rc/audit/output/mod.rs
-  - src/audit/output/markdown.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:28 - US-015
-- **What was implemented**: Implement agent context output
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - rc/audit/output/mod.rs
-  - src/audit/output/agent_context.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:32 - US-016
-- **What was implemented**: Add audit CLI subcommand
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/main.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:37 - US-017
-- **What was implemented**: Implement interactive Q&A flow
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - src/audit/interactive.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:42 - US-018
-- **What was implemented**: Implement audit-to-PRD generation
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - rc/main.rs
-  - src/audit/prd_generator.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:47 - US-019
-- **What was implemented**: Implement PRD-to-prd.json conversion
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - rc/audit/mod.rs
-  - rc/main.rs
-  - src/audit/prd_converter.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:50 - US-020
-- **What was implemented**: Create /audit skill for Claude Code
-- **Files changed**:
-  - rd.json
-  - rogress.txt
-  - skills/audit/
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 12:54 - US-021
-- **What was implemented**: Implement start_audit MCP tool
-- **Files changed**:
-  - rd.json
-  - rogress.txt
+  - rc/mcp/resources/mod.rs
   - rc/mcp/server.rs
-  - rc/mcp/tools/mod.rs
-  - src/mcp/tools/audit.rs
+  - rc/mcp/tools/get_status.rs
+  - rc/mcp/tools/stop_execution.rs
+  - rc/runner.rs
+  - rc/ui/display.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 12:59 - US-022
-- **What was implemented**: Implement get_audit_status MCP tool
+## 2026-01-18 21:05 - US-013
+- **What was implemented**: Add ralph status command
 - **Files changed**:
   - rd.json
   - rogress.txt
-  - rc/mcp/server.rs
-  - rc/mcp/tools/audit.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 13:05 - US-023
-- **What was implemented**: Implement get_audit_results MCP tool
+## 2026-01-18 21:05 - US-012
+- **What was implemented**: Add --resume and --timeout CLI flags
 - **Files changed**:
   - rd.json
   - rogress.txt
-  - rc/mcp/server.rs
-  - rc/mcp/tools/audit.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 13:10 - US-024
-- **What was implemented**: Implement generate_prd_from_audit MCP tool
+## 2026-01-18 21:08 - US-014
+- **What was implemented**: Integrate checkpoint save into runner loop
 - **Files changed**:
   - rd.json
   - rogress.txt
-  - rc/mcp/server.rs
-  - rc/mcp/tools/audit.rs
+  - rc/mcp/tools/executor.rs
+  - rc/runner.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 13:14 - US-025
-- **What was implemented**: Add audit settings to quality profiles
-- **Files changed**:
-  - rogress.txt
-  - uality/ralph-quality.toml
-  - rc/quality/mod.rs
-  - rc/quality/profiles.rs
-  - ests/fixtures/test_quality_config.toml
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 13:25 - US-026
-- **What was implemented**: Integration test on Ralph's own codebase
+## 2026-01-18 21:09 - US-016
+- **What was implemented**: Integrate timeout wrapper into agent executor
 - **Files changed**:
   - rd.json
   - rogress.txt
-  - rc/audit/interactive.rs
-  - rc/audit/inventory.rs
-  - rc/main.rs
-  - rc/mcp/executor.rs
-  - rc/ui/help.rs
-  - rc/ui/tui/animation.rs
-  - src/lib.rs
-  - tests/audit_integration_tests.rs
+  - rc/runner.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 18:15 - US-001
-- **What was implemented**: Create parallel UI event system
+## 2026-01-18 21:12 - US-015
+- **What was implemented**: Integrate checkpoint resume into runner startup
 - **Files changed**:
-  - rc/ui/mod.rs
-  - src/ui/parallel_events.rs
-  - tasks/prd-parallel-ux.md
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:19 - US-002
-- **What was implemented**: Create parallel display controller
-- **Files changed**:
+  - rd.json
   - rogress.txt
-  - rc/ui/mod.rs
-  - src/ui/parallel_display.rs
+  - rc/runner.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 18:21 - US-009
-- **What was implemented**: Update module exports
+## 2026-01-18 21:15 - US-019
+- **What was implemented**: Add pause key handler to keyboard input
 - **Files changed**:
+  - rd.json
   - rogress.txt
-  - rc/parallel/mod.rs
-  - rc/ui/mod.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:22 - US-003
-- **What was implemented**: Implement story lifecycle display methods
-- **Files changed**:
-  - rogress.txt
-  - rc/ui/parallel_display.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:27 - US-004
-- **What was implemented**: Implement header and status sections
-- **Files changed**:
-  - rogress.txt
-  - rc/ui/mod.rs
-  - src/ui/parallel_status.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:32 - US-005
-- **What was implemented**: Add event channel to scheduler
-- **Files changed**:
-  - rogress.txt
-  - rc/parallel/scheduler.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:36 - US-006
-- **What was implemented**: Replace eprintln with UI events in scheduler
-- **Files changed**:
-  - rogress.txt
-  - rc/parallel/scheduler.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:40 - US-007
-- **What was implemented**: Implement iteration progress callbacks
-- **Files changed**:
-  - rogress.txt
-  - rc/parallel/scheduler.rs
-  - rc/ui/parallel_display.rs
-- **Iterations used**: 1
-- **Learnings for future iterations:**
-- Story completed successfully via automated execution
----
-
-## 2026-01-18 18:45 - US-008
-- **What was implemented**: Integrate keyboard listener
-- **Files changed**:
-  - rogress.txt
-  - rc/parallel/scheduler.rs
+  - rc/mcp/tools/executor.rs
   - rc/ui/keyboard.rs
-  - rc/ui/parallel_events.rs
-  - rc/ui/parallel_status.rs
+  - rc/ui/tui_runner.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
 
-## 2026-01-18 18:50 - US-010
-- **What was implemented**: Support quiet mode and display options
+## 2026-01-18 21:17 - US-017
+- **What was implemented**: Integrate heartbeat monitor into agent executor
 - **Files changed**:
+  - rd.json
   - rogress.txt
-  - rc/parallel/scheduler.rs
-  - rc/ui/parallel_display.rs
+  - rc/mcp/tools/executor.rs
+  - rc/runner.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 21:18 - US-018
+- **What was implemented**: Integrate error classification into executor result handling
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---
+
+## 2026-01-18 21:23 - US-020
+- **What was implemented**: Integration tests for error recovery system
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - tests/error_recovery_tests.rs
 - **Iterations used**: 1
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution

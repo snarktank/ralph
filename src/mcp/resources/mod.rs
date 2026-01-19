@@ -77,6 +77,16 @@ pub struct StatusResource {
     pub commit_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paused_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pause_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_attempts: Option<u32>,
 }
 
 impl StatusResource {
@@ -92,6 +102,11 @@ impl StatusResource {
                 progress_percent: None,
                 commit_hash: None,
                 error: None,
+                paused_at: None,
+                pause_reason: None,
+                retry_at: None,
+                attempt: None,
+                max_attempts: None,
             },
             ExecutionState::Running {
                 story_id,
@@ -113,6 +128,11 @@ impl StatusResource {
                     progress_percent: Some(progress),
                     commit_hash: None,
                     error: None,
+                    paused_at: None,
+                    pause_reason: None,
+                    retry_at: None,
+                    attempt: None,
+                    max_attempts: None,
                 }
             }
             ExecutionState::Completed {
@@ -127,6 +147,11 @@ impl StatusResource {
                 progress_percent: Some(100),
                 commit_hash: commit_hash.clone(),
                 error: None,
+                paused_at: None,
+                pause_reason: None,
+                retry_at: None,
+                attempt: None,
+                max_attempts: None,
             },
             ExecutionState::Failed { story_id, error } => StatusResource {
                 state: "failed".to_string(),
@@ -137,6 +162,50 @@ impl StatusResource {
                 progress_percent: None,
                 commit_hash: None,
                 error: Some(error.clone()),
+                paused_at: None,
+                pause_reason: None,
+                retry_at: None,
+                attempt: None,
+                max_attempts: None,
+            },
+            ExecutionState::Paused {
+                story_id,
+                paused_at,
+                pause_reason,
+            } => StatusResource {
+                state: "paused".to_string(),
+                story_id: Some(story_id.clone()),
+                started_at: None,
+                iteration: None,
+                max_iterations: None,
+                progress_percent: None,
+                commit_hash: None,
+                error: None,
+                paused_at: Some(*paused_at),
+                pause_reason: Some(pause_reason.clone()),
+                retry_at: None,
+                attempt: None,
+                max_attempts: None,
+            },
+            ExecutionState::WaitingForRetry {
+                story_id,
+                retry_at,
+                attempt,
+                max_attempts,
+            } => StatusResource {
+                state: "waiting_for_retry".to_string(),
+                story_id: Some(story_id.clone()),
+                started_at: None,
+                iteration: None,
+                max_iterations: None,
+                progress_percent: None,
+                commit_hash: None,
+                error: None,
+                paused_at: None,
+                pause_reason: None,
+                retry_at: Some(*retry_at),
+                attempt: Some(*attempt),
+                max_attempts: Some(*max_attempts),
             },
         }
     }

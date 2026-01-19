@@ -1,456 +1,363 @@
 {
-  "branchName": "ralph/codebase-audit",
-  "description": "Add comprehensive codebase audit, inventory, and evaluation feature to Ralph - enabling pre-development context, architecture gap detection, interactive Q&A refinement, and automatic PRD generation with prd.json conversion for immediate execution",
+  "branchName": "feature/error-recovery-system",
+  "description": "Robust error handling, checkpoint/resume, and graceful degradation system for Ralph to handle API rate limits, usage quotas, timeouts, and stalled executions",
   "project": "Ralph",
   "userStories": [
     {
       "acceptanceCriteria": [
-        "Create src/audit/mod.rs with module organization and re-exports",
-        "Define core types: AuditReport, AuditFinding, FeatureOpportunity, Severity",
-        "Define AuditError enum with thiserror",
-        "Add mod audit; to src/main.rs",
+        "Create src/error/mod.rs with module exports",
+        "Create src/error/classification.rs with ErrorCategory enum (Transient, UsageLimit, Fatal, Timeout)",
+        "Define TransientReason, UsageLimitReason, FatalReason, TimeoutReason sub-enums",
+        "Define RecoveryHint enum (RetryNow, RetryAfter, WaitForUser, StopExecution, ResumeFromCheckpoint)",
+        "Define ClassifiedError struct with category, message, recovery_hint, context",
+        "Add pub mod error; to src/lib.rs",
+        "Unit tests for classification types",
         "Typecheck passes"
       ],
-      "description": "As a developer, I need the audit module scaffolding so other audit features can be built on top of it.",
+      "description": "As a developer, I need error classification types to categorize errors into actionable recovery strategies.",
       "id": "US-001",
-      "notes": "Foundation module - all other audit features depend on this",
+      "notes": "Foundation module - other recovery features depend on this",
       "passes": true,
       "priority": 1,
-      "title": "Create audit module structure"
+      "title": "Error classification types and module structure"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/inventory.rs with InventoryScanner struct",
-        "Scan directory tree respecting .gitignore patterns",
-        "Count files by extension",
-        "Identify key files (README, Cargo.toml, package.json, etc.)",
-        "Calculate total lines of code",
-        "Return FileInventory struct with results",
-        "Unit tests pass",
+        "Create src/error/detector.rs",
+        "Define ErrorPattern struct with regex pattern, category, recovery_hint",
+        "Define ErrorDetector with pre-configured patterns for Claude Code errors",
+        "Detect rate limit patterns: '429', 'rate limit', 'too many requests'",
+        "Detect usage limit patterns: 'plan limit', 'usage limit', 'quota exceeded'",
+        "Detect auth errors: 'unauthorized', 'authentication failed', 'invalid token'",
+        "Implement classify_error() that returns ClassifiedError from text",
+        "Implement classify_exit_code() for timeout detection",
+        "Unit tests for all pattern matching scenarios",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to scan the directory structure so I can see what files and folders exist in the codebase.",
+      "description": "As Ralph, I need to detect and classify errors from agent output using pattern matching.",
       "id": "US-002",
-      "notes": "Use ignore crate for .gitignore support",
+      "notes": "Uses case-insensitive regex matching",
       "passes": true,
       "priority": 2,
-      "title": "Implement file inventory scanner"
+      "title": "Error pattern detector for Claude Code errors"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/languages/mod.rs with LanguageDetector",
-        "Detect Rust (Cargo.toml, .rs files)",
-        "Detect TypeScript/JavaScript (package.json, .ts/.js files)",
-        "Detect Python (pyproject.toml, requirements.txt, .py files)",
-        "Detect Go (go.mod, .go files)",
-        "Return primary and secondary languages with percentages",
-        "Unit tests for each language detection",
+        "Create src/checkpoint/mod.rs with module exports",
+        "Define Checkpoint struct with version, created_at, current_story, pause_reason, uncommitted_files",
+        "Define StoryCheckpoint with story_id, iteration, max_iterations",
+        "Define PauseReason enum (UsageLimitExceeded, RateLimited, UserRequested, Timeout, Error)",
+        "Implement Serialize/Deserialize for all types",
+        "Add pub mod checkpoint; to src/lib.rs",
+        "Unit tests for serialization roundtrip",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to detect which programming languages are used so I understand the tech stack.",
+      "description": "As a user, I want execution state saved to checkpoint file so I can resume after interruptions.",
       "id": "US-003",
-      "notes": "Languages detected by manifest files and file extensions",
+      "notes": "Uses serde_json for persistence",
       "passes": true,
       "priority": 3,
-      "title": "Implement language detection"
+      "title": "Checkpoint types and save/load functionality"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/dependencies.rs with DependencyParser",
-        "Parse Cargo.toml for Rust dependencies",
-        "Parse package.json for npm dependencies",
-        "Parse pyproject.toml/requirements.txt for Python dependencies",
-        "Parse go.mod for Go dependencies",
-        "Return DependencyAnalysis with direct and dev dependencies",
-        "Unit tests for each ecosystem parser",
+        "Create src/checkpoint/manager.rs",
+        "Define CheckpointManager with checkpoint_path field",
+        "Implement new() that creates .ralph directory if missing",
+        "Implement save() that writes atomically (temp file then rename)",
+        "Implement load() that reads and deserializes checkpoint",
+        "Implement clear() that removes checkpoint file",
+        "Implement exists() to check for checkpoint presence",
+        "Implement verify() that validates checkpoint version and data",
+        "Handle file not found gracefully in load()",
+        "Unit tests for all operations",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to analyze dependencies so I can see what libraries the project uses.",
+      "description": "As a developer, I need a checkpoint manager to coordinate saving and loading execution state atomically.",
       "id": "US-004",
-      "notes": "Use toml and serde_json crates for parsing",
+      "notes": "Atomic writes prevent corruption on crash",
       "passes": true,
       "priority": 4,
-      "title": "Implement dependency parser"
+      "title": "Checkpoint manager with atomic saves"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/patterns.rs with PatternAnalyzer",
-        "Detect naming conventions (snake_case, camelCase, PascalCase)",
-        "Detect module organization patterns",
-        "Detect error handling patterns",
-        "Detect async patterns if applicable",
-        "Return PatternAnalysis struct",
-        "Unit tests pass",
+        "Create src/timeout/mod.rs with module exports",
+        "Define TimeoutConfig struct with agent_timeout, iteration_timeout, heartbeat_interval, missed_heartbeats_threshold",
+        "Default agent_timeout: 600 seconds (10 minutes)",
+        "Default iteration_timeout: 900 seconds (15 minutes)",
+        "Default heartbeat_interval: 30 seconds",
+        "Default missed_heartbeats_threshold: 3",
+        "Implement TimeoutConfig::default() with these values",
+        "Add pub mod timeout; to src/lib.rs",
+        "Unit tests for config defaults",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to detect code patterns and conventions so agents can follow existing practices.",
+      "description": "As Ralph, I need to timeout agent execution that exceeds time limits.",
       "id": "US-005",
-      "notes": "Use regex for pattern matching in source files",
+      "notes": "Configurable via CLI flags",
       "passes": true,
       "priority": 5,
-      "title": "Implement code pattern detection"
+      "title": "Timeout configuration and wrapper"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/architecture.rs with ArchitectureAnalyzer",
-        "Detect architecture patterns (layered, modular, hexagonal, clean, etc.)",
-        "Identify module/layer boundaries",
-        "Detect coupling between modules",
-        "Return ArchitectureAnalysis struct",
-        "Unit tests pass",
+        "Create src/timeout/heartbeat.rs",
+        "Define HeartbeatMonitor struct with config, last_heartbeat, sender/receiver channels",
+        "Implement new() that initializes monitor with TimeoutConfig",
+        "Implement pulse() that updates last_heartbeat timestamp",
+        "Implement start_monitoring() that spawns background task",
+        "Background task checks elapsed time since last heartbeat",
+        "Send warning after missed_heartbeats_threshold - 1 missed beats",
+        "Send stall detection after missed_heartbeats_threshold missed beats",
+        "Implement stop() that terminates background task",
+        "Unit tests for heartbeat detection",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to identify the architecture pattern so I understand how the codebase is organized.",
+      "description": "As Ralph, I need to detect stalled agents via heartbeat monitoring.",
       "id": "US-006",
-      "notes": "Analyze directory structure and import patterns",
+      "notes": "Uses tokio::sync::watch for signaling",
       "passes": true,
       "priority": 6,
-      "title": "Implement architecture analysis"
+      "title": "Heartbeat monitor for stall detection"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/api.rs with ApiInventory",
-        "Detect HTTP endpoints (axum, actix, express patterns)",
-        "Detect CLI commands (clap patterns)",
-        "Detect MCP tools if present",
-        "Return ApiAnalysis with endpoints, commands, tools",
-        "Unit tests pass",
+        "Create src/pause/mod.rs with module exports",
+        "Define RetryStrategy struct with base_delay, max_delay, max_attempts, jitter_percent",
+        "Implement calculate_delay() with exponential backoff formula",
+        "Default base_delay: 1 second, max_delay: 60 seconds, jitter: 10%",
+        "Implement should_retry() based on attempt count and error category",
+        "Only retry Transient category errors",
+        "Add pub mod pause; to src/lib.rs",
+        "Unit tests for delay calculation and retry logic",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to discover API endpoints and interfaces so I know what the codebase exposes.",
+      "description": "As Ralph, I need to retry transient errors with exponential backoff.",
       "id": "US-007",
-      "notes": "Use regex to find route definitions and clap derives",
+      "notes": "Jitter prevents thundering herd",
       "passes": true,
       "priority": 7,
-      "title": "Implement API inventory"
+      "title": "Retry strategy with exponential backoff"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/testing.rs with TestAnalyzer",
-        "Count test files and test functions",
-        "Identify untested modules (modules with no corresponding tests)",
-        "Detect test patterns (unit, integration, e2e)",
-        "Return TestAnalysis struct",
-        "Unit tests pass",
+        "Add PauseController struct to src/pause/mod.rs",
+        "Define PauseState enum (Running, PauseRequested, Paused)",
+        "Implement request_pause() that sets PauseRequested state",
+        "Implement is_pause_requested() to check for pending pause",
+        "Implement execute_pause() that transitions to Paused",
+        "Implement resume() that transitions back to Running",
+        "Use Arc<RwLock<PauseState>> for thread-safe access",
+        "Unit tests for state transitions",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to analyze test coverage so I know which areas lack tests.",
+      "description": "As a user, I want to manually pause execution and resume later.",
       "id": "US-008",
-      "notes": "Look for #[test] and #[cfg(test)] in Rust, test/spec files in JS",
+      "notes": "Pause happens between iterations, not mid-execution",
       "passes": true,
       "priority": 8,
-      "title": "Implement test coverage analysis"
+      "title": "Pause controller for pause/resume state"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/documentation.rs with DocAnalyzer",
-        "Check for README presence and completeness",
-        "Detect missing doc comments on public items (Rust)",
-        "Identify undocumented API endpoints",
-        "Return DocumentationAnalysis with gaps",
-        "Unit tests pass",
+        "Create src/notification/mod.rs with module exports",
+        "Define Notification enum (RateLimited, UsageLimitExceeded, Timeout, Retrying, Paused, Resuming)",
+        "Each variant includes relevant data (countdown, attempt, reason)",
+        "Add pub mod notification; to src/lib.rs",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to find missing documentation so I know what needs to be documented.",
+      "description": "As a user, I want clear notifications about errors and recovery actions.",
       "id": "US-009",
-      "notes": "Look for /// comments before pub items in Rust",
+      "notes": "Notifications displayed via RalphDisplay",
       "passes": true,
       "priority": 9,
-      "title": "Implement documentation gap detection"
+      "title": "Notification types and renderer"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/detectors/mod.rs and architecture_gaps.rs",
-        "Detect missing abstraction layers",
-        "Detect inconsistent module boundaries",
-        "Detect layer violations (e.g., UI calling DB directly)",
-        "Return list of AuditFinding with recommendations",
-        "Unit tests pass",
+        "Create src/notification/renderer.rs",
+        "Define NotificationRenderer with reference to RalphDisplay",
+        "Implement render_rate_limit() with countdown timer display",
+        "Implement render_usage_limit() with action required message",
+        "Implement render_timeout() with checkpoint confirmation",
+        "Implement render_retry() with attempt number and delay",
+        "Implement render_paused() with resume instructions",
+        "Use existing color scheme from src/ui/colors.rs",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to identify architecture gaps so I know what improvements are needed.",
+      "description": "As a user, I want themed notification panels for different error states.",
       "id": "US-010",
-      "notes": "Analyze import patterns to detect violations",
+      "notes": "Reuses existing RalphDisplay and color utilities",
       "passes": true,
       "priority": 10,
-      "title": "Implement architecture gap detector"
+      "title": "Notification renderer with themed panels"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/detectors/opportunities.rs",
-        "Define opportunity patterns (e.g., has quality gates but no audit command)",
-        "Match patterns against audit results",
-        "Return list of FeatureOpportunity with suggested stories",
-        "Unit tests pass",
+        "Add Paused variant to ExecutionState in src/mcp/server.rs",
+        "Paused includes story_id, paused_at, pause_reason",
+        "Add WaitingForRetry variant to ExecutionState",
+        "WaitingForRetry includes story_id, retry_at, attempt, max_attempts",
+        "Update GetStatusResponse to handle new states",
+        "Update state_description() for new states",
+        "Update display.update_from_state() for new states",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to suggest complementary features so I know what could be added.",
+      "description": "As Ralph, I need new execution states to represent pause and retry conditions.",
       "id": "US-011",
-      "notes": "Pattern matching based on what exists vs what could exist",
+      "notes": "Minimal changes to existing state machine",
       "passes": true,
       "priority": 11,
-      "title": "Implement opportunity detector"
+      "title": "Extend ExecutionState with Paused and WaitingForRetry"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/detectors/tech_debt.rs",
-        "Detect TODO/FIXME/HACK comments",
-        "Detect outdated dependencies",
-        "Detect dead code indicators",
-        "Return list of AuditFinding for tech debt items",
-        "Unit tests pass",
+        "Add --resume flag to run command in main.rs",
+        "Add --no-resume flag to skip checkpoint prompt",
+        "Add --timeout <seconds> flag for agent timeout override",
+        "Add --no-checkpoint flag to disable checkpointing",
+        "Update run command help text",
+        "Parse flags and pass to runner",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to find technical debt so I can prioritize cleanup.",
+      "description": "As a user, I want CLI flags to control resume and timeout behavior.",
       "id": "US-012",
-      "notes": "Use regex to find TODO comments, compare dep versions",
+      "notes": "Follow existing CLI patterns in main.rs",
       "passes": true,
       "priority": 12,
-      "title": "Implement technical debt detector"
+      "title": "Add --resume and --timeout CLI flags"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/output/mod.rs and structured.rs",
-        "Serialize AuditReport to JSON",
-        "Include all sections: metadata, inventory, dependencies, findings, opportunities",
-        "Write to audit.json file",
-        "Unit tests pass",
+        "Add 'status' subcommand to CLI in main.rs",
+        "Display current/last execution state",
+        "Display checkpoint info if present (story, iteration, pause reason, age)",
+        "Display suggested action based on state",
+        "Exit code 0 for idle, 1 for failed, 75 for paused",
         "Typecheck passes"
       ],
-      "description": "As a user, I want audit results in JSON format so tools can consume them programmatically.",
+      "description": "As a user, I want a status command to check execution state without starting a run.",
       "id": "US-013",
-      "notes": "Use serde_json for serialization",
+      "notes": "Exit code 75 = EX_TEMPFAIL for temporary failure",
       "passes": true,
       "priority": 13,
-      "title": "Implement JSON report output"
+      "title": "Add ralph status command"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/output/markdown.rs",
-        "Generate executive summary with key metrics",
-        "Format findings with severity badges",
-        "Format opportunities with complexity indicators",
-        "Include table of contents",
-        "Unit tests pass",
+        "Update runner.rs to accept CheckpointManager",
+        "Save checkpoint before each iteration starts",
+        "Save checkpoint after quality gates complete",
+        "Save checkpoint on any pause or error condition",
+        "Clear checkpoint on successful story completion",
         "Typecheck passes"
       ],
-      "description": "As a user, I want audit results in markdown format so I can read them easily.",
+      "description": "As a user, I want checkpoints saved automatically during execution.",
       "id": "US-014",
-      "notes": "Generate GitHub-flavored markdown",
+      "notes": "Checkpoint saved at safe points only",
       "passes": true,
       "priority": 14,
-      "title": "Implement markdown report output"
+      "title": "Integrate checkpoint save into runner loop"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/output/agent_context.rs",
-        "Generate Codebase Patterns section for progress.txt",
-        "Include naming conventions, architecture pattern, key conventions",
-        "Append to existing progress.txt (don't overwrite)",
-        "Unit tests pass",
+        "Check for checkpoint in .ralph/checkpoint.json on run command",
+        "Display checkpoint summary (story, iteration, reason, age)",
+        "Prompt user: Resume / Discard / View details",
+        "If --resume flag, auto-resume without prompt",
+        "If --no-resume flag, discard without prompt",
+        "Resume sets execution to continue from checkpoint iteration",
         "Typecheck passes"
       ],
-      "description": "As a developer, I want audit patterns written to progress.txt so agents can follow existing conventions.",
+      "description": "As a user, I want Ralph to prompt for resume when checkpoint exists.",
       "id": "US-015",
-      "notes": "Format matches existing progress.txt pattern",
+      "notes": "Interactive prompt using dialoguer or similar",
       "passes": true,
       "priority": 15,
-      "title": "Implement agent context output"
+      "title": "Integrate checkpoint resume into runner startup"
     },
     {
       "acceptanceCriteria": [
-        "Add Audit variant to Commands enum in src/main.rs",
-        "Support -d, --dir for target directory",
-        "Support -f, --format for output format (json, markdown, context, all)",
-        "Support -o, --output for output file",
-        "Support --profile for quality profile",
-        "Support --smart for smart Q&A mode",
-        "Support --no-interactive to skip Q&A",
-        "Support --generate-prd to auto-generate PRD",
-        "Print help text with -h, --help",
+        "Update StoryExecutor in src/mcp/tools/executor.rs",
+        "Accept TimeoutConfig in ExecutorConfig",
+        "Wrap execute_agent() with tokio::time::timeout()",
+        "On timeout, save checkpoint before returning error",
+        "Classify timeout as ErrorCategory::Timeout",
         "Typecheck passes"
       ],
-      "description": "As a user, I want to run ralph audit from the command line so I can audit any codebase.",
+      "description": "As Ralph, I need agent execution wrapped with timeout.",
       "id": "US-016",
-      "notes": "Follow existing Commands pattern in main.rs",
+      "notes": "Hard timeout prevents infinite hangs",
       "passes": true,
       "priority": 16,
-      "title": "Add audit CLI subcommand"
+      "title": "Integrate timeout wrapper into agent executor"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/interactive.rs with Q&A logic",
-        "Ask 3-5 questions with A/B/C/D options",
-        "Questions include: project purpose, priorities, target users",
-        "Parse user responses (e.g., 1A, 2C, 3B)",
-        "Refine findings based on answers",
-        "Skip questions in --no-interactive mode",
-        "In --smart mode, only ask when confidence < threshold",
-        "Unit tests pass",
+        "Start HeartbeatMonitor before agent execution",
+        "Update heartbeat on agent output/activity",
+        "On stall warning, log warning message",
+        "On stall detection, trigger graceful timeout",
+        "Stop monitor after execution completes",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to ask me clarifying questions so it better understands my goals.",
+      "description": "As Ralph, I need heartbeat monitoring during agent execution.",
       "id": "US-017",
-      "notes": "Use console crate for terminal input",
+      "notes": "Stall detection is softer than hard timeout",
       "passes": true,
       "priority": 17,
-      "title": "Implement interactive Q&A flow"
+      "title": "Integrate heartbeat monitor into agent executor"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/prd_generator.rs",
-        "Convert findings to user stories",
-        "Convert opportunities to user stories",
-        "Generate PRD markdown following existing /prd skill format",
-        "Save to tasks/prd-<project>-improvements.md",
-        "Prompt user before generating (unless --generate-prd flag)",
-        "Unit tests pass",
+        "After agent execution, classify any error using ErrorDetector",
+        "For Transient errors, apply retry strategy",
+        "For UsageLimit errors, save checkpoint and pause",
+        "For Fatal errors, stop execution with clear message",
+        "For Timeout errors, save checkpoint and report",
+        "Display appropriate notification for each case",
         "Typecheck passes"
       ],
-      "description": "As a user, I want to generate a PRD from audit findings so I can start improving the codebase.",
+      "description": "As Ralph, I need to classify executor errors and determine recovery action.",
       "id": "US-018",
-      "notes": "Follow PRD format from skills/prd/SKILL.md",
+      "notes": "Maps classification to recovery action",
       "passes": true,
       "priority": 18,
-      "title": "Implement audit-to-PRD generation"
+      "title": "Integrate error classification into executor result handling"
     },
     {
       "acceptanceCriteria": [
-        "Create src/audit/prd_converter.rs",
-        "Parse generated PRD markdown",
-        "Extract user stories and acceptance criteria",
-        "Generate valid prd.json with project, branchName, userStories",
-        "Set all stories to passes: false",
-        "Save to prd.json in working directory",
-        "Prompt user before converting",
-        "Unit tests pass",
+        "Add 'p' key handler in src/ui/keyboard.rs",
+        "Call pause_controller.request_pause() on 'p' press",
+        "Display 'Pausing after current iteration...' message",
+        "Ignore 'p' if already paused or pause requested",
+        "Update help display to show 'p' key option",
         "Typecheck passes"
       ],
-      "description": "As a user, I want the audit to convert the generated PRD to prd.json so I can run ralph immediately.",
+      "description": "As a user, I want to press 'p' to pause execution.",
       "id": "US-019",
-      "notes": "Follow prd.json format from skills/ralph/SKILL.md",
+      "notes": "Pause happens at next safe point, not immediately",
       "passes": true,
       "priority": 19,
-      "title": "Implement PRD-to-prd.json conversion"
+      "title": "Add pause key handler to keyboard input"
     },
     {
       "acceptanceCriteria": [
-        "Create skills/audit/SKILL.md with full skill instructions",
-        "Define interactive Q&A flow matching CLI behavior",
-        "Include instructions for presenting findings",
-        "Include instructions for generating PRD",
-        "Include instructions for converting to prd.json",
-        "Skill follows existing /prd and /ralph skill patterns"
+        "Create tests/error_recovery_tests.rs",
+        "Test checkpoint save and load roundtrip",
+        "Test error classification for known patterns",
+        "Test retry backoff calculation",
+        "Test pause controller state transitions",
+        "Test timeout wrapper behavior",
+        "All tests pass"
       ],
-      "description": "As a user, I want to type /audit in Claude Code so I can run an interactive audit.",
+      "description": "As a developer, I need integration tests to verify the recovery system works end-to-end.",
       "id": "US-020",
-      "notes": "Reference skills/prd/SKILL.md and skills/ralph/SKILL.md as templates",
+      "notes": "Uses tests/ directory for integration tests",
       "passes": true,
       "priority": 20,
-      "title": "Create /audit skill for Claude Code"
-    },
-    {
-      "acceptanceCriteria": [
-        "Create src/mcp/tools/audit.rs with start_audit tool",
-        "Accept path parameter (optional, defaults to PRD directory)",
-        "Accept sections parameter to limit analysis scope",
-        "Accept format parameter for output format",
-        "Return audit ID for status checking",
-        "Register tool in src/mcp/server.rs",
-        "Unit tests pass",
-        "Typecheck passes"
-      ],
-      "description": "As an AI agent, I want to start an audit via MCP so I can analyze codebases programmatically.",
-      "id": "US-021",
-      "notes": "Follow pattern from existing MCP tools in src/mcp/tools/",
-      "passes": true,
-      "priority": 21,
-      "title": "Implement start_audit MCP tool"
-    },
-    {
-      "acceptanceCriteria": [
-        "Add get_audit_status tool to src/mcp/tools/audit.rs",
-        "Accept audit ID parameter",
-        "Return status: pending, running, completed, failed",
-        "Return progress percentage if running",
-        "Register tool in src/mcp/server.rs",
-        "Unit tests pass",
-        "Typecheck passes"
-      ],
-      "description": "As an AI agent, I want to check audit progress so I know when it's complete.",
-      "id": "US-022",
-      "notes": "Status tracking similar to story execution state",
-      "passes": true,
-      "priority": 22,
-      "title": "Implement get_audit_status MCP tool"
-    },
-    {
-      "acceptanceCriteria": [
-        "Add get_audit_results tool to src/mcp/tools/audit.rs",
-        "Accept audit ID parameter",
-        "Return full AuditReport as JSON",
-        "Return error if audit not complete",
-        "Register tool in src/mcp/server.rs",
-        "Unit tests pass",
-        "Typecheck passes"
-      ],
-      "description": "As an AI agent, I want to retrieve audit results so I can present findings to the user.",
-      "id": "US-023",
-      "notes": "Serialize AuditReport to JSON for MCP response",
-      "passes": true,
-      "priority": 23,
-      "title": "Implement get_audit_results MCP tool"
-    },
-    {
-      "acceptanceCriteria": [
-        "Add generate_prd_from_audit tool to src/mcp/tools/audit.rs",
-        "Accept audit ID parameter",
-        "Accept optional user answers from Q&A",
-        "Generate PRD markdown and prd.json",
-        "Return paths to generated files",
-        "Register tool in src/mcp/server.rs",
-        "Unit tests pass",
-        "Typecheck passes"
-      ],
-      "description": "As an AI agent, I want to generate a PRD from audit results so users can start improving their codebase.",
-      "id": "US-024",
-      "notes": "Reuse prd_generator and prd_converter modules",
-      "passes": true,
-      "priority": 24,
-      "title": "Implement generate_prd_from_audit MCP tool"
-    },
-    {
-      "acceptanceCriteria": [
-        "Add [profiles.*.audit] section to quality/ralph-quality.toml",
-        "Add enabled boolean",
-        "Add max_critical_findings, max_high_findings thresholds",
-        "Add section toggles (structure, patterns, api, deps, tests, docs, arch)",
-        "Load audit config in quality profile loader",
-        "Unit tests pass",
-        "Typecheck passes"
-      ],
-      "description": "As a user, I want to configure audit behavior via quality profiles so I can customize thresholds.",
-      "id": "US-025",
-      "notes": "Follow existing profile pattern in src/quality/profiles.rs",
-      "passes": true,
-      "priority": 25,
-      "title": "Add audit settings to quality profiles"
-    },
-    {
-      "acceptanceCriteria": [
-        "Create integration test that runs full audit on ralph codebase",
-        "Verify all analysis sections produce results",
-        "Verify JSON output is valid and parseable",
-        "Verify markdown output is well-formed",
-        "Verify findings are reasonable for Ralph codebase",
-        "Test passes"
-      ],
-      "description": "As a developer, I want to run the audit on Ralph itself so I can verify it works end-to-end.",
-      "id": "US-026",
-      "notes": "Use tests/ directory for integration tests",
-      "passes": true,
-      "priority": 26,
-      "title": "Integration test on Ralph's own codebase"
+      "title": "Integration tests for error recovery system"
     }
   ]
 }

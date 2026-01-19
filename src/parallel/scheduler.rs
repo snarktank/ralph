@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tokio::sync::{mpsc, watch, Mutex, RwLock, Semaphore};
 
@@ -12,6 +12,7 @@ use crate::mcp::tools::load_prd::{validate_prd, PrdFile};
 use crate::parallel::dependency::{DependencyGraph, StoryNode};
 use crate::parallel::reconcile::{ReconciliationEngine, ReconciliationIssue, ReconciliationResult};
 use crate::runner::{RunResult, RunnerConfig};
+use crate::timeout::TimeoutConfig;
 use crate::ui::parallel_display::ParallelRunnerDisplay;
 use crate::ui::parallel_events::{ParallelUIEvent, StoryDisplayInfo};
 
@@ -42,6 +43,12 @@ pub struct ParallelRunnerConfig {
     pub fallback_to_sequential: bool,
     /// Strategy for detecting conflicts between parallel stories.
     pub conflict_strategy: ConflictStrategy,
+    /// Timeout configuration for execution limits.
+    pub timeout_config: TimeoutConfig,
+    /// Timeout for an entire batch of parallel executions.
+    /// If a batch takes longer than this, remaining tasks are cancelled.
+    /// Default: 30 minutes.
+    pub batch_timeout: Duration,
 }
 
 impl Default for ParallelRunnerConfig {
@@ -51,6 +58,8 @@ impl Default for ParallelRunnerConfig {
             infer_dependencies: true,
             fallback_to_sequential: true,
             conflict_strategy: ConflictStrategy::default(),
+            timeout_config: TimeoutConfig::default(),
+            batch_timeout: Duration::from_secs(1800), // 30 minutes
         }
     }
 }
@@ -566,6 +575,8 @@ impl ParallelRunner {
                     agent_command: agent.clone(),
                     max_iterations: self.base_config.max_iterations_per_story,
                     git_mutex: Some(self.git_mutex.clone()),
+                    timeout_config: self.config.timeout_config.clone(),
+                    ..Default::default()
                 };
 
                 let execution_state = self.execution_state.clone();
@@ -672,18 +683,58 @@ impl ParallelRunner {
                 handles.push(handle);
             }
 
-            // Wait for all tasks in this batch to complete
+            // Wait for all tasks in this batch to complete (with timeout)
             if !handles.is_empty() {
                 let batch_story_ids: Vec<String> = {
                     let state = self.execution_state.read().await;
                     state.in_flight.iter().cloned().collect()
                 };
 
-                // Wait for all handles to complete
-                let results = futures::future::join_all(handles).await;
+                // Wait for all handles to complete, with batch timeout
+                let batch_future = futures::future::join_all(handles);
+                let batch_result =
+                    tokio::time::timeout(self.config.batch_timeout, batch_future).await;
 
-                for (_story_id, _success, iterations) in results.into_iter().flatten() {
-                    total_iterations += iterations;
+                match batch_result {
+                    Ok(results) => {
+                        for (_story_id, _success, iterations) in results.into_iter().flatten() {
+                            total_iterations += iterations;
+                        }
+                    }
+                    Err(_) => {
+                        // Batch timed out - mark all in-flight stories as failed
+                        let mut state = self.execution_state.write().await;
+                        for story_id in &batch_story_ids {
+                            if state.in_flight.contains(story_id) {
+                                state.in_flight.remove(story_id);
+                                state.release_locks(story_id);
+                                state.failed.insert(
+                                    story_id.clone(),
+                                    format!(
+                                        "Batch timed out after {:?}",
+                                        self.config.batch_timeout
+                                    ),
+                                );
+                                // Send StoryFailed event
+                                if let Some(ref sender) = ui_sender {
+                                    let event = ParallelUIEvent::StoryFailed {
+                                        story_id: story_id.clone(),
+                                        error: format!(
+                                            "Batch timed out after {:?}",
+                                            self.config.batch_timeout
+                                        ),
+                                        iteration: 1,
+                                    };
+                                    let _ = sender.try_send(event);
+                                }
+                            }
+                        }
+                        drop(state);
+
+                        // Continue to next iteration - some stories may have completed
+                        // before the timeout and their results were handled in the spawned task
+                        continue;
+                    }
                 }
 
                 // Run reconciliation after each batch completes
@@ -820,6 +871,8 @@ impl ParallelRunner {
                                 agent_command: agent.to_string(),
                                 max_iterations: self.base_config.max_iterations_per_story,
                                 git_mutex: Some(self.git_mutex.clone()),
+                                timeout_config: self.config.timeout_config.clone(),
+                                ..Default::default()
                             };
 
                             let executor = StoryExecutor::new(executor_config);

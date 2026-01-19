@@ -83,6 +83,26 @@ pub enum ExecutionState {
         /// Error message describing the failure
         error: String,
     },
+    /// Execution paused (e.g., waiting for user input or external event)
+    Paused {
+        /// The story ID that is paused
+        story_id: String,
+        /// When execution was paused (Unix timestamp)
+        paused_at: u64,
+        /// Reason for the pause
+        pause_reason: String,
+    },
+    /// Waiting for retry after a transient failure
+    WaitingForRetry {
+        /// The story ID waiting for retry
+        story_id: String,
+        /// When the retry will be attempted (Unix timestamp)
+        retry_at: u64,
+        /// Current attempt number
+        attempt: u32,
+        /// Maximum number of attempts allowed
+        max_attempts: u32,
+    },
 }
 
 /// Shared server state that can be accessed across async contexts.
@@ -691,6 +711,8 @@ impl RalphMcpServer {
             agent_command,
             max_iterations,
             git_mutex: None, // MCP server executes single story at a time
+            timeout_config: crate::timeout::TimeoutConfig::default(),
+            ..Default::default()
         };
 
         // Clone necessary data for the spawned task

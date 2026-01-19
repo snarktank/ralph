@@ -13,6 +13,8 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::terminal;
 
+use crate::pause::PauseController;
+
 /// Key bindings for toggle controls.
 #[derive(Debug, Clone, Copy)]
 pub struct KeyBindings {
@@ -22,6 +24,8 @@ pub struct KeyBindings {
     pub toggle_expand: KeyCode,
     /// Quit/interrupt
     pub quit: KeyCode,
+    /// Pause execution
+    pub pause: KeyCode,
 }
 
 impl Default for KeyBindings {
@@ -30,6 +34,7 @@ impl Default for KeyBindings {
             toggle_streaming: KeyCode::Char('s'),
             toggle_expand: KeyCode::Char('e'),
             quit: KeyCode::Char('q'),
+            pause: KeyCode::Char('p'),
         }
     }
 }
@@ -135,6 +140,8 @@ pub struct KeyboardListener {
     bindings: KeyBindings,
     /// Whether the listener is running
     running: Arc<AtomicBool>,
+    /// Optional pause controller for pause functionality
+    pause_controller: Option<PauseController>,
 }
 
 impl KeyboardListener {
@@ -144,6 +151,7 @@ impl KeyboardListener {
             state,
             bindings: KeyBindings::default(),
             running: Arc::new(AtomicBool::new(false)),
+            pause_controller: None,
         }
     }
 
@@ -153,7 +161,14 @@ impl KeyboardListener {
             state,
             bindings,
             running: Arc::new(AtomicBool::new(false)),
+            pause_controller: None,
         }
+    }
+
+    /// Set the pause controller for pause functionality.
+    pub fn with_pause_controller(mut self, pause_controller: PauseController) -> Self {
+        self.pause_controller = Some(pause_controller);
+        self
     }
 
     /// Check if the listener is currently running.
@@ -168,6 +183,7 @@ impl KeyboardListener {
         let state = Arc::clone(&self.state);
         let bindings = self.bindings;
         let running = Arc::clone(&self.running);
+        let pause_controller = self.pause_controller.clone();
 
         running.store(true, Ordering::Relaxed);
 
@@ -179,7 +195,12 @@ impl KeyboardListener {
                 // Poll for events with timeout
                 if event::poll(Duration::from_millis(100)).unwrap_or(false) {
                     if let Ok(Event::Key(key_event)) = event::read() {
-                        Self::handle_key_event(&state, &bindings, key_event);
+                        Self::handle_key_event(
+                            &state,
+                            &bindings,
+                            pause_controller.as_ref(),
+                            key_event,
+                        );
                     }
                 }
             }
@@ -197,7 +218,12 @@ impl KeyboardListener {
     }
 
     /// Handle a key event.
-    fn handle_key_event(state: &ToggleState, bindings: &KeyBindings, event: KeyEvent) {
+    fn handle_key_event(
+        state: &ToggleState,
+        bindings: &KeyBindings,
+        pause_controller: Option<&PauseController>,
+        event: KeyEvent,
+    ) {
         // Check for Ctrl+C (immediate interrupt)
         if event.modifiers.contains(KeyModifiers::CONTROL) && event.code == KeyCode::Char('c') {
             state.request_immediate_interrupt();
@@ -221,6 +247,16 @@ impl KeyboardListener {
                 }
                 code if code == bindings.quit => {
                     state.request_quit();
+                }
+                code if code == bindings.pause => {
+                    if let Some(controller) = pause_controller {
+                        // Only print message if pause was successfully requested
+                        // (i.e., not already paused or pause already requested)
+                        if controller.request_pause() {
+                            // Print message on a new line to avoid corrupting current output
+                            println!("\r\nPausing after current iteration...");
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -261,14 +297,14 @@ pub fn render_toggle_hint(state: &ToggleState) -> String {
     };
 
     format!(
-        "[s] stream: {} | [e] expand: {} | [q] quit",
+        "[s] stream: {} | [e] expand: {} | [p] pause | [q] quit",
         streaming_status, expand_status
     )
 }
 
 /// Render a compact toggle hint.
 pub fn render_compact_hint() -> &'static str {
-    "[s]tream [e]xpand [q]uit"
+    "[s]tream [e]xpand [p]ause [q]uit"
 }
 
 #[cfg(test)]

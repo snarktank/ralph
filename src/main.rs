@@ -1,8 +1,10 @@
 use clap::{ArgAction, Parser, ValueEnum};
 use rmcp::{transport::stdio, ServiceExt};
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use ralphmacchio::audit;
+use ralphmacchio::checkpoint::{CheckpointManager, PauseReason};
 use ralphmacchio::logging::{init_logging, LoggingConfig};
 use ralphmacchio::mcp::RalphMcpServer;
 use ralphmacchio::runner::{Runner, RunnerConfig};
@@ -99,6 +101,22 @@ struct Cli {
     #[arg(long, default_value = "3")]
     max_concurrency: usize,
 
+    /// Resume from checkpoint if available
+    #[arg(long)]
+    resume: bool,
+
+    /// Skip checkpoint prompt (do not resume)
+    #[arg(long, conflicts_with = "resume")]
+    no_resume: bool,
+
+    /// Agent timeout in seconds (overrides default)
+    #[arg(long, value_name = "SECONDS")]
+    timeout: Option<u64>,
+
+    /// Disable checkpointing
+    #[arg(long)]
+    no_checkpoint: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -127,6 +145,22 @@ enum Commands {
         /// Max concurrent stories (0 = unlimited)
         #[arg(long, default_value = "3")]
         max_concurrency: usize,
+
+        /// Resume from checkpoint if available
+        #[arg(long)]
+        resume: bool,
+
+        /// Skip checkpoint prompt (do not resume)
+        #[arg(long, conflicts_with = "resume")]
+        no_resume: bool,
+
+        /// Agent timeout in seconds (overrides default)
+        #[arg(long, value_name = "SECONDS")]
+        timeout: Option<u64>,
+
+        /// Disable checkpointing
+        #[arg(long)]
+        no_checkpoint: bool,
 
         /// Print help information
         #[arg(long, short)]
@@ -182,6 +216,16 @@ enum Commands {
         #[arg(long, short)]
         help: bool,
     },
+    /// Check execution state without starting a run
+    Status {
+        /// Working directory (where .ralph directory is located)
+        #[arg(long, short = 'd')]
+        dir: Option<PathBuf>,
+
+        /// Print help information
+        #[arg(long, short)]
+        help: bool,
+    },
 }
 
 /// Build display options from CLI arguments
@@ -195,8 +239,28 @@ fn build_display_options(cli: &Cli) -> DisplayOptions {
         .with_expand_details(cli.verbose >= 1) // Expand details at -v or higher
 }
 
+/// Exit codes for the status command
+mod exit_codes {
+    use std::process::ExitCode;
+
+    /// System is idle (no checkpoint, no active execution)
+    pub fn idle() -> ExitCode {
+        ExitCode::from(0)
+    }
+
+    /// Last execution failed
+    pub fn failed() -> ExitCode {
+        ExitCode::from(1)
+    }
+
+    /// Execution is paused (checkpoint exists)
+    pub fn paused() -> ExitCode {
+        ExitCode::from(75)
+    }
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Build display options from CLI flags
@@ -211,13 +275,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Handle --help flag with styled output
     if cli.help {
         print!("{}", help_renderer.render_help());
-        return Ok(());
+        return Ok(ExitCode::SUCCESS);
     }
 
     // Handle --version flag with styled output and mascot
     if cli.version {
         print!("{}", help_renderer.render_version());
-        return Ok(());
+        return Ok(ExitCode::SUCCESS);
     }
 
     match cli.command {
@@ -235,8 +299,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!(
                 "  --max-concurrency <N>    Max concurrent stories (0 = unlimited) [default: 3]"
             );
+            println!("  --resume                 Resume from checkpoint if available");
+            println!("  --no-resume              Skip checkpoint prompt (do not resume)");
+            println!("  --timeout <SECONDS>      Agent timeout in seconds (overrides default)");
+            println!("  --no-checkpoint          Disable checkpointing");
             println!("  -h, --help               Print help information");
-            return Ok(());
+            return Ok(ExitCode::SUCCESS);
         }
         Some(Commands::Run {
             ref prd,
@@ -244,6 +312,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             max_iterations,
             parallel,
             max_concurrency,
+            resume,
+            no_resume,
+            timeout,
+            no_checkpoint,
             help: false,
         }) => {
             run_stories(
@@ -253,6 +325,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 max_iterations,
                 parallel,
                 max_concurrency,
+                resume,
+                no_resume,
+                timeout,
+                no_checkpoint,
             )
             .await?;
         }
@@ -263,7 +339,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!();
             println!("Options:");
             println!("  -h, --help  Print help information");
-            return Ok(());
+            return Ok(ExitCode::SUCCESS);
         }
         Some(Commands::Quality { help: false }) => {
             // Initialize logging for quality checks (unless quiet)
@@ -280,7 +356,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Options:");
             println!("  --prd <FILE>  Path to PRD file to preload (optional)");
             println!("  -h, --help    Print help information");
-            return Ok(());
+            return Ok(ExitCode::SUCCESS);
         }
         Some(Commands::McpServer { prd, help: false }) => {
             // Configure logging to stderr only for MCP server mode
@@ -328,7 +404,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("  --no-interactive       Skip interactive Q&A prompts");
             println!("  --generate-prd         Auto-generate PRD from audit findings");
             println!("  -h, --help             Print help information");
-            return Ok(());
+            return Ok(ExitCode::SUCCESS);
         }
         Some(Commands::Audit {
             ref dir,
@@ -352,6 +428,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .await?;
         }
+        Some(Commands::Status { help: true, .. }) => {
+            println!("Check execution state without starting a run");
+            println!();
+            println!("Usage: ralph status [OPTIONS]");
+            println!();
+            println!("Options:");
+            println!("  -d, --dir <DIR>  Working directory [default: .]");
+            println!("  -h, --help       Print help information");
+            println!();
+            println!("Exit codes:");
+            println!("  0   Idle (no checkpoint, no active execution)");
+            println!("  1   Failed (last execution failed)");
+            println!("  75  Paused (checkpoint exists, execution paused)");
+            return Ok(ExitCode::SUCCESS);
+        }
+        Some(Commands::Status {
+            ref dir,
+            help: false,
+        }) => {
+            return run_status(dir.clone(), cli.quiet);
+        }
         None => {
             // Default: run stories if prd.json exists, otherwise show help
             // Check multiple locations: prd.json, ralph/prd.json
@@ -364,6 +461,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     cli.max_iterations,
                     cli.parallel,
                     cli.max_concurrency,
+                    cli.resume,
+                    cli.no_resume,
+                    cli.timeout,
+                    cli.no_checkpoint,
                 )
                 .await?;
             } else {
@@ -372,7 +473,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
 
 /// Find the PRD file, checking multiple locations
@@ -398,6 +499,7 @@ fn find_prd_file(default_path: &std::path::Path) -> Option<PathBuf> {
 }
 
 /// Run stories from the PRD until all pass
+#[allow(clippy::too_many_arguments)]
 async fn run_stories(
     cli: &Cli,
     prd: PathBuf,
@@ -405,6 +507,10 @@ async fn run_stories(
     max_iterations: u32,
     parallel: bool,
     max_concurrency: usize,
+    resume: bool,
+    no_resume: bool,
+    timeout: Option<u64>,
+    no_checkpoint: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use ralphmacchio::parallel::scheduler::ParallelRunnerConfig;
 
@@ -435,6 +541,10 @@ async fn run_stories(
         display_options,
         parallel,
         parallel_config: Some(parallel_config),
+        resume,
+        no_resume,
+        timeout_seconds: timeout,
+        no_checkpoint,
     };
 
     let runner = Runner::new(config);
@@ -649,4 +759,143 @@ fn write_output(path: &Option<PathBuf>, content: &str) -> Result<(), Box<dyn std
         }
     }
     Ok(())
+}
+
+/// Run the status command to check execution state
+fn run_status(dir: Option<PathBuf>, quiet: bool) -> Result<ExitCode, Box<dyn std::error::Error>> {
+    use chrono::Utc;
+
+    let working_dir = dir.unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    // Try to load checkpoint
+    let manager = match CheckpointManager::new(&working_dir) {
+        Ok(m) => m,
+        Err(e) => {
+            if !quiet {
+                eprintln!("Error accessing checkpoint directory: {}", e);
+            }
+            return Ok(exit_codes::failed());
+        }
+    };
+
+    match manager.load() {
+        Ok(Some(checkpoint)) => {
+            // Checkpoint exists - execution is paused
+            if !quiet {
+                println!("Status: PAUSED");
+                println!();
+
+                // Display checkpoint info
+                if let Some(ref story) = checkpoint.current_story {
+                    println!("Current Story: {}", story.story_id);
+                    println!("  Iteration: {}/{}", story.iteration, story.max_iterations);
+                }
+
+                // Display pause reason
+                let reason_str = match &checkpoint.pause_reason {
+                    PauseReason::UsageLimitExceeded => "Usage limit exceeded".to_string(),
+                    PauseReason::RateLimited => "Rate limited".to_string(),
+                    PauseReason::UserRequested => "User requested".to_string(),
+                    PauseReason::Timeout => "Timeout".to_string(),
+                    PauseReason::IterationBoundary => "Iteration boundary".to_string(),
+                    PauseReason::Error(msg) => format!("Error: {}", msg),
+                };
+                println!("Pause Reason: {}", reason_str);
+
+                // Calculate and display age
+                let now = Utc::now();
+                let age = now.signed_duration_since(checkpoint.created_at);
+                let age_str = format_duration(age);
+                println!("Checkpoint Age: {}", age_str);
+
+                // Display uncommitted files if any
+                if !checkpoint.uncommitted_files.is_empty() {
+                    println!();
+                    println!("Uncommitted Files:");
+                    for file in &checkpoint.uncommitted_files {
+                        println!("  - {}", file);
+                    }
+                }
+
+                // Display suggested action
+                println!();
+                println!("Suggested Action:");
+                match &checkpoint.pause_reason {
+                    PauseReason::UsageLimitExceeded => {
+                        println!(
+                            "  Wait for usage limits to reset, then run 'ralph run' to resume."
+                        );
+                    }
+                    PauseReason::RateLimited => {
+                        println!(
+                            "  Wait for rate limits to clear, then run 'ralph run' to resume."
+                        );
+                    }
+                    PauseReason::UserRequested => {
+                        println!("  Run 'ralph run' to resume execution.");
+                    }
+                    PauseReason::Timeout => {
+                        println!("  Check for stuck processes, then run 'ralph run' to resume.");
+                    }
+                    PauseReason::IterationBoundary => {
+                        println!("  Run 'ralph run' to resume execution.");
+                    }
+                    PauseReason::Error(_) => {
+                        println!(
+                            "  Review the error above, fix any issues, then run 'ralph run' to resume."
+                        );
+                    }
+                }
+            }
+            Ok(exit_codes::paused())
+        }
+        Ok(None) => {
+            // No checkpoint - system is idle
+            if !quiet {
+                println!("Status: IDLE");
+                println!();
+                println!("No active execution or checkpoint found.");
+                println!();
+                println!("Suggested Action:");
+                println!("  Run 'ralph run' to start executing user stories.");
+            }
+            Ok(exit_codes::idle())
+        }
+        Err(e) => {
+            // Error loading checkpoint - treat as failed
+            if !quiet {
+                eprintln!("Status: ERROR");
+                eprintln!();
+                eprintln!("Failed to load checkpoint: {}", e);
+                eprintln!();
+                eprintln!("Suggested Action:");
+                eprintln!(
+                    "  Check .ralph/checkpoint.json for corruption or remove it to start fresh."
+                );
+            }
+            Ok(exit_codes::failed())
+        }
+    }
+}
+
+/// Format a duration in a human-readable way
+fn format_duration(duration: chrono::Duration) -> String {
+    let total_seconds = duration.num_seconds().unsigned_abs();
+
+    if total_seconds < 60 {
+        format!("{} seconds ago", total_seconds)
+    } else if total_seconds < 3600 {
+        let minutes = total_seconds / 60;
+        format!(
+            "{} minute{} ago",
+            minutes,
+            if minutes == 1 { "" } else { "s" }
+        )
+    } else if total_seconds < 86400 {
+        let hours = total_seconds / 3600;
+        format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
+    } else {
+        let days = total_seconds / 86400;
+        format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
+    }
 }

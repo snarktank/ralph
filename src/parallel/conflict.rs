@@ -128,6 +128,8 @@ mod tests {
             iterations_used: 1,
             gate_results: Vec::new(),
             files_changed: files.into_iter().map(String::from).collect(),
+            futility_verdict: None,
+            iteration_context: None,
         }
     }
 

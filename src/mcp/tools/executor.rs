@@ -13,7 +13,17 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{watch, Mutex};
+
+use crate::checkpoint::{Checkpoint, CheckpointManager, PauseReason, StoryCheckpoint};
+use crate::error::classification::{ErrorCategory, TimeoutReason};
+use crate::iteration::{
+    context::{ErrorCategory as IterErrorCategory, IterationContext, IterationError},
+    futility::{FutileRetryDetector, FutilityConfig, FutilityVerdict},
+};
+use crate::metrics::MetricsCollector;
+use crate::timeout::{HeartbeatEvent, HeartbeatMonitor, TimeoutConfig};
 
 use crate::mcp::tools::load_prd::{PrdFile, PrdUserStory};
 use crate::quality::{GateResult, Profile, QualityGateChecker};
@@ -33,6 +43,10 @@ pub struct ExecutionResult {
     pub gate_results: Vec<GateResult>,
     /// Files that were changed
     pub files_changed: Vec<String>,
+    /// Futility verdict if execution was stopped early
+    pub futility_verdict: Option<FutilityVerdict>,
+    /// Iteration context with error history and learnings
+    pub iteration_context: Option<IterationContext>,
 }
 
 /// Error types for story execution
@@ -52,6 +66,8 @@ pub enum ExecutorError {
     Cancelled,
     /// IO error
     IoError(String),
+    /// Execution timed out
+    Timeout(String),
 }
 
 impl std::fmt::Display for ExecutorError {
@@ -64,11 +80,30 @@ impl std::fmt::Display for ExecutorError {
             ExecutorError::AgentError(msg) => write!(f, "Agent execution error: {}", msg),
             ExecutorError::Cancelled => write!(f, "Execution was cancelled"),
             ExecutorError::IoError(msg) => write!(f, "IO error: {}", msg),
+            ExecutorError::Timeout(msg) => write!(f, "Execution timed out: {}", msg),
         }
     }
 }
 
 impl std::error::Error for ExecutorError {}
+
+impl ExecutorError {
+    /// Classify this error into an ErrorCategory for recovery decisions.
+    pub fn classify(&self) -> ErrorCategory {
+        use crate::error::classification::{FatalReason, TransientReason};
+
+        match self {
+            ExecutorError::Timeout(_) => ErrorCategory::Timeout(TimeoutReason::ProcessTimeout),
+            ExecutorError::Cancelled => ErrorCategory::Fatal(FatalReason::InternalError),
+            ExecutorError::StoryNotFound(_) => ErrorCategory::Fatal(FatalReason::ResourceNotFound),
+            ExecutorError::PrdError(_) => ErrorCategory::Fatal(FatalReason::ConfigurationError),
+            ExecutorError::GitError(_) => ErrorCategory::Transient(TransientReason::ResourceLocked),
+            ExecutorError::QualityGateFailed(_) => ErrorCategory::Fatal(FatalReason::InternalError),
+            ExecutorError::AgentError(_) => ErrorCategory::Transient(TransientReason::ServerError),
+            ExecutorError::IoError(_) => ErrorCategory::Transient(TransientReason::NetworkError),
+        }
+    }
+}
 
 /// Configuration for the story executor
 #[derive(Debug, Clone)]
@@ -87,6 +122,14 @@ pub struct ExecutorConfig {
     pub max_iterations: u32,
     /// Optional mutex for serializing git operations across parallel executions
     pub git_mutex: Option<Arc<Mutex<()>>>,
+    /// Timeout configuration for execution limits
+    pub timeout_config: TimeoutConfig,
+    /// Enable futile retry detection to stop early on hopeless patterns
+    pub enable_futility_detection: bool,
+    /// Configuration for futility detection thresholds
+    pub futility_config: FutilityConfig,
+    /// Optional metrics collector for tracking execution statistics
+    pub metrics_collector: Option<MetricsCollector>,
 }
 
 impl Default for ExecutorConfig {
@@ -99,6 +142,10 @@ impl Default for ExecutorConfig {
             agent_command: "claude".to_string(),
             max_iterations: 10,
             git_mutex: None,
+            timeout_config: TimeoutConfig::default(),
+            enable_futility_detection: true,
+            futility_config: FutilityConfig::default(),
+            metrics_collector: None,
         }
     }
 }
@@ -106,12 +153,29 @@ impl Default for ExecutorConfig {
 /// Story executor that handles the end-to-end execution of user stories
 pub struct StoryExecutor {
     config: ExecutorConfig,
+    checkpoint_manager: Option<CheckpointManager>,
 }
 
 impl StoryExecutor {
     /// Create a new story executor with the given configuration
     pub fn new(config: ExecutorConfig) -> Self {
-        Self { config }
+        // Attempt to create a checkpoint manager for the project root
+        let checkpoint_manager = CheckpointManager::new(&config.project_root).ok();
+        Self {
+            config,
+            checkpoint_manager,
+        }
+    }
+
+    /// Create a new story executor with an explicit checkpoint manager
+    pub fn with_checkpoint_manager(
+        config: ExecutorConfig,
+        checkpoint_manager: Option<CheckpointManager>,
+    ) -> Self {
+        Self {
+            config,
+            checkpoint_manager,
+        }
     }
 
     /// Execute a single story by ID
@@ -146,30 +210,114 @@ impl StoryExecutor {
         let prd = self.load_prd()?;
         let story = self.find_story(&prd, story_id)?;
 
-        // Build the prompt for the agent
-        let prompt = self.build_agent_prompt(story, &prd);
+        // Initialize iteration context for learning transfer
+        let mut iter_context = IterationContext::new(story_id, self.config.max_iterations);
 
+        // Initialize futility detector if enabled
+        let futility_detector = if self.config.enable_futility_detection {
+            Some(FutileRetryDetector::with_config(
+                self.config.futility_config.clone(),
+            ))
+        } else {
+            None
+        };
+
+        // Record metrics start if collector is available
+        if let Some(ref collector) = self.config.metrics_collector {
+            collector.start_story(story_id, self.config.max_iterations);
+        }
+
+        let execution_start = std::time::Instant::now();
         let mut iterations_used = 0;
         let mut last_error: Option<String> = None;
-        let mut files_changed: Vec<String>;
+        let mut files_changed: Vec<String> = Vec::new();
+        let mut last_gate_results: Vec<GateResult> = Vec::new();
 
         // Iteration loop
         for iteration in 1..=self.config.max_iterations {
             iterations_used = iteration;
+            iter_context.start_iteration(iteration);
             on_iteration(iteration, self.config.max_iterations);
+
+            // Record iteration in metrics
+            if let Some(ref collector) = self.config.metrics_collector {
+                collector.record_iteration(iteration);
+            }
 
             // Check for cancellation
             if *cancel_receiver.borrow() {
                 return Err(ExecutorError::Cancelled);
             }
 
+            // Build the prompt with iteration context if we have previous errors
+            let prompt = if iter_context.error_history.is_empty() {
+                self.build_agent_prompt(story, &prd)
+            } else {
+                self.build_agent_prompt_with_context(story, &prd, &iter_context)
+            };
+
             // Run the agent
             match self.run_agent(&prompt, iteration).await {
                 Ok(changed) => {
                     files_changed = changed;
                 }
+                Err(ExecutorError::Timeout(msg)) => {
+                    // Record timeout error in context
+                    iter_context.record_error(IterationError::new(
+                        iteration,
+                        IterErrorCategory::AgentExecution,
+                        &msg,
+                    ));
+
+                    // Record in metrics
+                    if let Some(ref collector) = self.config.metrics_collector {
+                        collector.record_error(IterErrorCategory::AgentExecution);
+                    }
+
+                    // On timeout, save checkpoint before returning error
+                    self.save_timeout_checkpoint(story_id, iteration);
+                    return Err(ExecutorError::Timeout(msg));
+                }
                 Err(e) => {
-                    last_error = Some(e.to_string());
+                    let error_msg = e.to_string();
+                    let category = IterErrorCategory::from_error_message(&error_msg, None);
+
+                    // Record error in iteration context
+                    iter_context.record_error(IterationError::new(iteration, category, &error_msg));
+
+                    // Record in metrics
+                    if let Some(ref collector) = self.config.metrics_collector {
+                        collector.record_error(category);
+                    }
+
+                    last_error = Some(error_msg);
+
+                    // Check for futility before continuing
+                    if let Some(ref detector) = futility_detector {
+                        let verdict = detector.analyze(&iter_context);
+                        if !verdict.should_continue() {
+                            // Record metrics completion
+                            if let Some(ref collector) = self.config.metrics_collector {
+                                collector.complete_story(
+                                    false,
+                                    execution_start.elapsed(),
+                                    Some(format!("Futile: {:?}", verdict.reason())),
+                                );
+                            }
+
+                            return Ok(ExecutionResult {
+                                success: false,
+                                commit_hash: None,
+                                error: verdict.reason().map(String::from),
+                                iterations_used,
+                                gate_results: last_gate_results,
+                                files_changed,
+                                futility_verdict: Some(verdict),
+                                iteration_context: Some(iter_context),
+                            });
+                        }
+                    }
+
                     continue; // Try next iteration
                 }
             }
@@ -179,8 +327,22 @@ impl StoryExecutor {
                 return Err(ExecutorError::Cancelled);
             }
 
-            // Run quality gates
+            // Run quality gates with timing
+            let gate_start = std::time::Instant::now();
             let gate_results = self.run_quality_gates();
+            let gate_duration = gate_start.elapsed();
+
+            // Record gate durations in metrics
+            if let Some(ref collector) = self.config.metrics_collector {
+                for gate in &gate_results {
+                    collector.record_gate_duration(
+                        &gate.gate_name,
+                        gate_duration / gate_results.len() as u32,
+                    );
+                }
+            }
+
+            last_gate_results = gate_results.clone();
             let all_passed = QualityGateChecker::all_passed(&gate_results);
 
             if all_passed {
@@ -189,6 +351,11 @@ impl StoryExecutor {
                 self.update_prd_passes(story_id)?;
                 self.append_progress(story, &files_changed, iteration)?;
 
+                // Record successful completion in metrics
+                if let Some(ref collector) = self.config.metrics_collector {
+                    collector.complete_story(true, execution_start.elapsed(), None);
+                }
+
                 return Ok(ExecutionResult {
                     success: true,
                     commit_hash: Some(commit_hash),
@@ -196,24 +363,89 @@ impl StoryExecutor {
                     iterations_used,
                     gate_results,
                     files_changed,
+                    futility_verdict: None,
+                    iteration_context: Some(iter_context),
                 });
             }
 
-            // Quality gates failed, prepare error message for next iteration
+            // Quality gates failed, record in iteration context
             let failed_gates: Vec<&str> = gate_results
                 .iter()
                 .filter(|g| !g.passed)
                 .map(|g| g.gate_name.as_str())
                 .collect();
+
+            // Record each failed gate as an error
+            for gate_name in &failed_gates {
+                let category = IterErrorCategory::from_error_message("", Some(gate_name));
+                iter_context.record_error(
+                    IterationError::new(
+                        iteration,
+                        category,
+                        format!("Gate '{}' failed", gate_name),
+                    )
+                    .with_gate(*gate_name)
+                    .with_files(files_changed.clone()),
+                );
+
+                // Record in metrics
+                if let Some(ref collector) = self.config.metrics_collector {
+                    collector.record_error(category);
+                }
+            }
+
             last_error = Some(format!("Quality gates failed: {}", failed_gates.join(", ")));
+
+            // Check for futility after gate failures
+            if let Some(ref detector) = futility_detector {
+                let verdict = detector.analyze(&iter_context);
+                if !verdict.should_continue() {
+                    // Record metrics completion
+                    if let Some(ref collector) = self.config.metrics_collector {
+                        collector.complete_story(
+                            false,
+                            execution_start.elapsed(),
+                            Some(format!("Futile: {:?}", verdict.reason())),
+                        );
+                    }
+
+                    return Ok(ExecutionResult {
+                        success: false,
+                        commit_hash: None,
+                        error: verdict.reason().map(String::from),
+                        iterations_used,
+                        gate_results,
+                        files_changed,
+                        futility_verdict: Some(verdict),
+                        iteration_context: Some(iter_context),
+                    });
+                }
+            }
         }
 
         // Max iterations reached without success
+        // Record metrics completion
+        if let Some(ref collector) = self.config.metrics_collector {
+            collector.complete_story(false, execution_start.elapsed(), last_error.clone());
+        }
+
         Err(ExecutorError::AgentError(format!(
             "Failed after {} iterations. Last error: {}",
             iterations_used,
             last_error.unwrap_or_else(|| "Unknown error".to_string())
         )))
+    }
+
+    /// Build an agent prompt that includes iteration context from previous failures.
+    fn build_agent_prompt_with_context(
+        &self,
+        story: &PrdUserStory,
+        prd: &PrdFile,
+        context: &IterationContext,
+    ) -> String {
+        let base_prompt = self.build_agent_prompt(story, prd);
+        let context_section = context.build_prompt_context();
+        format!("{}{}", base_prompt, context_section)
     }
 
     /// Load the PRD file
@@ -271,6 +503,10 @@ impl StoryExecutor {
     }
 
     /// Run the agent (Claude Code or Amp CLI) to implement the story
+    ///
+    /// This method integrates heartbeat monitoring to detect stalled agents.
+    /// The heartbeat is updated whenever the agent produces output, and stall
+    /// detection triggers a graceful timeout.
     async fn run_agent(&self, prompt: &str, iteration: u32) -> Result<Vec<String>, ExecutorError> {
         let agent_cmd = &self.config.agent_command;
 
@@ -298,21 +534,208 @@ impl StoryExecutor {
             )));
         }
 
-        // Run the agent with the prompt
-        let output = tokio::process::Command::new(program)
+        // Create heartbeat monitor for stall detection
+        let (heartbeat_monitor, mut heartbeat_receiver) =
+            HeartbeatMonitor::new(self.config.timeout_config.clone());
+
+        // Start heartbeat monitoring before agent execution
+        heartbeat_monitor.start_monitoring().await;
+
+        // Spawn the agent process with piped stdout/stderr for streaming
+        let mut child = tokio::process::Command::new(program)
             .args(&args)
             .current_dir(&self.config.project_root)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| ExecutorError::AgentError(format!("Failed to run {}: {}", program, e)))?;
+            .spawn()
+            .map_err(|e| {
+                ExecutorError::AgentError(format!("Failed to spawn {}: {}", program, e))
+            })?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(ExecutorError::AgentError(format!(
-                "{} failed (iteration {}): {}",
-                program, iteration, stderr
+        // Take ownership of stdout and stderr
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+
+        // Create readers for stdout and stderr
+        let mut stdout_reader = stdout.map(|s| BufReader::new(s).lines());
+        let mut stderr_reader = stderr.map(|s| BufReader::new(s).lines());
+
+        // Collect stderr for error reporting
+        let mut stderr_output = String::new();
+
+        // Track if we received a stall detection
+        let mut stall_detected = false;
+
+        // Overall timeout for the agent execution
+        let timeout_duration = self.config.timeout_config.agent_timeout;
+        let timeout_deadline = tokio::time::Instant::now() + timeout_duration;
+
+        // Main loop: process output, heartbeat events, and wait for completion
+        loop {
+            tokio::select! {
+                // Check for heartbeat events
+                event = heartbeat_receiver.recv() => {
+                    match event {
+                        Some(HeartbeatEvent::Warning(missed)) => {
+                            // Log warning about missed heartbeats
+                            eprintln!(
+                                "Warning: Agent stall detected - {} missed heartbeats (iteration {})",
+                                missed, iteration
+                            );
+                        }
+                        Some(HeartbeatEvent::StallDetected(missed)) => {
+                            // Stall detected - trigger graceful timeout
+                            eprintln!(
+                                "Agent stall detected: {} missed heartbeats, triggering timeout (iteration {})",
+                                missed, iteration
+                            );
+                            stall_detected = true;
+                            // Kill the child process gracefully
+                            let _ = child.kill().await;
+                            break;
+                        }
+                        None => {
+                            // Channel closed, continue processing
+                        }
+                    }
+                }
+
+                // Read stdout line
+                line = async {
+                    if let Some(ref mut reader) = stdout_reader {
+                        reader.next_line().await
+                    } else {
+                        Ok(None)
+                    }
+                } => {
+                    match line {
+                        Ok(Some(_)) => {
+                            // Activity detected - update heartbeat
+                            heartbeat_monitor.pulse().await;
+                        }
+                        Ok(None) => {
+                            // EOF on stdout
+                            stdout_reader = None;
+                        }
+                        Err(_) => {
+                            stdout_reader = None;
+                        }
+                    }
+                }
+
+                // Read stderr line
+                line = async {
+                    if let Some(ref mut reader) = stderr_reader {
+                        reader.next_line().await
+                    } else {
+                        Ok(None)
+                    }
+                } => {
+                    match line {
+                        Ok(Some(text)) => {
+                            // Activity detected - update heartbeat
+                            heartbeat_monitor.pulse().await;
+                            // Collect stderr for error reporting
+                            stderr_output.push_str(&text);
+                            stderr_output.push('\n');
+                        }
+                        Ok(None) => {
+                            // EOF on stderr
+                            stderr_reader = None;
+                        }
+                        Err(_) => {
+                            stderr_reader = None;
+                        }
+                    }
+                }
+
+                // Check for process completion
+                status = child.wait() => {
+                    match status {
+                        Ok(exit_status) => {
+                            // Stop heartbeat monitoring
+                            heartbeat_monitor.stop().await;
+
+                            if !exit_status.success() {
+                                return Err(ExecutorError::AgentError(format!(
+                                    "{} failed (iteration {}): {}",
+                                    program, iteration, stderr_output.trim()
+                                )));
+                            }
+                            // Process completed successfully
+                            let files_changed = self.get_changed_files()?;
+                            return Ok(files_changed);
+                        }
+                        Err(e) => {
+                            heartbeat_monitor.stop().await;
+                            return Err(ExecutorError::AgentError(format!(
+                                "Failed to wait for {}: {}", program, e
+                            )));
+                        }
+                    }
+                }
+
+                // Overall timeout
+                _ = tokio::time::sleep_until(timeout_deadline) => {
+                    heartbeat_monitor.stop().await;
+                    let _ = child.kill().await;
+                    return Err(ExecutorError::Timeout(format!(
+                        "Agent '{}' timed out after {:?} (iteration {})",
+                        program, timeout_duration, iteration
+                    )));
+                }
+            }
+
+            // Check if both readers are done and process hasn't exited yet
+            if stdout_reader.is_none() && stderr_reader.is_none() {
+                // Wait for process to exit
+                match child.wait().await {
+                    Ok(exit_status) => {
+                        heartbeat_monitor.stop().await;
+
+                        if stall_detected {
+                            return Err(ExecutorError::Timeout(format!(
+                                "Agent '{}' stalled (no output for {:?}) (iteration {})",
+                                program,
+                                self.config.timeout_config.heartbeat_interval
+                                    * self.config.timeout_config.missed_heartbeats_threshold,
+                                iteration
+                            )));
+                        }
+
+                        if !exit_status.success() {
+                            return Err(ExecutorError::AgentError(format!(
+                                "{} failed (iteration {}): {}",
+                                program,
+                                iteration,
+                                stderr_output.trim()
+                            )));
+                        }
+
+                        let files_changed = self.get_changed_files()?;
+                        return Ok(files_changed);
+                    }
+                    Err(e) => {
+                        heartbeat_monitor.stop().await;
+                        return Err(ExecutorError::AgentError(format!(
+                            "Failed to wait for {}: {}",
+                            program, e
+                        )));
+                    }
+                }
+            }
+        }
+
+        // Stop heartbeat monitoring after execution completes
+        heartbeat_monitor.stop().await;
+
+        if stall_detected {
+            return Err(ExecutorError::Timeout(format!(
+                "Agent '{}' stalled (no output for {:?}) (iteration {})",
+                program,
+                self.config.timeout_config.heartbeat_interval
+                    * self.config.timeout_config.missed_heartbeats_threshold,
+                iteration
             )));
         }
 
@@ -348,6 +771,35 @@ impl StoryExecutor {
             .collect();
 
         Ok(files)
+    }
+
+    /// Save a checkpoint when execution times out.
+    ///
+    /// This captures the current execution state so the story can be resumed later.
+    /// Errors during checkpoint saving are logged but not propagated.
+    fn save_timeout_checkpoint(&self, story_id: &str, iteration: u32) {
+        if let Some(ref manager) = self.checkpoint_manager {
+            // Get uncommitted files for checkpoint
+            let uncommitted_files = self.get_changed_files().unwrap_or_default();
+
+            let checkpoint = Checkpoint::new(
+                Some(StoryCheckpoint::new(
+                    story_id,
+                    iteration,
+                    self.config.max_iterations,
+                )),
+                PauseReason::Timeout,
+                uncommitted_files,
+            );
+
+            // Save checkpoint with error logging (best effort, but warn on failure)
+            if let Err(e) = manager.save(&checkpoint) {
+                eprintln!(
+                    "Warning: Failed to save timeout checkpoint for story '{}': {}",
+                    story_id, e
+                );
+            }
+        }
     }
 
     /// Run quality gates and return results

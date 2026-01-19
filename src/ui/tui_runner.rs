@@ -147,7 +147,7 @@ impl TuiRunnerDisplay {
             "off"
         };
         self.style_dim(&format!(
-            " [s] stream: {} | [e] expand: {} | [q] quit",
+            " [s] stream: {} | [e] expand: {} | [p] pause | [q] quit",
             streaming, expand
         ))
         .to_string()

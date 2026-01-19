@@ -38,7 +38,7 @@
       "description": "As a developer, I need logging middleware for debugging.",
       "id": "TEST-003",
       "notes": "",
-      "passes": true,
+      "passes": false,
       "priority": 3,
       "title": "Implement logging middleware"
     }
