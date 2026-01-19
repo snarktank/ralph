@@ -161,6 +161,20 @@ pub enum ParallelUIEvent {
         /// Reason for falling back to sequential execution.
         reason: String,
     },
+
+    /// Keyboard toggle event (streaming, expand, or quit).
+    KeyboardToggle {
+        /// Type of toggle: "streaming", "expand", or "quit"
+        toggle_type: String,
+        /// New state (true = on, false = off)
+        new_state: bool,
+    },
+
+    /// Graceful quit requested (finish current stories, then exit).
+    GracefulQuitRequested,
+
+    /// Immediate interrupt requested (Ctrl+C).
+    ImmediateInterrupt,
 }
 
 impl ParallelUIEvent {
@@ -175,6 +189,9 @@ impl ParallelUIEvent {
             Self::ConflictDeferred { story_id, .. } => Some(story_id),
             Self::ReconciliationStatus { .. } => None,
             Self::SequentialRetryStarted { story_id, .. } => Some(story_id),
+            Self::KeyboardToggle { .. } => None,
+            Self::GracefulQuitRequested => None,
+            Self::ImmediateInterrupt => None,
         }
     }
 

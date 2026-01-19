@@ -393,6 +393,11 @@ impl ParallelRunner {
                         | ParallelUIEvent::ReconciliationStatus { .. } => {
                             // These events don't have direct display methods yet
                         }
+                        ParallelUIEvent::KeyboardToggle { .. }
+                        | ParallelUIEvent::GracefulQuitRequested
+                        | ParallelUIEvent::ImmediateInterrupt => {
+                            // Keyboard events are handled separately by the keyboard listener
+                        }
                     }
                 }
             }))

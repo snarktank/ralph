@@ -41,13 +41,15 @@ pub struct ToggleState {
     pub show_streaming: AtomicBool,
     /// Whether details are expanded
     pub expand_details: AtomicBool,
-    /// Whether quit was requested
+    /// Whether graceful quit was requested (finish current stories, then exit)
     pub quit_requested: AtomicBool,
+    /// Whether immediate interrupt was requested (Ctrl+C)
+    pub immediate_interrupt: AtomicBool,
 }
 
 impl Default for ToggleState {
     fn default() -> Self {
-        Self::new(true, false) // Streaming on by default
+        Self::new(false, false) // Streaming off by default, expand off by default
     }
 }
 
@@ -58,6 +60,7 @@ impl ToggleState {
             show_streaming: AtomicBool::new(show_streaming),
             expand_details: AtomicBool::new(expand_details),
             quit_requested: AtomicBool::new(false),
+            immediate_interrupt: AtomicBool::new(false),
         }
     }
 
@@ -88,9 +91,24 @@ impl ToggleState {
         !old
     }
 
-    /// Request quit.
+    /// Request graceful quit (finish current stories, then exit).
     pub fn request_quit(&self) {
         self.quit_requested.store(true, Ordering::Relaxed);
+    }
+
+    /// Check if immediate interrupt was requested (Ctrl+C).
+    pub fn is_immediate_interrupt(&self) -> bool {
+        self.immediate_interrupt.load(Ordering::Relaxed)
+    }
+
+    /// Request immediate interrupt (Ctrl+C).
+    pub fn request_immediate_interrupt(&self) {
+        self.immediate_interrupt.store(true, Ordering::Relaxed);
+    }
+
+    /// Check if any form of quit was requested (graceful or immediate).
+    pub fn should_stop(&self) -> bool {
+        self.is_quit_requested() || self.is_immediate_interrupt()
     }
 }
 
@@ -180,9 +198,9 @@ impl KeyboardListener {
 
     /// Handle a key event.
     fn handle_key_event(state: &ToggleState, bindings: &KeyBindings, event: KeyEvent) {
-        // Check for Ctrl+C (always quit)
+        // Check for Ctrl+C (immediate interrupt)
         if event.modifiers.contains(KeyModifiers::CONTROL) && event.code == KeyCode::Char('c') {
-            state.request_quit();
+            state.request_immediate_interrupt();
             return;
         }
 
@@ -243,7 +261,7 @@ pub fn render_toggle_hint(state: &ToggleState) -> String {
     };
 
     format!(
-        " [s] streaming: {} │ [e] expand: {} │ [q] quit │ [ctrl+c] interrupt",
+        "[s] stream: {} | [e] expand: {} | [q] quit",
         streaming_status, expand_status
     )
 }
@@ -260,9 +278,10 @@ mod tests {
     #[test]
     fn test_toggle_state_default() {
         let state = ToggleState::default();
-        assert!(state.should_show_streaming()); // Streaming on by default
+        assert!(!state.should_show_streaming()); // Streaming off by default
         assert!(!state.should_expand_details());
         assert!(!state.is_quit_requested());
+        assert!(!state.is_immediate_interrupt());
     }
 
     #[test]
@@ -293,16 +312,58 @@ mod tests {
     fn test_quit_request() {
         let state = ToggleState::default();
         assert!(!state.is_quit_requested());
+        assert!(!state.should_stop());
 
         state.request_quit();
         assert!(state.is_quit_requested());
+        assert!(state.should_stop());
+    }
+
+    #[test]
+    fn test_immediate_interrupt() {
+        let state = ToggleState::default();
+        assert!(!state.is_immediate_interrupt());
+        assert!(!state.should_stop());
+
+        state.request_immediate_interrupt();
+        assert!(state.is_immediate_interrupt());
+        assert!(state.should_stop());
+    }
+
+    #[test]
+    fn test_should_stop_either_quit() {
+        // Test that should_stop returns true for either quit type
+        let state1 = ToggleState::default();
+        state1.request_quit();
+        assert!(state1.should_stop());
+
+        let state2 = ToggleState::default();
+        state2.request_immediate_interrupt();
+        assert!(state2.should_stop());
     }
 
     #[test]
     fn test_render_toggle_hint() {
         let state = ToggleState::new(true, false);
         let hint = render_toggle_hint(&state);
-        assert!(hint.contains("streaming: on"));
+        assert!(hint.contains("stream: on"));
         assert!(hint.contains("expand: off"));
+        assert!(hint.contains("[q] quit"));
+    }
+
+    #[test]
+    fn test_render_toggle_hint_off() {
+        let state = ToggleState::new(false, false);
+        let hint = render_toggle_hint(&state);
+        assert!(hint.contains("stream: off"));
+        assert!(hint.contains("expand: off"));
+    }
+
+    #[test]
+    fn test_render_toggle_hint_expand_on() {
+        let state = ToggleState::new(false, true);
+        let hint = render_toggle_hint(&state);
+        assert!(hint.contains("stream: off"));
+        assert!(hint.contains("expand: on"));
     }
 }

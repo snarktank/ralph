@@ -8,12 +8,14 @@
 //! - In Flight section with active stories
 //! - Pending section with blocked stories
 //! - Completed section (collapsible)
+//! - Toggle hint bar for keyboard controls
 
 #![allow(dead_code)]
 
 use owo_colors::OwoColorize;
 
 use crate::ui::colors::Theme;
+use crate::ui::keyboard::ToggleState;
 use crate::ui::parallel_events::{StoryDisplayInfo, StoryStatus};
 use crate::ui::spinner::progress_chars;
 
@@ -917,6 +919,53 @@ impl ParallelStatusRenderer {
             text[..max_len].to_string()
         }
     }
+
+    /// Render the toggle hint bar showing keyboard controls.
+    ///
+    /// Format: [s] stream: off | [e] expand: off | [q] quit
+    pub fn render_hint_bar(&self, toggle_state: &ToggleState) -> String {
+        let streaming_status = if toggle_state.should_show_streaming() {
+            "on"
+        } else {
+            "off"
+        };
+        let expand_status = if toggle_state.should_expand_details() {
+            "on"
+        } else {
+            "off"
+        };
+
+        if self.colors_enabled {
+            format!(
+                "{} {} {} {} {} {} {} {}",
+                "[s]".color(self.theme.active).bold(),
+                format!("stream: {}", streaming_status).color(self.theme.muted),
+                "│".color(self.theme.muted),
+                "[e]".color(self.theme.active).bold(),
+                format!("expand: {}", expand_status).color(self.theme.muted),
+                "│".color(self.theme.muted),
+                "[q]".color(self.theme.warning).bold(),
+                "quit".color(self.theme.muted)
+            )
+        } else {
+            format!(
+                "[s] stream: {} │ [e] expand: {} │ [q] quit",
+                streaming_status, expand_status
+            )
+        }
+    }
+
+    /// Render the complete status display with hint bar.
+    pub fn render_with_hints(
+        &self,
+        state: &ParallelExecutionState,
+        toggle_state: &ToggleState,
+    ) -> String {
+        let mut output = self.render(state);
+        output.push('\n');
+        output.push_str(&self.render_hint_bar(toggle_state));
+        output
+    }
 }
 
 #[cfg(test)]
@@ -958,7 +1007,7 @@ mod tests {
 
     #[test]
     fn test_parallel_execution_state_add_story() {
-        let mut state = create_test_state();
+        let state = create_test_state();
         assert_eq!(state.total_count(), 4);
         assert_eq!(state.pending_count(), 4);
         assert_eq!(state.running_count(), 0);
@@ -1210,5 +1259,65 @@ mod tests {
         assert!(output.contains("Pending"));
         assert!(output.contains("Completed"));
         assert!(output.contains("Failed"));
+    }
+
+    #[test]
+    fn test_render_hint_bar_default() {
+        let renderer = ParallelStatusRenderer::new().with_colors(false);
+        let toggle_state = ToggleState::default();
+
+        let hint = renderer.render_hint_bar(&toggle_state);
+        assert!(hint.contains("[s]"));
+        assert!(hint.contains("stream: off"));
+        assert!(hint.contains("[e]"));
+        assert!(hint.contains("expand: off"));
+        assert!(hint.contains("[q]"));
+        assert!(hint.contains("quit"));
+    }
+
+    #[test]
+    fn test_render_hint_bar_streaming_on() {
+        let renderer = ParallelStatusRenderer::new().with_colors(false);
+        let toggle_state = ToggleState::new(true, false);
+
+        let hint = renderer.render_hint_bar(&toggle_state);
+        assert!(hint.contains("stream: on"));
+        assert!(hint.contains("expand: off"));
+    }
+
+    #[test]
+    fn test_render_hint_bar_expand_on() {
+        let renderer = ParallelStatusRenderer::new().with_colors(false);
+        let toggle_state = ToggleState::new(false, true);
+
+        let hint = renderer.render_hint_bar(&toggle_state);
+        assert!(hint.contains("stream: off"));
+        assert!(hint.contains("expand: on"));
+    }
+
+    #[test]
+    fn test_render_hint_bar_both_on() {
+        let renderer = ParallelStatusRenderer::new().with_colors(false);
+        let toggle_state = ToggleState::new(true, true);
+
+        let hint = renderer.render_hint_bar(&toggle_state);
+        assert!(hint.contains("stream: on"));
+        assert!(hint.contains("expand: on"));
+    }
+
+    #[test]
+    fn test_render_with_hints() {
+        let state = create_test_state();
+        let toggle_state = ToggleState::default();
+        let renderer = ParallelStatusRenderer::new().with_colors(false);
+
+        let output = renderer.render_with_hints(&state, &toggle_state);
+
+        // Should contain the main content
+        assert!(output.contains("Test PRD"));
+        // Should contain the hint bar
+        assert!(output.contains("[s]"));
+        assert!(output.contains("[e]"));
+        assert!(output.contains("[q]"));
     }
 }
