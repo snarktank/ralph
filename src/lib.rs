@@ -8,6 +8,7 @@ pub mod checkpoint;
 pub mod error;
 pub mod integrations;
 pub mod mcp;
+pub mod notification;
 pub mod parallel;
 pub mod pause;
 pub mod quality;
