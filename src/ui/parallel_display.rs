@@ -233,18 +233,51 @@ impl ParallelRunnerDisplay {
 
         let mut message = format!("{} {} - {}", styled_icon, styled_id, display_title);
 
-        // Add iteration info if available
+        // Add iteration info with visual progress bar if available
         if let Some((current, max)) = iteration_info {
             let iter_text = format!("[{}/{}]", current, max);
+            let progress_bar = Self::format_progress_bar(current, max);
             let styled_iter = if self.colors_enabled {
-                format!("{}", iter_text.color(self.theme.muted))
+                format!(
+                    "{} {}",
+                    iter_text.color(self.theme.muted),
+                    progress_bar.color(self.theme.in_progress)
+                )
             } else {
-                iter_text
+                format!("{} {}", iter_text, progress_bar)
             };
             message.push_str(&format!(" {}", styled_iter));
         }
 
         message
+    }
+
+    /// Format a visual progress bar string.
+    ///
+    /// # Arguments
+    /// * `current` - Current iteration (1-indexed)
+    /// * `max` - Maximum iterations
+    ///
+    /// # Returns
+    /// A string like "====--" representing progress
+    fn format_progress_bar(current: u32, max: u32) -> String {
+        // Use a fixed width for the progress bar
+        const BAR_WIDTH: u32 = 6;
+
+        if max == 0 {
+            return "-".repeat(BAR_WIDTH as usize);
+        }
+
+        // Calculate filled portion (current is 1-indexed, so current-1 iterations are complete)
+        let completed = current.saturating_sub(1);
+        let filled = ((completed as f64 / max as f64) * BAR_WIDTH as f64).round() as u32;
+        let empty = BAR_WIDTH.saturating_sub(filled);
+
+        format!(
+            "{}{}",
+            "=".repeat(filled as usize),
+            "-".repeat(empty as usize)
+        )
     }
 
     /// Get the theme color for a story status.

@@ -401,3 +401,13 @@ Feature: Codebase Audit
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
+
+## 2026-01-18 18:36 - US-006
+- **What was implemented**: Replace eprintln with UI events in scheduler
+- **Files changed**:
+  - rogress.txt
+  - rc/parallel/scheduler.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---

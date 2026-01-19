@@ -572,8 +572,22 @@ impl ParallelRunner {
                     let executor = StoryExecutor::new(executor_config);
                     let (_cancel_tx, cancel_rx) = watch::channel(false);
 
+                    // Clone for iteration callback closure
+                    let iter_story_id = story_id_clone.clone();
+                    let iter_ui_sender = task_ui_sender.clone();
+
                     let result = executor
-                        .execute_story(&story_id_clone, cancel_rx, |_iter, _max| {})
+                        .execute_story(&story_id_clone, cancel_rx, |iter, max| {
+                            if let Some(ref sender) = iter_ui_sender {
+                                let event = ParallelUIEvent::IterationUpdate {
+                                    story_id: iter_story_id.clone(),
+                                    iteration: iter,
+                                    max_iterations: max,
+                                    message: None,
+                                };
+                                let _ = sender.try_send(event);
+                            }
+                        })
                         .await;
 
                     let duration_ms = start_time.elapsed().as_millis() as u64;
@@ -789,8 +803,22 @@ impl ParallelRunner {
                             let executor = StoryExecutor::new(executor_config);
                             let (_cancel_tx, cancel_rx) = watch::channel(false);
 
+                            // Clone for iteration callback closure
+                            let iter_story_id = story_id.clone();
+                            let iter_ui_sender = ui_sender.clone();
+
                             let result = executor
-                                .execute_story(story_id, cancel_rx, |_iter, _max| {})
+                                .execute_story(story_id, cancel_rx, |iter, max| {
+                                    if let Some(ref sender) = iter_ui_sender {
+                                        let event = ParallelUIEvent::IterationUpdate {
+                                            story_id: iter_story_id.clone(),
+                                            iteration: iter,
+                                            max_iterations: max,
+                                            message: None,
+                                        };
+                                        let _ = sender.try_send(event);
+                                    }
+                                })
                                 .await;
 
                             let duration_ms = start_time.elapsed().as_millis() as u64;
