@@ -64,6 +64,8 @@ pub fn state_description(state: &ExecutionState) -> &'static str {
         ExecutionState::Running { .. } => "running",
         ExecutionState::Completed { .. } => "completed",
         ExecutionState::Failed { .. } => "failed",
+        ExecutionState::Paused { .. } => "paused",
+        ExecutionState::WaitingForRetry { .. } => "waiting_for_retry",
     }
 }
 

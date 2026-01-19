@@ -600,6 +600,19 @@ impl RalphDisplay {
             StateTransition::ToFailed { story_id, error } => {
                 self.handle_failed(&story_id, &error, story_info);
             }
+            StateTransition::ToPaused {
+                story_id,
+                pause_reason,
+            } => {
+                self.handle_paused(&story_id, &pause_reason);
+            }
+            StateTransition::ToWaitingForRetry {
+                story_id,
+                attempt,
+                max_attempts,
+            } => {
+                self.handle_waiting_for_retry(&story_id, attempt, max_attempts);
+            }
             StateTransition::ToIdle => {
                 self.handle_idle();
             }
@@ -615,7 +628,7 @@ impl RalphDisplay {
     /// Detect the type of state transition.
     fn detect_transition(&self, new_state: &ExecutionState) -> StateTransition {
         match (&self.last_state, new_state) {
-            // Transition to Running
+            // Transition to Running (from various states including Paused and WaitingForRetry)
             (
                 None | Some(ExecutionState::Idle),
                 ExecutionState::Running {
@@ -634,6 +647,22 @@ impl RalphDisplay {
             )
             | (
                 Some(ExecutionState::Failed { .. }),
+                ExecutionState::Running {
+                    story_id,
+                    max_iterations,
+                    ..
+                },
+            )
+            | (
+                Some(ExecutionState::Paused { .. }),
+                ExecutionState::Running {
+                    story_id,
+                    max_iterations,
+                    ..
+                },
+            )
+            | (
+                Some(ExecutionState::WaitingForRetry { .. }),
                 ExecutionState::Running {
                     story_id,
                     max_iterations,
@@ -676,6 +705,32 @@ impl RalphDisplay {
                     error: error.clone(),
                 }
             }
+            // Transition to Paused
+            (
+                Some(ExecutionState::Running { .. }),
+                ExecutionState::Paused {
+                    story_id,
+                    pause_reason,
+                    ..
+                },
+            ) => StateTransition::ToPaused {
+                story_id: story_id.clone(),
+                pause_reason: pause_reason.clone(),
+            },
+            // Transition to WaitingForRetry
+            (
+                Some(ExecutionState::Running { .. }),
+                ExecutionState::WaitingForRetry {
+                    story_id,
+                    attempt,
+                    max_attempts,
+                    ..
+                },
+            ) => StateTransition::ToWaitingForRetry {
+                story_id: story_id.clone(),
+                attempt: *attempt,
+                max_attempts: *max_attempts,
+            },
             // Transition to Idle (reset)
             (Some(_), ExecutionState::Idle) => StateTransition::ToIdle,
             // No transition (same state)
@@ -806,6 +861,31 @@ impl RalphDisplay {
 
         // Clear the current story
         self.clear_current_story();
+    }
+
+    /// Handle transition to Paused state.
+    fn handle_paused(&mut self, story_id: &str, pause_reason: &str) {
+        // Update the spinner to show paused state
+        self.update_spinner_message(format!("Story {} paused: {}", story_id, pause_reason));
+
+        // Update terminal title to show paused state
+        let _ = self
+            .ghostty
+            .update_title(Some(story_id), None, TitleStatus::Running);
+    }
+
+    /// Handle transition to WaitingForRetry state.
+    fn handle_waiting_for_retry(&mut self, story_id: &str, attempt: u32, max_attempts: u32) {
+        // Update the spinner to show retry waiting state
+        self.update_spinner_message(format!(
+            "Story {} waiting for retry (attempt {}/{})",
+            story_id, attempt, max_attempts
+        ));
+
+        // Update terminal title to show retry state
+        let _ = self
+            .ghostty
+            .update_title(Some(story_id), None, TitleStatus::Running);
     }
 
     /// Handle transition to Idle state.
@@ -981,6 +1061,17 @@ enum StateTransition {
     },
     /// Transitioning to Failed state
     ToFailed { story_id: String, error: String },
+    /// Transitioning to Paused state
+    ToPaused {
+        story_id: String,
+        pause_reason: String,
+    },
+    /// Transitioning to WaitingForRetry state
+    ToWaitingForRetry {
+        story_id: String,
+        attempt: u32,
+        max_attempts: u32,
+    },
     /// Transitioning to Idle state
     ToIdle,
     /// No transition (same state)

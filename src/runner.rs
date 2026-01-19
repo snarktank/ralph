@@ -29,6 +29,14 @@ pub struct RunnerConfig {
     pub parallel: bool,
     /// Configuration for parallel execution (used when parallel is true)
     pub parallel_config: Option<ParallelRunnerConfig>,
+    /// Resume from checkpoint if available
+    pub resume: bool,
+    /// Skip checkpoint prompt (do not resume)
+    pub no_resume: bool,
+    /// Agent timeout override in seconds (None = use default)
+    pub timeout_seconds: Option<u64>,
+    /// Disable checkpointing
+    pub no_checkpoint: bool,
 }
 
 impl Default for RunnerConfig {
@@ -42,6 +50,10 @@ impl Default for RunnerConfig {
             display_options: DisplayOptions::default(),
             parallel: false,
             parallel_config: None,
+            resume: false,
+            no_resume: false,
+            timeout_seconds: None,
+            no_checkpoint: false,
         }
     }
 }

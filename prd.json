@@ -189,7 +189,7 @@
       "description": "As a user, I want themed notification panels for different error states.",
       "id": "US-010",
       "notes": "Reuses existing RalphDisplay and color utilities",
-      "passes": false,
+      "passes": true,
       "priority": 10,
       "title": "Notification renderer with themed panels"
     },
