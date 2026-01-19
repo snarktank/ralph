@@ -4,7 +4,12 @@
 //! for agent execution, including agent-level and iteration-level limits,
 //! as well as heartbeat monitoring.
 
+pub mod heartbeat;
+
 use std::time::Duration;
+
+// Re-export heartbeat types for convenient access
+pub use heartbeat::{HeartbeatEvent, HeartbeatMonitor};
 
 /// Configuration for timeout behavior during agent execution.
 ///

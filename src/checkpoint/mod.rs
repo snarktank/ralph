@@ -3,6 +3,10 @@
 //! This module provides types and functionality for saving and loading
 //! execution state, enabling resumption after interruptions.
 
+pub mod manager;
+
+pub use manager::{CheckpointError, CheckpointManager, CheckpointResult};
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

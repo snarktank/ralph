@@ -323,10 +323,7 @@ mod tests {
         );
 
         let result = manager.verify(&checkpoint);
-        assert!(matches!(
-            result,
-            Err(CheckpointError::ValidationFailed(_))
-        ));
+        assert!(matches!(result, Err(CheckpointError::ValidationFailed(_))));
     }
 
     #[test]
@@ -341,10 +338,7 @@ mod tests {
         );
 
         let result = manager.verify(&checkpoint);
-        assert!(matches!(
-            result,
-            Err(CheckpointError::ValidationFailed(_))
-        ));
+        assert!(matches!(result, Err(CheckpointError::ValidationFailed(_))));
     }
 
     #[test]
@@ -393,10 +387,7 @@ mod tests {
 
         // Load should return second checkpoint
         let loaded = manager.load().unwrap().unwrap();
-        assert_eq!(
-            loaded.current_story.as_ref().unwrap().story_id,
-            "US-002"
-        );
+        assert_eq!(loaded.current_story.as_ref().unwrap().story_id, "US-002");
         assert_eq!(loaded.pause_reason, PauseReason::Timeout);
     }
 

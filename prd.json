@@ -96,7 +96,7 @@
       "description": "As Ralph, I need to timeout agent execution that exceeds time limits.",
       "id": "US-005",
       "notes": "Configurable via CLI flags",
-      "passes": false,
+      "passes": true,
       "priority": 5,
       "title": "Timeout configuration and wrapper"
     },
