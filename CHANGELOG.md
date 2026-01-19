@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.2.0](https://github.com/kcirtapfromspace/ralph/compare/v0.1.1...v0.2.0) (2026-01-19)
+
+
+### Features
+
+* Add parallel execution UX improvements ([612239c](https://github.com/kcirtapfromspace/ralph/commit/612239cc1376a8660d818155ba95ddcb3be3f60c))
+* Add timeout protection to prevent parallel execution hangs ([d516dc7](https://github.com/kcirtapfromspace/ralph/commit/d516dc717147f6219f95cf3100164172533530ee))
+* Error Recovery System with Checkpoint/Resume ([0d743b0](https://github.com/kcirtapfromspace/ralph/commit/0d743b0ffffd6963ab9594942d4a2c16004f6642))
+* TEST-001 - Create hello world function ([e4d2343](https://github.com/kcirtapfromspace/ralph/commit/e4d2343462a5d3d52f2b6b23ceefb38fe8a403b1))
+* TEST-003 - Implement logging middleware ([299b94b](https://github.com/kcirtapfromspace/ralph/commit/299b94be6ba4cbfa1397a1b2eef333a9a18d6bfc))
+* US-001 - Create parallel UI event system ([4eebe77](https://github.com/kcirtapfromspace/ralph/commit/4eebe77fe9fbcf7d02ba69338d68bed829529ee1))
+* US-001 - Error classification types and module structure ([c62a314](https://github.com/kcirtapfromspace/ralph/commit/c62a314d5aaf1286e6ee3aca526af78521eefaff))
+* US-002 - Create parallel display controller ([3f342a8](https://github.com/kcirtapfromspace/ralph/commit/3f342a87c5add05886cd42c68fe55b90b3872722))
+* US-002 - Error pattern detector for Claude Code errors ([01f48db](https://github.com/kcirtapfromspace/ralph/commit/01f48db3d187cbc31daedb52fc90a72ecc964a1d))
+* US-003 - Checkpoint types and save/load functionality ([d11bea3](https://github.com/kcirtapfromspace/ralph/commit/d11bea3249b1b2ebdcab7fa8271139bb30c1c7e8))
+* US-003 - Implement story lifecycle display methods ([8880ce2](https://github.com/kcirtapfromspace/ralph/commit/8880ce2b3eae31de08f28af4c8207af6b8c22d9b))
+* US-004 - Checkpoint manager with atomic saves ([6a4076b](https://github.com/kcirtapfromspace/ralph/commit/6a4076bbb6c01a8a9d17513b3bc36d0deafaa6a5))
+* US-004 - Implement header and status sections ([d8654d8](https://github.com/kcirtapfromspace/ralph/commit/d8654d8a0e5c9ccb04b4721a010e74b9359c8690))
+* US-005 - Add event channel to scheduler ([5701db4](https://github.com/kcirtapfromspace/ralph/commit/5701db4efe0f16ca696e9dbed10aab95ba97c66a))
+* US-005 - Timeout configuration and wrapper ([d122fb9](https://github.com/kcirtapfromspace/ralph/commit/d122fb9871806698c0b2abccf7c044f09554859c))
+* US-006 - Heartbeat monitor for stall detection ([3a8e1b3](https://github.com/kcirtapfromspace/ralph/commit/3a8e1b32d9a5d26dc0a1bc3aefeebc84ff76baae))
+* US-006 - Replace eprintln with UI events in scheduler ([181e968](https://github.com/kcirtapfromspace/ralph/commit/181e968f332dd66d656ef5f3c96fccdc1a6ac72b))
+* US-007 - Implement iteration progress callbacks ([f33d9f2](https://github.com/kcirtapfromspace/ralph/commit/f33d9f2fde8e572f398b2946afa621e4221145e8))
+* US-007 - Retry strategy with exponential backoff ([2203980](https://github.com/kcirtapfromspace/ralph/commit/220398044d8f1b353acec61bb48db295631d4ada))
+* US-008 - Integrate keyboard listener ([c8194d6](https://github.com/kcirtapfromspace/ralph/commit/c8194d6bfc9c32d962082ee58ca5c9a3f445e750))
+* US-008 - Pause controller for pause/resume state ([ddff623](https://github.com/kcirtapfromspace/ralph/commit/ddff623a95bd9985d8a227a51d5eeef62abc8338))
+* US-009 - Notification types and renderer ([dab0da4](https://github.com/kcirtapfromspace/ralph/commit/dab0da418b105a0938ad25ddd3c22c2117394210))
+* US-009 - Update module exports ([16007a3](https://github.com/kcirtapfromspace/ralph/commit/16007a3ee2c4c323a080e3ccfc09e8b192e3f195))
+* US-010 - Notification renderer with themed panels ([c26e829](https://github.com/kcirtapfromspace/ralph/commit/c26e8299765d401c97120a8f5e8d295e72f3c7d1))
+* US-010 - Support quiet mode and display options ([ef2d963](https://github.com/kcirtapfromspace/ralph/commit/ef2d963df90fd632ea0e5d79957ba45f0bff684b))
+* US-011 - Extend ExecutionState with Paused and WaitingForRetry ([f329043](https://github.com/kcirtapfromspace/ralph/commit/f329043cddabebb2c1846cc22ce890f6ed08b1e8))
+* US-012 - Add --resume and --timeout CLI flags ([5e86d3b](https://github.com/kcirtapfromspace/ralph/commit/5e86d3b035aad7f4316f9c7c77a22e1c3662d91f))
+* US-013 - Add ralph status command ([8e81318](https://github.com/kcirtapfromspace/ralph/commit/8e813187e9bc32f00732468e323ce89301746cb8))
+* US-014 - Integrate checkpoint save into runner loop ([16bc8ef](https://github.com/kcirtapfromspace/ralph/commit/16bc8efddbae126df2a2874a3a5c8875b1bce8ff))
+* US-015 - Integrate checkpoint resume into runner startup ([0ac8148](https://github.com/kcirtapfromspace/ralph/commit/0ac814823495ad22f50e285de9d60a696b38d317))
+* US-016 - Integrate timeout wrapper into agent executor ([6383768](https://github.com/kcirtapfromspace/ralph/commit/63837680ab3d091dd2e1bf442022981180f5c536))
+* US-017 - Integrate heartbeat monitor into agent executor ([bb71619](https://github.com/kcirtapfromspace/ralph/commit/bb7161966938d4cd2e59d238c5c395d9223e2bf5))
+* US-018 - Integrate error classification into executor result handling ([0876e62](https://github.com/kcirtapfromspace/ralph/commit/0876e62d8f3cb8813373337e851aa96b0de5bc5c))
+* US-019 - Add pause key handler to keyboard input ([f56112b](https://github.com/kcirtapfromspace/ralph/commit/f56112b53b3641d402bb6e80aeb6949682a97248))
+* US-020 - Integration tests for error recovery system ([71f3e2d](https://github.com/kcirtapfromspace/ralph/commit/71f3e2dbd9844d1aea5a1199109a87001ded0560))
+
+
+### Bug Fixes
+
+* Address CI failures (formatting, clippy, struct fields) ([9e6a67f](https://github.com/kcirtapfromspace/ralph/commit/9e6a67fa1bfc7b05078db0b91cd2882d6242dc32))
+* Address Greptile review comments ([8c89b13](https://github.com/kcirtapfromspace/ralph/commit/8c89b1380d950eb29b9ca252583709973e2e2673))
+* Address Greptile review comments ([f8122fa](https://github.com/kcirtapfromspace/ralph/commit/f8122faa74decd8944911f674d103ea6c7155566))
+* Allow CDLA-Permissive-2.0 license in cargo-deny ([4b3cf21](https://github.com/kcirtapfromspace/ralph/commit/4b3cf2163873448f99c22617d1f14dbaa5d1dd8e))
+* Restore failing story in test fixture ([bab7b74](https://github.com/kcirtapfromspace/ralph/commit/bab7b74ccf121ec7253b02212381b024f62238e4))
+
 ## [0.1.1](https://github.com/kcirtapfromspace/ralph/compare/v0.1.0...v0.1.1) (2026-01-18)
 
 
