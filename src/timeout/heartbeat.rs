@@ -322,10 +322,12 @@ mod tests {
         // Wait for threshold intervals (3 missed)
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Collect all events
+        // Stop monitoring to stop event generation
+        monitor.stop().await;
+
+        // Collect events that were sent
         let mut events = Vec::new();
-        while let Ok(event) =
-            tokio::time::timeout(Duration::from_millis(100), receiver.recv()).await
+        while let Ok(event) = tokio::time::timeout(Duration::from_millis(50), receiver.recv()).await
         {
             if let Some(e) = event {
                 events.push(e);
@@ -333,8 +335,6 @@ mod tests {
                 break;
             }
         }
-
-        monitor.stop().await;
 
         // Should have received a stall detection
         assert!(events
@@ -462,10 +462,12 @@ mod tests {
         // Wait long enough for both warning and stall
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Collect all events
+        // Stop monitoring to stop event generation
+        monitor.stop().await;
+
+        // Collect events that were sent
         let mut events = Vec::new();
-        while let Ok(event) =
-            tokio::time::timeout(Duration::from_millis(100), receiver.recv()).await
+        while let Ok(event) = tokio::time::timeout(Duration::from_millis(50), receiver.recv()).await
         {
             if let Some(e) = event {
                 events.push(e);
@@ -473,8 +475,6 @@ mod tests {
                 break;
             }
         }
-
-        monitor.stop().await;
 
         // Should have warning(s) and stall detection
         let has_warning = events

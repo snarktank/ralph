@@ -691,6 +691,7 @@ impl RalphMcpServer {
             agent_command,
             max_iterations,
             git_mutex: None, // MCP server executes single story at a time
+            timeout_config: crate::timeout::TimeoutConfig::default(),
         };
 
         // Clone necessary data for the spawned task

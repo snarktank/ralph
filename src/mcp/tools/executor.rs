@@ -15,6 +15,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{watch, Mutex};
 
+use crate::timeout::TimeoutConfig;
+
 use crate::mcp::tools::load_prd::{PrdFile, PrdUserStory};
 use crate::quality::{GateResult, Profile, QualityGateChecker};
 
@@ -52,6 +54,8 @@ pub enum ExecutorError {
     Cancelled,
     /// IO error
     IoError(String),
+    /// Execution timed out
+    Timeout(String),
 }
 
 impl std::fmt::Display for ExecutorError {
@@ -64,6 +68,7 @@ impl std::fmt::Display for ExecutorError {
             ExecutorError::AgentError(msg) => write!(f, "Agent execution error: {}", msg),
             ExecutorError::Cancelled => write!(f, "Execution was cancelled"),
             ExecutorError::IoError(msg) => write!(f, "IO error: {}", msg),
+            ExecutorError::Timeout(msg) => write!(f, "Execution timed out: {}", msg),
         }
     }
 }
@@ -87,6 +92,8 @@ pub struct ExecutorConfig {
     pub max_iterations: u32,
     /// Optional mutex for serializing git operations across parallel executions
     pub git_mutex: Option<Arc<Mutex<()>>>,
+    /// Timeout configuration for execution limits
+    pub timeout_config: TimeoutConfig,
 }
 
 impl Default for ExecutorConfig {
@@ -99,6 +106,7 @@ impl Default for ExecutorConfig {
             agent_command: "claude".to_string(),
             max_iterations: 10,
             git_mutex: None,
+            timeout_config: TimeoutConfig::default(),
         }
     }
 }
@@ -298,15 +306,26 @@ impl StoryExecutor {
             )));
         }
 
-        // Run the agent with the prompt
-        let output = tokio::process::Command::new(program)
+        // Run the agent with the prompt, wrapped in a timeout
+        let timeout_duration = self.config.timeout_config.agent_timeout;
+        let agent_future = tokio::process::Command::new(program)
             .args(&args)
             .current_dir(&self.config.project_root)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| ExecutorError::AgentError(format!("Failed to run {}: {}", program, e)))?;
+            .output();
+
+        let output = match tokio::time::timeout(timeout_duration, agent_future).await {
+            Ok(result) => result.map_err(|e| {
+                ExecutorError::AgentError(format!("Failed to run {}: {}", program, e))
+            })?,
+            Err(_) => {
+                return Err(ExecutorError::Timeout(format!(
+                    "Agent '{}' timed out after {:?} (iteration {})",
+                    program, timeout_duration, iteration
+                )));
+            }
+        };
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
