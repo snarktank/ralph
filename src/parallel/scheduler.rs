@@ -4,13 +4,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tokio::sync::{watch, Mutex, RwLock, Semaphore};
+use tokio::sync::{mpsc, watch, Mutex, RwLock, Semaphore};
 
 use crate::mcp::tools::executor::{detect_agent, ExecutorConfig, StoryExecutor};
 use crate::mcp::tools::load_prd::{validate_prd, PrdFile};
 use crate::parallel::dependency::{DependencyGraph, StoryNode};
 use crate::parallel::reconcile::{ReconciliationEngine, ReconciliationIssue, ReconciliationResult};
 use crate::runner::{RunResult, RunnerConfig};
+use crate::ui::parallel_display::ParallelRunnerDisplay;
+use crate::ui::parallel_events::ParallelUIEvent;
 
 /// Strategy for detecting conflicts between parallel story executions.
 #[allow(dead_code)]
@@ -205,6 +207,8 @@ pub struct ParallelRunner {
     execution_state: Arc<RwLock<ParallelExecutionState>>,
     /// Mutex to serialize git operations across parallel stories.
     git_mutex: Arc<Mutex<()>>,
+    /// Optional channel sender for UI events during parallel execution.
+    ui_tx: Option<mpsc::Sender<ParallelUIEvent>>,
 }
 
 #[allow(dead_code)]
@@ -225,6 +229,7 @@ impl ParallelRunner {
             semaphore,
             execution_state,
             git_mutex,
+            ui_tx: None,
         }
     }
 
@@ -312,6 +317,98 @@ impl ParallelRunner {
         };
 
         let mut total_iterations: u32 = 0;
+
+        // Create UI channel and spawn event handler if UI is enabled
+        let (ui_tx, ui_rx) = mpsc::channel::<ParallelUIEvent>(100);
+        let _ui_handle = if self.ui_tx.is_some() {
+            let mut display = ParallelRunnerDisplay::new();
+
+            // Initialize display with story information
+            let story_infos: Vec<_> = prd
+                .user_stories
+                .iter()
+                .map(|s| {
+                    crate::ui::parallel_events::StoryDisplayInfo::new(&s.id, &s.title, s.priority)
+                })
+                .collect();
+            display.init_stories(&story_infos);
+
+            // Spawn event handling task
+            Some(tokio::spawn(async move {
+                let mut rx = ui_rx;
+                while let Some(event) = rx.recv().await {
+                    match &event {
+                        ParallelUIEvent::StoryStarted {
+                            story,
+                            iteration,
+                            concurrent_count: _,
+                        } => {
+                            display.story_started(
+                                &story.id,
+                                &story.title,
+                                *iteration,
+                                5, // Default max iterations
+                            );
+                        }
+                        ParallelUIEvent::IterationUpdate {
+                            story_id,
+                            iteration,
+                            max_iterations,
+                            message: _,
+                        } => {
+                            // We need story title - use story_id as fallback
+                            display.update_iteration(
+                                story_id,
+                                story_id,
+                                *iteration,
+                                *max_iterations,
+                            );
+                        }
+                        ParallelUIEvent::StoryCompleted {
+                            story_id,
+                            iterations_used,
+                            duration_ms: _,
+                        } => {
+                            display.story_completed(story_id, story_id, *iterations_used, None);
+                        }
+                        ParallelUIEvent::StoryFailed {
+                            story_id,
+                            error,
+                            iteration: _,
+                        } => {
+                            display.story_failed(story_id, story_id, error);
+                        }
+                        ParallelUIEvent::ConflictDeferred {
+                            story_id,
+                            blocking_story_id,
+                            conflicting_files: _,
+                        } => {
+                            display.story_deferred(story_id, story_id, blocking_story_id);
+                        }
+                        ParallelUIEvent::SequentialRetryStarted { story_id, reason } => {
+                            display.story_sequential_retry(story_id, story_id, reason);
+                        }
+                        ParallelUIEvent::GateUpdate { .. }
+                        | ParallelUIEvent::ReconciliationStatus { .. } => {
+                            // These events don't have direct display methods yet
+                        }
+                    }
+                }
+            }))
+        } else {
+            // Drop the receiver if UI is not enabled
+            drop(ui_rx);
+            None
+        };
+
+        // Store sender for use in spawned tasks (only if UI enabled)
+        // Note: ui_sender will be used by spawned story tasks in future stories
+        let _ui_sender = if self.ui_tx.is_some() {
+            Some(ui_tx)
+        } else {
+            drop(ui_tx);
+            None
+        };
 
         // Main execution loop
         loop {
