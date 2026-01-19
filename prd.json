@@ -76,7 +76,7 @@
       "description": "As a developer, I need a checkpoint manager to coordinate saving and loading execution state atomically.",
       "id": "US-004",
       "notes": "Atomic writes prevent corruption on crash",
-      "passes": false,
+      "passes": true,
       "priority": 4,
       "title": "Checkpoint manager with atomic saves"
     },

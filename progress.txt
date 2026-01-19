@@ -63,3 +63,17 @@ Feature: Error Recovery System
 - **Learnings for future iterations:**
 - Story completed successfully via automated execution
 ---
+
+## 2026-01-18 19:52 - US-004
+- **What was implemented**: Checkpoint manager with atomic saves
+- **Files changed**:
+  - rd.json
+  - rogress.txt
+  - rc/checkpoint/manager.rs
+  - rc/checkpoint/mod.rs
+  - rc/timeout/mod.rs
+  - src/timeout/heartbeat.rs
+- **Iterations used**: 1
+- **Learnings for future iterations:**
+- Story completed successfully via automated execution
+---

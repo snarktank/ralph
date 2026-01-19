@@ -9,6 +9,7 @@ pub mod error;
 pub mod integrations;
 pub mod mcp;
 pub mod parallel;
+pub mod pause;
 pub mod quality;
 pub mod runner;
 pub mod timeout;
