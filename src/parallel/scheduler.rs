@@ -294,6 +294,14 @@ impl ParallelRunner {
 
         // Check if all stories already pass - no agent needed in this case
         if initially_passing.len() == total_stories {
+            // Show completion message for parallel mode
+            if !self.base_config.display_options.quiet {
+                use crate::ui::parallel_display::ParallelRunnerDisplay;
+                let display = ParallelRunnerDisplay::with_display_options(
+                    self.base_config.display_options.clone(),
+                );
+                display.display_completion(total_stories, total_stories, 0);
+            }
             return RunResult {
                 all_passed: true,
                 stories_passed: total_stories,

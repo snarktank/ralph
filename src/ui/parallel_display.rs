@@ -205,6 +205,68 @@ impl ParallelRunnerDisplay {
         println!();
     }
 
+    /// Display completion message for parallel execution.
+    ///
+    /// Shows a summary of completed execution including story counts and iterations.
+    pub fn display_completion(&self, completed: usize, total: usize, iterations: u32) {
+        if self.display_options.quiet {
+            return;
+        }
+
+        println!();
+        if self.colors_enabled {
+            let success_rgb = self.theme.success;
+            if completed == total {
+                println!(
+                    "\x1b[38;2;{};{};{}m╔═══════════════════════════════════════════════════════════╗\x1b[0m",
+                    success_rgb.0, success_rgb.1, success_rgb.2
+                );
+                println!(
+                    "\x1b[38;2;{};{};{}m║  🎉 ALL {} STORIES COMPLETE! 🎉                           ║\x1b[0m",
+                    success_rgb.0, success_rgb.1, success_rgb.2, total
+                );
+                println!(
+                    "\x1b[38;2;{};{};{}m╚═══════════════════════════════════════════════════════════╝\x1b[0m",
+                    success_rgb.0, success_rgb.1, success_rgb.2
+                );
+            } else {
+                let warning_rgb = self.theme.warning;
+                println!(
+                    "\x1b[38;2;{};{};{}m╔═══════════════════════════════════════════════════════════╗\x1b[0m",
+                    warning_rgb.0, warning_rgb.1, warning_rgb.2
+                );
+                println!(
+                    "\x1b[38;2;{};{};{}m║  ⚠️  {}/{} STORIES COMPLETE                                ║\x1b[0m",
+                    warning_rgb.0, warning_rgb.1, warning_rgb.2, completed, total
+                );
+                println!(
+                    "\x1b[38;2;{};{};{}m╚═══════════════════════════════════════════════════════════╝\x1b[0m",
+                    warning_rgb.0, warning_rgb.1, warning_rgb.2
+                );
+            }
+        } else if completed == total {
+            println!("╔═══════════════════════════════════════════════════════════╗");
+            println!(
+                "║  ALL {} STORIES COMPLETE!                                 ║",
+                total
+            );
+            println!("╚═══════════════════════════════════════════════════════════╝");
+        } else {
+            println!("╔═══════════════════════════════════════════════════════════╗");
+            println!(
+                "║  {}/{} STORIES COMPLETE                                   ║",
+                completed, total
+            );
+            println!("╚═══════════════════════════════════════════════════════════╝");
+        }
+
+        if iterations > 0 {
+            println!();
+            println!("  Total iterations: {}", iterations);
+        }
+        println!();
+    }
+
     /// Initialize progress bars for all stories that will be executed.
     ///
     /// This sets up a progress bar for each story in the execution queue,
