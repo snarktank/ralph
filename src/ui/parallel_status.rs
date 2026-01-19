@@ -337,7 +337,8 @@ impl ParallelStatusRenderer {
         let percentage = if total == 0 {
             100
         } else {
-            (completed * 100) / total
+            // Use saturating_mul to prevent overflow for large values
+            completed.saturating_mul(100) / total
         };
 
         // Calculate bar width (leaving room for label and counts)
@@ -695,8 +696,8 @@ impl ParallelStatusRenderer {
 
         // Build commit hash if available
         let commit_info = if let Some(ref hash) = story.commit_hash {
-            // Show short hash (first 7 chars)
-            let short_hash = if hash.len() > 7 { &hash[..7] } else { hash };
+            // Show short hash (first 7 chars) - use chars() for UTF-8 safety
+            let short_hash: String = hash.chars().take(7).collect();
             format!("[{}]", short_hash)
         } else {
             String::new()

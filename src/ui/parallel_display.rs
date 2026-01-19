@@ -213,11 +213,11 @@ impl ParallelRunnerDisplay {
     /// # Arguments
     /// * `stories` - List of story display information for all stories to track
     pub fn init_stories(&mut self, stories: &[StoryDisplayInfo]) {
+        // Clear any existing progress bars first
+        self.clear();
+
         // Display header with worker count
         self.display_header(stories.len());
-
-        // Clear any existing progress bars
-        self.clear();
 
         // Create a progress bar for each story
         for story in stories {
