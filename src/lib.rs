@@ -11,4 +11,5 @@ pub mod mcp;
 pub mod parallel;
 pub mod quality;
 pub mod runner;
+pub mod timeout;
 pub mod ui;

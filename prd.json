@@ -37,7 +37,7 @@
       "description": "As Ralph, I need to detect and classify errors from agent output using pattern matching.",
       "id": "US-002",
       "notes": "Uses case-insensitive regex matching",
-      "passes": false,
+      "passes": true,
       "priority": 2,
       "title": "Error pattern detector for Claude Code errors"
     },
