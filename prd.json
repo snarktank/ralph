@@ -322,7 +322,7 @@
       "description": "As Ralph, I need to classify executor errors and determine recovery action.",
       "id": "US-018",
       "notes": "Maps classification to recovery action",
-      "passes": false,
+      "passes": true,
       "priority": 18,
       "title": "Integrate error classification into executor result handling"
     },
