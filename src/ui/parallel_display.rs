@@ -288,7 +288,7 @@ impl ParallelRunnerDisplay {
     /// * `title` - The story title
     /// * `iteration` - Current iteration number (1-indexed)
     /// * `max_iterations` - Maximum allowed iterations
-    pub fn iteration_update(
+    pub fn update_iteration(
         &self,
         story_id: &str,
         title: &str,
@@ -312,21 +312,39 @@ impl ParallelRunnerDisplay {
     /// * `story_id` - The story identifier
     /// * `title` - The story title
     /// * `iterations_used` - Total iterations taken
-    pub fn story_completed(&self, story_id: &str, title: &str, iterations_used: u32) {
+    /// * `commit_hash` - Optional commit hash for the completed story
+    pub fn story_completed(
+        &self,
+        story_id: &str,
+        title: &str,
+        iterations_used: u32,
+        commit_hash: Option<&str>,
+    ) {
         if let Some(pb) = self.story_progress.get(story_id) {
             let message = self.format_story_message(story_id, title, StoryStatus::Completed, None);
-            let final_message = format!(
-                "{} {}",
-                message,
-                if self.colors_enabled {
-                    format!(
-                        "{}",
-                        format!("({} iterations)", iterations_used).color(self.theme.muted)
-                    )
+
+            // Build iteration info
+            let iter_info = if self.colors_enabled {
+                format!(
+                    "{}",
+                    format!("({} iterations)", iterations_used).color(self.theme.muted)
+                )
+            } else {
+                format!("({} iterations)", iterations_used)
+            };
+
+            // Add commit hash if provided
+            let final_message = if let Some(hash) = commit_hash {
+                let commit_display = if self.colors_enabled {
+                    format!("{}", hash.color(self.theme.story_id))
                 } else {
-                    format!("({} iterations)", iterations_used)
-                }
-            );
+                    hash.to_string()
+                };
+                format!("{} {} [{}]", message, iter_info, commit_display)
+            } else {
+                format!("{} {}", message, iter_info)
+            };
+
             pb.finish_with_message(final_message);
         }
     }
