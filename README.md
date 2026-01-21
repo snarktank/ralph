@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -13,6 +13,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli) (install via `gh extension install github/gh-copilot`)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -31,6 +32,8 @@ cp /path/to/ralph/ralph.sh scripts/ralph/
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+# OR
+cp /path/to/ralph/COPILOT.md scripts/ralph/COPILOT.md  # For GitHub Copilot CLI
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -50,6 +53,8 @@ For Claude Code
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
 ```
+
+For GitHub Copilot CLI, skills are not directly supported - use the COPILOT.md prompt file instead.
 
 ### Configure Amp auto-handoff (recommended)
 
@@ -93,9 +98,12 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Using GitHub Copilot CLI
+./scripts/ralph/ralph.sh --tool copilot [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool copilot` to select your AI coding tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -111,9 +119,10 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--tool copilot`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
+| `COPILOT.md` | Prompt template for GitHub Copilot CLI |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -139,7 +148,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (Amp, Claude Code, or GitHub Copilot CLI) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -163,7 +172,7 @@ Too big (split these):
 
 After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
 
-Examples of what to add to AGENTS.md:
+Examples of what to add to AGENTS.md (or CLAUDE.md/COPILOT.md for tool-specific notes):
 - Patterns discovered ("this codebase uses X for Y")
 - Gotchas ("do not forget to update Z when changing W")
 - Useful context ("the settings panel is in component X")
@@ -200,7 +209,7 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `prompt.md` (for Amp), `CLAUDE.md` (for Claude Code), or `COPILOT.md` (for GitHub Copilot CLI) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
@@ -214,3 +223,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [GitHub Copilot CLI documentation](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-cli)
