@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [OpenAI Codex](https://github.com/openai/codex)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -13,6 +13,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -31,6 +32,8 @@ cp /path/to/ralph/ralph.sh scripts/ralph/
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+# OR
+cp /path/to/ralph/CODEX.md scripts/ralph/CODEX.md      # For OpenAI Codex
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -63,6 +66,18 @@ Add to `~/.config/amp/settings.json`:
 
 This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
 
+### Configure Codex command (optional)
+
+Ralph invokes Codex via `CODEX_CMD` (defaults to `codex exec --full-auto`) and streams `CODEX.md` to stdin. If you see `stdin is not a terminal`, you're using the interactive CLI; switch to `codex exec` or override `CODEX_CMD` with it. Ralph also uses `--output-last-message` (when available) to detect completion. To add flags:
+
+```bash
+CODEX_CMD="codex exec --full-auto --your-flags"
+./scripts/ralph/ralph.sh --tool codex
+```
+
+You can also override the prompt path with `CODEX_PROMPT_FILE`.
+You can override the completion file with `CODEX_LAST_MESSAGE_FILE`.
+
 ## Workflow
 
 ### 1. Create a PRD
@@ -93,9 +108,12 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Using OpenAI Codex
+./scripts/ralph/ralph.sh --tool codex [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool codex` to select your AI coding tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -111,9 +129,10 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--tool codex`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
+| `CODEX.md` | Prompt template for OpenAI Codex |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -200,7 +219,7 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `prompt.md` (for Amp), `CLAUDE.md` (for Claude Code), or `CODEX.md` (for OpenAI Codex) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
@@ -214,3 +233,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [OpenAI Codex documentation](https://github.com/openai/codex)
