@@ -10,7 +10,7 @@ You are an autonomous coding agent working on a software project.
 4. Pick the **highest priority** user story where `passes: false`
 5. Implement that single user story
 6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update COPILOT.md files if you discover reusable patterns (see below)
+7. Update AGENTS.md files if you discover reusable patterns (see below)
 8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
 9. Update the PRD to set `passes: true` for the completed story
 10. Append your progress to `progress.txt`
@@ -20,6 +20,7 @@ You are an autonomous coding agent working on a software project.
 APPEND to progress.txt (never replace, always append):
 ```
 ## [Date/Time] - [Story ID]
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - What was implemented
 - Files changed
 - **Learnings for future iterations:**
@@ -28,6 +29,8 @@ APPEND to progress.txt (never replace, always append):
   - Useful context (e.g., "the evaluation panel is in component X")
 ---
 ```
+
+Include the thread URL so future iterations can use the `read_thread` tool to reference previous work if needed.
 
 The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
 
@@ -44,12 +47,12 @@ If you discover a **reusable pattern** that future iterations should know, add i
 
 Only add patterns that are **general and reusable**, not story-specific details.
 
-## Update COPILOT.md Files
+## Update AGENTS.md Files
 
-Before committing, check if any edited files have learnings worth preserving in nearby COPILOT.md files:
+Before committing, check if any edited files have learnings worth preserving in nearby AGENTS.md files:
 
 1. **Identify directories with edited files** - Look at which directories you modified
-2. **Check for existing COPILOT.md** - Look for COPILOT.md in those directories or parent directories
+2. **Check for existing AGENTS.md** - Look for AGENTS.md in those directories or parent directories
 3. **Add valuable learnings** - If you discovered something future developers/agents should know:
    - API patterns or conventions specific to that module
    - Gotchas or non-obvious requirements
@@ -57,7 +60,7 @@ Before committing, check if any edited files have learnings worth preserving in 
    - Testing approaches for that area
    - Configuration or environment requirements
 
-**Examples of good COPILOT.md additions:**
+**Examples of good AGENTS.md additions:**
 - "When modifying X, also update Y to keep them in sync"
 - "This module uses pattern Z for all API calls"
 - "Tests require the dev server running on PORT 3000"
@@ -68,7 +71,7 @@ Before committing, check if any edited files have learnings worth preserving in 
 - Temporary debugging notes
 - Information already in progress.txt
 
-Only update COPILOT.md if you have **genuinely reusable knowledge** that would help future work in that directory.
+Only update AGENTS.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
 ## Quality Requirements
 
@@ -77,15 +80,16 @@ Only update COPILOT.md if you have **genuinely reusable knowledge** that would h
 - Keep changes focused and minimal
 - Follow existing code patterns
 
-## Browser Testing (If Available)
+## Browser Testing (Required for Frontend Stories)
 
-For any story that changes UI, verify it works in the browser if you have browser testing tools configured:
+For any story that changes UI, you MUST verify it works in the browser:
 
-1. Navigate to the relevant page
-2. Verify the UI changes work as expected
-3. Take a screenshot if helpful for the progress log
+1. Load the `dev-browser` skill
+2. Navigate to the relevant page
+3. Verify the UI changes work as expected
+4. Take a screenshot if helpful for the progress log
 
-If no browser tools are available, note in your progress report that manual browser verification is needed.
+A frontend story is NOT complete until browser verification passes.
 
 ## Stop Condition
 
