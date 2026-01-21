@@ -95,7 +95,15 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   else
     # Codex: use --dangerously-bypass-approvals-and-sandbox for autonomous operation
-    OUTPUT=$(codex exec --dangerously-bypass-approvals-and-sandbox < "$SCRIPT_DIR/CODEX.md" 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(codex exec --dangerously-bypass-approvals-and-sandbox - < "$SCRIPT_DIR/AGENTS.md" 2>&1 | tee /dev/stderr) || true
+    # Filter output as Codex echoes the full prompt, which includes "<promise>COMPLETE</promise>" and undesirably triggers the stop condition 
+    # When Codex prints role markers, keep only assistant output to avoid matching the trigger phrase in prompt
+    if echo "$OUTPUT" | grep -q "^assistant"; then
+      OUTPUT=$(echo "$OUTPUT" | awk 'BEGIN{found=0} /^assistant/{found=1;next} {if(found) print}')
+    # Fallback: when role markers are absent, start from the post-run summary to trim the echoed prompt
+    elif echo "$OUTPUT" | grep -q "^tokens used"; then
+      OUTPUT=$(echo "$OUTPUT" | awk 'BEGIN{found=0} /^tokens used/{found=1} {if(found) print}')
+    fi
   fi
   
   # Check for completion signal
