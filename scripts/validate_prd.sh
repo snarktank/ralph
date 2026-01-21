@@ -3,21 +3,30 @@ set -e
 
 FILE=${1:-prd.json}
 
+# Ensure PRD file exists
 if [ ! -f "$FILE" ]; then
   echo "✗ PRD file not found: $FILE"
   exit 1
 fi
 
+# Ensure jq is available
 if ! command -v jq >/dev/null 2>&1; then
   echo "✗ jq is required but not installed"
   exit 1
 fi
 
+# Fields that must exist on each user story
 REQUIRED_FIELDS=("id" "title" "priority")
 ERROR=0
 
 echo "Validating PRD: $FILE"
 echo "-------------------------"
+
+# Ensure userStories exists and is an array
+if ! jq -e '.userStories | type == "array"' "$FILE" >/dev/null; then
+  echo "✗ 'userStories' must be an array"
+  exit 1
+fi
 
 # Collect all user story IDs
 IDS=$(jq -r '.userStories[].id' "$FILE")
@@ -35,8 +44,8 @@ COUNT=$(jq '.userStories | length' "$FILE")
 
 for ((i=0; i<COUNT; i++)); do
   for FIELD in "${REQUIRED_FIELDS[@]}"; do
-    VALUE=$(jq -r ".userStories[$i].$FIELD // empty" "$FILE")
-    if [ -z "$VALUE" ]; then
+    EXISTS=$(jq ".userStories[$i] | has(\"$FIELD\")" "$FILE")
+    if [ "$EXISTS" != "true" ]; then
       echo "✗ Missing field '$FIELD' in userStory index $i"
       ERROR=1
     fi
@@ -49,8 +58,3 @@ else
   echo "✗ PRD validation failed"
   exit 1
 fi
-
-
-# // this is the main file that i have added validate_prd.sh file in the main root folder i have made a file name 
-# prd.json.example also in the main root folder
-# // now i will run this script to validate the prd.json file
