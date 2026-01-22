@@ -18,11 +18,23 @@ cd flowchart && npm run build
 
 # Run Ralph with Claude Code
 ./ralph.sh --tool claude [max_iterations]
+
+# Cross-platform (Node.js)
+node ./ralph.js [max_iterations]
+node ./ralph.js --tool claude [max_iterations]
+
+# Install CLI globally (local)
+npm install -g /path/to/ralph
+
+# Run Ralph from any project root
+ralph [max_iterations]
+ralph --tool claude [max_iterations]
 ```
 
 ## Key Files
 
 - `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
+- `ralph.js` - Cross-platform Node.js loop (Windows-compatible)
 - `prompt.md` - Instructions given to each AMP instance
 -  `CLAUDE.md` - Instructions given to each Claude Code instance
 - `prd.json.example` - Example PRD format

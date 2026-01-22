@@ -235,12 +235,12 @@ Add ability to mark tasks with different statuses.
 
 1. Read the current `prd.json` if it exists
 2. Check if `branchName` differs from the new feature's branch name
-3. If different AND `progress.txt` has content beyond the header:
-   - Create archive folder: `archive/YYYY-MM-DD-feature-name/`
-   - Copy current `prd.json` and `progress.txt` to archive
+3. If different:
+   - Create archive folder: `archive/YYYY-MM-DD-<branch>`
+   - Copy current `prd.json` and `progress.txt` to archive (if they exist)
    - Reset `progress.txt` with fresh header
 
-**The ralph.sh script handles this automatically** when you run it, but if you are manually updating prd.json between runs, archive first.
+**The ralph.sh script handles this automatically** when you run it (and `ralph.js` does the same for cross-platform runs). If you are manually updating prd.json between runs, archive first.
 
 ---
 
