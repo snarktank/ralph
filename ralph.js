@@ -39,6 +39,16 @@ export function pathsAreEqual(pathA, pathB) {
   return a === b;
 }
 
+export function getHelpText() {
+  return `Usage: ralph [--tool <command>] [--tool-args <arg>] [--prompt-file <path>] [max_iterations]
+
+Examples:
+  ralph 5
+  ralph --tool claude --tool-args --print --tool-args --dangerously-skip-permissions 3
+  ralph --tool custom-tool --prompt-file custom.md 2
+`;
+}
+
 export function readBranchName(prdPath) {
   const prdContent = fs.readFileSync(prdPath, "utf-8");
   const prd = JSON.parse(prdContent);
@@ -253,12 +263,18 @@ const createTestSpawn = () => {
 
 if (isEntrypoint) {
   const options = {};
+  const args = process.argv.slice(2);
 
   if (testMode) {
     options.spawn = createTestSpawn();
   }
 
-  runLoop(parseArgs(process.argv.slice(2)), process.cwd(), options).then(() => {
+  if (args.length === 0 || args.includes("-h") || args.includes("--help")) {
+    console.log(getHelpText());
+    process.exit(0);
+  }
+
+  runLoop(parseArgs(args), process.cwd(), options).then(() => {
     process.exit(0);
   });
 }

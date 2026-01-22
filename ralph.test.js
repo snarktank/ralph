@@ -12,6 +12,7 @@ import {
   runLoop,
   resolveEntrypointPath,
   pathsAreEqual,
+  getHelpText,
 } from "./ralph.js";
 
 const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "ralph.js");
@@ -89,6 +90,13 @@ test("parseArgs returns defaults for empty args", () => {
     toolArgs: [],
     promptFile: "prompt.md",
   });
+});
+
+test("getHelpText includes usage", () => {
+  const helpText = getHelpText();
+  assert.ok(helpText.includes("Usage: ralph"));
+  assert.ok(helpText.includes("--tool"));
+  assert.ok(helpText.includes("--prompt-file"));
 });
 
 test("resolveEntrypointPath normalizes wrapper paths", () => {
@@ -488,7 +496,7 @@ test("script entrypoint exits successfully on COMPLETE", async () => {
   };
 
   const result = await new Promise((resolve) => {
-    const child = spawn(process.execPath, [scriptPath], { env, cwd: tmpDir });
+    const child = spawn(process.execPath, [scriptPath, "1"], { env, cwd: tmpDir });
     let output = "";
 
     child.stdout.on("data", (chunk) => {

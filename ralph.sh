@@ -8,6 +8,8 @@ set -e
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
 PROMPT_FILE=""
+SHOW_HELP=0
+ORIGINAL_ARG_COUNT=$#
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -27,6 +29,10 @@ while [[ $# -gt 0 ]]; do
       PROMPT_FILE="${1#*=}"
       shift
       ;;
+    -h|--help)
+      SHOW_HELP=1
+      shift
+      ;;
     *)
       # Assume it's max_iterations if it's a number
       if [[ "$1" =~ ^[0-9]+$ ]]; then
@@ -42,6 +48,18 @@ PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
+
+if [[ $SHOW_HELP -eq 1 || $ORIGINAL_ARG_COUNT -eq 0 ]]; then
+  cat <<'EOF'
+Usage: ralph [--tool <command>] [--prompt-file <path>] [max_iterations]
+
+Examples:
+  ralph 5
+  ralph --tool claude 3
+  ralph --tool custom-tool --prompt-file custom.md 2
+EOF
+  exit 0
+fi
 
 if [[ -z "$PROMPT_FILE" ]]; then
   if [[ "$TOOL" == "claude" ]]; then
