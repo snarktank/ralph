@@ -18,6 +18,27 @@ export function stripPrefix(branchName) {
   return branchName.replace(/^ralph\//, "");
 }
 
+export function resolveEntrypointPath(entrypointPath) {
+  const resolved = path.resolve(entrypointPath);
+  const normalized = resolved.replace(/[\\/]node_modules[\\/]ralph[\\/]ralph\.js$/, `${path.sep}ralph.js`);
+
+  if (normalized !== resolved && fs.existsSync(normalized)) {
+    return normalized;
+  }
+
+  return resolved;
+}
+
+export function pathsAreEqual(pathA, pathB) {
+  if (!pathA || !pathB) return false;
+  const a = path.resolve(pathA);
+  const b = path.resolve(pathB);
+  if (process.platform === "win32") {
+    return a.toLowerCase() === b.toLowerCase();
+  }
+  return a === b;
+}
+
 export function readBranchName(prdPath) {
   const prdContent = fs.readFileSync(prdPath, "utf-8");
   const prd = JSON.parse(prdContent);
@@ -84,6 +105,8 @@ export function archiveIfBranchChanged(baseDir = scriptDir, date = new Date()) {
 export function parseArgs(args) {
   let tool = "amp";
   let maxIterations = 10;
+  let toolArgs = [];
+  let promptFile = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -95,19 +118,38 @@ export function parseArgs(args) {
       }
     } else if (arg.startsWith("--tool=")) {
       tool = arg.substring(7);
+    } else if (arg === "--tool-args") {
+      if (i + 1 < args.length) {
+        toolArgs.push(args[i + 1]);
+        i++;
+      }
+    } else if (arg === "--prompt-file") {
+      if (i + 1 < args.length) {
+        promptFile = args[i + 1];
+        i++;
+      }
+    } else if (arg.startsWith("--prompt-file=")) {
+      promptFile = arg.substring(14);
     } else if (/^\d+$/.test(arg)) {
       maxIterations = parseInt(arg, 10);
     }
   }
 
-  return { tool, maxIterations };
+  // Set default prompt file if not provided
+  if (!promptFile) {
+    promptFile = tool === "claude" ? "CLAUDE.md" : "prompt.md";
+  }
+
+  return { tool, maxIterations, toolArgs, promptFile };
 }
 
 export function runLoop(
-  { tool, maxIterations },
+  { tool, maxIterations, toolArgs = [], promptFile },
   baseDir = scriptDir,
   options = {}
 ) {
+  const resolvedPromptFile =
+    promptFile ?? (tool === "claude" ? "CLAUDE.md" : "prompt.md");
   const spawnImpl = options.spawn ?? spawn;
   const stdoutStream = options.stdout ?? process.stdout;
   const stderrStream = options.stderr ?? process.stderr;
@@ -123,9 +165,10 @@ export function runLoop(
         return;
       }
 
-      const inputFile = tool === "claude" ? "CLAUDE.md" : "prompt.md";
-      const inputPath = path.join(baseDir, inputFile);
-      const child = spawnImpl(tool, [], { stdio: ["pipe", "pipe", "pipe"] });
+      const inputPath = path.isAbsolute(resolvedPromptFile)
+        ? resolvedPromptFile
+        : path.join(baseDir, resolvedPromptFile);
+      const child = spawnImpl(tool, toolArgs, { stdio: ["pipe", "pipe", "pipe"] });
 
       let outputBuffer = "";
       let finished = false;
@@ -177,7 +220,9 @@ export function runLoop(
 
 const testMode = process.env.RALPH_TEST_MODE;
 
-const isEntrypoint = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? "");
+const entrypoint = resolveEntrypointPath(process.argv[1] ?? "");
+const meta = fileURLToPath(import.meta.url);
+const isEntrypoint = pathsAreEqual(meta, entrypoint);
 
 const createTestSpawn = () => {
   let iteration = 0;

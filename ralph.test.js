@@ -6,7 +6,13 @@ import path from "node:path";
 import os from "node:os";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
-import { parseArgs, archiveIfBranchChanged, runLoop } from "./ralph.js";
+import {
+  parseArgs,
+  archiveIfBranchChanged,
+  runLoop,
+  resolveEntrypointPath,
+  pathsAreEqual,
+} from "./ralph.js";
 
 const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "ralph.js");
 
@@ -14,11 +20,15 @@ test("parseArgs supports --tool amp|claude", () => {
   assert.deepEqual(parseArgs(["--tool", "amp"]), {
     tool: "amp",
     maxIterations: 10,
+    toolArgs: [],
+    promptFile: "prompt.md",
   });
 
   assert.deepEqual(parseArgs(["--tool", "claude"]), {
     tool: "claude",
     maxIterations: 10,
+    toolArgs: [],
+    promptFile: "CLAUDE.md",
   });
 });
 
@@ -26,6 +36,33 @@ test("parseArgs supports --tool=amp syntax", () => {
   assert.deepEqual(parseArgs(["--tool=amp"]), {
     tool: "amp",
     maxIterations: 10,
+    toolArgs: [],
+    promptFile: "prompt.md",
+  });
+});
+
+test("parseArgs accepts extra tool args", () => {
+  assert.deepEqual(parseArgs(["--tool", "claude", "--tool-args", "--print", "--tool-args", "--dangerously-skip-permissions", "5"]), {
+    tool: "claude",
+    maxIterations: 5,
+    toolArgs: ["--print", "--dangerously-skip-permissions"],
+    promptFile: "CLAUDE.md",
+  });
+});
+
+test("parseArgs accepts prompt file overrides", () => {
+  assert.deepEqual(parseArgs(["--tool", "custom", "--prompt-file", "custom.md"]), {
+    tool: "custom",
+    maxIterations: 10,
+    toolArgs: [],
+    promptFile: "custom.md",
+  });
+
+  assert.deepEqual(parseArgs(["--prompt-file=custom.md"]), {
+    tool: "amp",
+    maxIterations: 10,
+    toolArgs: [],
+    promptFile: "custom.md",
   });
 });
 
@@ -33,11 +70,15 @@ test("parseArgs supports max_iterations positional arg", () => {
   assert.deepEqual(parseArgs(["7"]), {
     tool: "amp",
     maxIterations: 7,
+    toolArgs: [],
+    promptFile: "prompt.md",
   });
 
   assert.deepEqual(parseArgs(["--tool", "claude", "3"]), {
     tool: "claude",
     maxIterations: 3,
+    toolArgs: [],
+    promptFile: "CLAUDE.md",
   });
 });
 
@@ -45,7 +86,30 @@ test("parseArgs returns defaults for empty args", () => {
   assert.deepEqual(parseArgs([]), {
     tool: "amp",
     maxIterations: 10,
+    toolArgs: [],
+    promptFile: "prompt.md",
   });
+});
+
+test("resolveEntrypointPath normalizes wrapper paths", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ralph-test-entrypoint-"));
+  const testFile = path.join(tmpDir, "ralph.js");
+  const nodeModulesPath = path.join(tmpDir, "node_modules", "ralph", "ralph.js");
+
+  fs.mkdirSync(path.dirname(nodeModulesPath), { recursive: true });
+  fs.writeFileSync(testFile, "test");
+  fs.writeFileSync(nodeModulesPath, "test");
+
+  const resolved = resolveEntrypointPath(nodeModulesPath);
+
+  assert.equal(resolved, path.resolve(testFile));
+});
+
+test("resolveEntrypointPath falls back to original path", () => {
+  const nonExistent = path.join(os.tmpdir(), "ralph-test-missing", "ralph.js");
+  const resolved = resolveEntrypointPath(nonExistent);
+
+  assert.equal(resolved, path.resolve(nonExistent));
 });
 
 test("archiveIfBranchChanged archives and resets when branch changes", () => {
