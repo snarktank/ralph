@@ -18,9 +18,11 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Setup
 
-### Option 1: Copy to your project
+Choose **one** of the following setup approaches:
 
-Copy the ralph files into your project:
+### Approach A: Project-local setup (recommended for teams)
+
+Keep everything in your project repository so teammates get Ralph automatically:
 
 ```bash
 # From your project root
@@ -33,23 +35,30 @@ cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
 
 chmod +x scripts/ralph/ralph.sh
+
+# Also copy the skills to your project
+cp -r /path/to/ralph/skills .claude/skills/    # For Claude Code
+# OR
+cp -r /path/to/ralph/skills .amp/skills/       # For Amp
 ```
 
-### Option 2: Install skills globally
+### Approach B: Global setup (for personal use across projects)
 
-Copy the skills to your Amp or Claude config for use across all projects:
+Install Ralph globally so it's available in any project:
 
-For AMP
+**For Amp:**
 ```bash
 cp -r skills/prd ~/.config/amp/skills/
 cp -r skills/ralph ~/.config/amp/skills/
 ```
 
-For Claude Code
+**For Claude Code:**
 ```bash
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
 ```
+
+Then copy `ralph.sh` and the prompt template to each project as needed.
 
 ### Configure Amp auto-handoff (recommended)
 
