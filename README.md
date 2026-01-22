@@ -13,8 +13,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- Node.js (required for `ralph.js`, recommended for Windows)
-- `jq` installed (required for `ralph.sh`)
+- Node.js (required for `ralph.js`)
 - A git repository for your project
 
 ## Install (local global)
@@ -33,14 +32,12 @@ Copy the ralph files into your project:
 ```bash
 # From your project root
 mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/ralph.js scripts/ralph/
 
 # Copy the prompt template for your AI tool of choice:
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
-
-chmod +x scripts/ralph/ralph.sh
 ```
 
 ### Option 2: Install skills globally
@@ -96,19 +93,19 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default, bash)
-./scripts/ralph/ralph.sh [max_iterations]
-
-# Using Claude Code (bash)
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
-
-# Cross-platform (Node.js)
+# Using Amp (Node.js)
 node ./scripts/ralph/ralph.js [max_iterations]
+
+# Using Claude Code (Node.js)
 node ./scripts/ralph/ralph.js --tool claude [max_iterations]
 
-# Global CLI (npm -g local)
+# Global CLI (npm -g)
 ralph [max_iterations]
 ralph --tool claude [max_iterations]
+
+# See help
+ralph -h
+ralph --help
 ```
 
 Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
@@ -127,8 +124,7 @@ Ralph will run the tool loop; the tool’s instructions (prompt) perform these s
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
-| `ralph.js` | Cross-platform Node.js loop (Windows-compatible) |
+| `ralph.js` | The Node.js loop that spawns fresh AI instances (supports `--tool <command>`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
