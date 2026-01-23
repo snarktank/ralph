@@ -16,7 +16,20 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
-## Setup
+## Quick Install
+
+Run this one-liner to set up Ralph in your project:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/snarktank/ralph/HEAD/install.sh)"
+```
+
+This will:
+- Download `ralph.sh` and `prompt.md` to `scripts/ralph/`
+- Install the `prd` and `ralph` skills to `~/.config/amp/skills/`
+- Configure Amp auto-handoff in `~/.config/amp/settings.json`
+
+## Manual Setup
 
 ### Option 1: Copy to your project
 
