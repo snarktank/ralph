@@ -1,0 +1,36 @@
+{
+  "project": "MyApp",
+  "branchName": "ralph/database-setup",
+  "description": "Database Setup - Initialize core database schema",
+  "priority": 1,
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Create users table",
+      "description": "As a developer, I need a users table to store user accounts.",
+      "acceptanceCriteria": [
+        "Create users table with id, email, name, created_at columns",
+        "Add unique constraint on email",
+        "Migration runs successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Create tasks table",
+      "description": "As a developer, I need a tasks table to store user tasks.",
+      "acceptanceCriteria": [
+        "Create tasks table with id, user_id, title, completed, created_at columns",
+        "Add foreign key constraint to users table",
+        "Migration runs successfully",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

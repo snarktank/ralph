@@ -1,0 +1,38 @@
+{
+  "project": "MyApp",
+  "branchName": "ralph/task-management",
+  "description": "Task Management - CRUD operations for tasks",
+  "priority": 3,
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Display task list",
+      "description": "As a user, I want to see my tasks.",
+      "acceptanceCriteria": [
+        "Task list shows all user tasks",
+        "Each task shows title and completion status",
+        "Empty state when no tasks exist",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add new task",
+      "description": "As a user, I want to create new tasks.",
+      "acceptanceCriteria": [
+        "Add task form with title input",
+        "New task appears in list immediately",
+        "Form clears after submission",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "project": "MyApp",
+  "branchName": "ralph/user-auth",
+  "description": "User Authentication - Add login and registration",
+  "priority": 2,
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add registration form",
+      "description": "As a user, I want to create an account.",
+      "acceptanceCriteria": [
+        "Registration form with email and password fields",
+        "Form validation for email format and password strength",
+        "Success message on registration",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add login form",
+      "description": "As a user, I want to log into my account.",
+      "acceptanceCriteria": [
+        "Login form with email and password fields",
+        "Error message for invalid credentials",
+        "Redirect to dashboard on success",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

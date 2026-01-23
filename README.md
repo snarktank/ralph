@@ -4,6 +4,8 @@
 
 Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
+**Now with Multi-PRD support!** Queue multiple PRDs in a `prds/` directory and Ralph will process them automatically from highest to lowest priority.
+
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
@@ -107,6 +109,69 @@ Ralph will:
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
 
+## Multi-PRD Mode
+
+Queue multiple PRDs and Ralph will process them automatically from highest to lowest priority.
+
+### Setup
+
+1. Create a `prds/` directory in your ralph folder:
+```bash
+mkdir -p scripts/ralph/prds
+```
+
+2. Add PRD files with a `priority` field (lower number = higher priority):
+```json
+{
+  "project": "MyApp",
+  "branchName": "ralph/feature-one",
+  "description": "First feature to implement",
+  "priority": 1,
+  "userStories": [...]
+}
+```
+
+3. Run Ralph - it auto-detects the `prds/` directory:
+```bash
+./scripts/ralph/ralph.sh --tool claude 15
+```
+
+### How It Works
+
+- Ralph automatically detects the `prds/` directory and enables multi-PRD mode
+- PRDs are processed in priority order (1, 2, 3, etc.)
+- After completing all stories in a PRD, Ralph:
+  - Archives the completed PRD
+  - Resets the progress log
+  - Activates the next PRD in the queue
+- Continues until all PRDs are complete
+
+### Example Output
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║           RALPH - Multi-PRD Mode                              ║
+╠═══════════════════════════════════════════════════════════════╣
+║  Tool: claude
+║  Max iterations per PRD: 10
+║  PRDs directory: /path/to/prds
+╚═══════════════════════════════════════════════════════════════╝
+
+PRD Queue (by priority):
+─────────────────────────────────────────────────────────────────
+  Priority 1: DatabaseSetup                [0/3] 01-database.json
+  Priority 2: UserAuth                     [0/4] 02-auth.json
+  Priority 3: TaskManagement               [0/5] 03-tasks.json
+─────────────────────────────────────────────────────────────────
+```
+
+### Tracking Files
+
+| File | Purpose |
+|------|---------|
+| `prds/*.json` | PRD queue - each file is a separate PRD with priority |
+| `.completed-prds` | Tracks which PRDs have been completed |
+
 ## Key Files
 
 | File | Purpose |
@@ -116,6 +181,9 @@ Ralph will:
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
+| `prds/` | Directory for multi-PRD mode - place PRD files here with priority field |
+| `prds/*.json.example` | Example PRD files showing multi-PRD setup |
+| `.completed-prds` | Tracks completed PRDs in multi-PRD mode |
 | `progress.txt` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs |
 | `skills/ralph/` | Skill for converting PRDs to JSON |

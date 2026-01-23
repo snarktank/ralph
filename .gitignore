@@ -2,6 +2,7 @@
 prd.json
 progress.txt
 .last-branch
+.completed-prds
 
 # Archive is optional to commit
 # archive/
