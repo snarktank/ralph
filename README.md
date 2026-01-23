@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`. Completion is detected when the tool outputs `<promise>COMPLETE</promise>`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -13,8 +13,15 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- `jq` installed (`brew install jq` on macOS)
+- Node.js (required for `ralph.js`)
 - A git repository for your project
+
+## Install (local global)
+
+```bash
+npm install -g /path/to/ralph
+ralph --tool claude 5
+```
 
 ## Setup
 
@@ -25,14 +32,12 @@ Copy the ralph files into your project:
 ```bash
 # From your project root
 mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/ralph.js scripts/ralph/
 
 # Copy the prompt template for your AI tool of choice:
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
-
-chmod +x scripts/ralph/ralph.sh
 ```
 
 ### Option 2: Install skills globally
@@ -88,16 +93,24 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default)
-./scripts/ralph/ralph.sh [max_iterations]
+# Using Amp (Node.js)
+node ./scripts/ralph/ralph.js [max_iterations]
 
-# Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
+# Using Claude Code (Node.js)
+node ./scripts/ralph/ralph.js --tool claude [max_iterations]
+
+# Global CLI (npm -g)
+ralph [max_iterations]
+ralph --tool claude [max_iterations]
+
+# See help
+ralph -h
+ralph --help
 ```
 
 Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
 
-Ralph will:
+Ralph will run the tool loop; the tool’s instructions (prompt) perform these steps:
 1. Create a feature branch (from PRD `branchName`)
 2. Pick the highest priority story where `passes: false`
 3. Implement that single story
@@ -111,7 +124,7 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.js` | The Node.js loop that spawns fresh AI instances (supports `--tool <command>`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
@@ -207,7 +220,7 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your pro
 
 ## Archiving
 
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+Ralph archives previous runs when you start a new feature (different `branchName`). The archive folder is `archive/YYYY-MM-DD-<branch>`. `ralph.sh` uses the last branch name, while `ralph.js` uses the current branch name.
 
 ## References
 

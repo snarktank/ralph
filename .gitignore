@@ -11,3 +11,6 @@ progress.txt
 
 #Claude
 .claude/
+
+# Local plan drafts
+/docs/plans/

@@ -13,16 +13,27 @@ cd flowchart && npm run dev
 # Build the flowchart
 cd flowchart && npm run build
 
-# Run Ralph with Amp (default)
-./ralph.sh [max_iterations]
+# Run Ralph with Amp (Node.js)
+node ./ralph.js [max_iterations]
 
-# Run Ralph with Claude Code
-./ralph.sh --tool claude [max_iterations]
+# Run Ralph with Claude Code (Node.js)
+node ./ralph.js --tool claude [max_iterations]
+
+# Install CLI globally (local)
+npm install -g /path/to/ralph
+
+# Run Ralph from any project root
+ralph [max_iterations]
+ralph --tool claude [max_iterations]
+
+# Show help
+ralph -h
+ralph --help
 ```
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
+- `ralph.js` - The Node.js loop that spawns fresh AI instances (supports `--tool <command>`)
 - `prompt.md` - Instructions given to each AMP instance
 -  `CLAUDE.md` - Instructions given to each Claude Code instance
 - `prd.json.example` - Example PRD format
