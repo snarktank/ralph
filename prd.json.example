@@ -1,6 +1,7 @@
 {
   "project": "MyApp",
   "branchName": "ralph/task-priority",
+  "baseBranch": "develop",
   "description": "Task Priority System - Add priority levels to tasks",
   "userStories": [
     {
