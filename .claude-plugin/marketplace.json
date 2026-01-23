@@ -1,0 +1,21 @@
+{
+  "name": "ralph-marketplace",
+  "owner": {
+    "name": "snarktank"
+  },
+  "metadata": {
+    "description": "Skills for the Ralph autonomous agent system - Generate PRDs and convert them to prd.json format for autonomous execution",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "ralph-skills",
+      "source": "./",
+      "description": "PRD generation and conversion skills for the Ralph autonomous agent loop",
+      "version": "1.0.0",
+      "keywords": ["ralph", "prd", "automation", "agent", "planning"],
+      "category": "productivity",
+      "skills": "./skills/"
+    }
+  ]
+}
