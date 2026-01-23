@@ -45,10 +45,11 @@ COUNT=$(jq '.userStories | length' "$FILE")
 for ((i=0; i<COUNT; i++)); do
   for FIELD in "${REQUIRED_FIELDS[@]}"; do
     EXISTS=$(jq ".userStories[$i] | has(\"$FIELD\")" "$FILE")
-    if [ "$EXISTS" != "true" ]; then
-      echo "✗ Missing field '$FIELD' in userStory index $i"
-      ERROR=1
+    # Fail fast on malformed PRDs before starting the agent loop
+    if [ -f "$SCRIPT_DIR/scripts/validate_prd.sh" ]; then
+      "$SCRIPT_DIR/scripts/validate_prd.sh" "$PRD_FILE"
     fi
+
   done
 done
 
