@@ -1,12 +1,14 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--retries N] [--hang-timeout N] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+MAX_RETRIES=3
+HANG_TIMEOUT=5  # Seconds to wait after result before killing hung process
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +18,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --retries)
+      MAX_RETRIES="$2"
+      shift 2
+      ;;
+    --retries=*)
+      MAX_RETRIES="${1#*=}"
+      shift
+      ;;
+    --hang-timeout)
+      HANG_TIMEOUT="$2"
+      shift 2
+      ;;
+    --hang-timeout=*)
+      HANG_TIMEOUT="${1#*=}"
       shift
       ;;
     *)
@@ -79,7 +97,128 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+# Retry configuration
+INITIAL_RETRY_DELAY=5
+
+# Temp file for stream output (cleaned up on exit)
+STREAM_OUTPUT=$(mktemp)
+trap "rm -f $STREAM_OUTPUT" EXIT
+
+# Function to check if output contains a retryable error
+is_retryable_error() {
+  local output="$1"
+  # Add patterns for known transient errors
+  if echo "$output" | grep -qE "No messages returned|ECONNRESET|ETIMEDOUT|rate limit|503|502|504|overloaded"; then
+    return 0
+  fi
+  return 1
+}
+
+# Function to run Claude with stream-json and hang detection
+# This fixes the issue where Claude completes work but hangs during exit/cleanup
+run_claude_with_stream() {
+  local prompt_file="$1"
+  local prompt_content
+  prompt_content=$(<"$prompt_file")
+
+  # Clear the output file
+  : > "$STREAM_OUTPUT"
+
+  # Run Claude with stream-json output in background
+  claude --dangerously-skip-permissions -p "$prompt_content" --output-format stream-json --verbose 2>&1 > "$STREAM_OUTPUT" &
+  local claude_pid=$!
+
+  local result_received=false
+  local killer_pid=""
+
+  # Monitor the output file for the result message
+  # The key insight: "type":"result" is emitted BEFORE the hang occurs
+  while kill -0 $claude_pid 2>/dev/null; do
+    if grep -q '"type":"result"' "$STREAM_OUTPUT" 2>/dev/null; then
+      result_received=true
+      echo "✓ Result received, waiting ${HANG_TIMEOUT}s for clean exit..."
+
+      # Give Claude time to exit gracefully, then kill if hung
+      ( sleep $HANG_TIMEOUT; kill $claude_pid 2>/dev/null ) &
+      killer_pid=$!
+      break
+    fi
+    sleep 0.5
+  done
+
+  # Wait for Claude to finish (or be killed)
+  wait $claude_pid 2>/dev/null || true
+
+  # Clean up the killer process if it's still running
+  if [ -n "$killer_pid" ]; then
+    kill $killer_pid 2>/dev/null || true
+  fi
+
+  # Extract the result text from stream-json output
+  local result_text=""
+  if [ "$result_received" = true ]; then
+    # Use jq to extract the result field from the result message
+    result_text=$(grep '"type":"result"' "$STREAM_OUTPUT" | jq -r '.result // empty' 2>/dev/null | head -1)
+
+    if [ -n "$result_text" ]; then
+      echo "$result_text"
+      return 0
+    fi
+  fi
+
+  # If no result was extracted, return the raw output
+  cat "$STREAM_OUTPUT"
+
+  if [ "$result_received" = true ]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Function to run the tool with retries
+run_with_retry() {
+  local attempt=1
+  local delay=$INITIAL_RETRY_DELAY
+  local output=""
+  local exit_code=0
+
+  while [ $attempt -le $MAX_RETRIES ]; do
+    if [ $attempt -gt 1 ]; then
+      echo "Retry attempt $attempt of $MAX_RETRIES (waiting ${delay}s)..."
+      sleep $delay
+      delay=$((delay * 2))  # Exponential backoff
+    fi
+
+    # Run the selected tool
+    if [[ "$TOOL" == "amp" ]]; then
+      output=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || exit_code=$?
+    else
+      # Use stream-json approach for Claude to avoid hang issues
+      output=$(run_claude_with_stream "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || exit_code=$?
+    fi
+
+    # Check if we got a retryable error
+    if is_retryable_error "$output"; then
+      echo ""
+      echo "⚠ Detected transient error, will retry..."
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    # Success or non-retryable error - return the output
+    echo "$output"
+    return 0
+  done
+
+  # All retries exhausted
+  echo ""
+  echo "✗ All $MAX_RETRIES retry attempts failed"
+  echo "$output"
+  return 1
+}
+
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Max retries: $MAX_RETRIES - Hang timeout: $HANG_TIMEOUT"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -87,14 +226,9 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-  # Run the selected tool with the ralph prompt
-  if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  else
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
-  fi
-  
+  # Run the tool with automatic retry on transient errors
+  OUTPUT=$(run_with_retry) || true
+
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
