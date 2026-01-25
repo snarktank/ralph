@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude|codex] [max_iterations]
 
 set -e
 
@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate tool choice
-if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
+if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "codex" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'codex'."
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,6 +38,22 @@ PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
+CODEX_PROMPT_FILE="${CODEX_PROMPT_FILE:-$SCRIPT_DIR/CODEX.md}"
+CODEX_CMD="${CODEX_CMD:-codex exec --full-auto}"
+CODEX_INPUT="${CODEX_INPUT:-stdin}"
+CODEX_LAST_MESSAGE_FILE="${CODEX_LAST_MESSAGE_FILE:-$SCRIPT_DIR/.codex-last-message}"
+
+if [[ "$TOOL" == "codex" && "$CODEX_INPUT" != "stdin" && "$CODEX_INPUT" != "file" ]]; then
+  echo "Error: Invalid CODEX_INPUT '$CODEX_INPUT'. Must be 'stdin' or 'file'."
+  exit 1
+fi
+
+read -r -a CODEX_CMD_ARR <<< "$CODEX_CMD"
+
+if [[ "$TOOL" == "codex" && "$CODEX_INPUT" == "file" && "${CODEX_CMD_ARR[0]}" == "codex" && "${CODEX_CMD_ARR[1]}" == "exec" ]]; then
+  echo "Error: CODEX_INPUT=file is not supported with 'codex exec'. Use stdin (default) or wrap Codex to read files."
+  exit 1
+fi
 
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
@@ -90,13 +106,32 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  else
+  elif [[ "$TOOL" == "claude" ]]; then
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+  else
+    # Codex: use non-interactive `codex exec` with stdin by default; override CODEX_CMD for custom flags.
+    CODEX_CMD_RUN=("${CODEX_CMD_ARR[@]}")
+    if [[ "${CODEX_CMD_ARR[0]}" == "codex" && "${CODEX_CMD_ARR[1]}" == "exec" ]]; then
+      CODEX_CMD_RUN+=("--output-last-message" "$CODEX_LAST_MESSAGE_FILE")
+    fi
+
+    : > "$CODEX_LAST_MESSAGE_FILE"
+    if [[ "$CODEX_INPUT" == "file" ]]; then
+      OUTPUT=$("${CODEX_CMD_RUN[@]}" "$CODEX_PROMPT_FILE" 2>&1 | tee /dev/stderr) || true
+    else
+      OUTPUT=$(cat "$CODEX_PROMPT_FILE" | "${CODEX_CMD_RUN[@]}" 2>&1 | tee /dev/stderr) || true
+    fi
   fi
   
   # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+  if [[ "$TOOL" == "codex" && -s "$CODEX_LAST_MESSAGE_FILE" ]]; then
+    COMPLETE_SIGNAL=$(grep -q "<promise>COMPLETE</promise>" "$CODEX_LAST_MESSAGE_FILE" && echo "yes" || echo "no")
+  else
+    COMPLETE_SIGNAL=$(echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>" && echo "yes" || echo "no")
+  fi
+
+  if [[ "$COMPLETE_SIGNAL" == "yes" ]]; then
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
