@@ -1,0 +1,232 @@
+{
+  "id": "task-004",
+  "section": "scene-setup",
+  "title": "Configure 3D Scene with Lighting and Camera",
+  "description": "Set up React Three Fiber Canvas with camera, OrbitControls, lighting, and shadow support",
+
+  "deepThinking": {
+    "actuallyBuilding": "A complete 3D scene foundation: Canvas with antialiasing and shadows enabled, PerspectiveCamera at [25,20,25] looking at origin, OrbitControls with damping and polar angle limits, ambient + directional lighting with shadow maps, and connection to UIStore for view preset camera positioning",
+    "visualOutcome": "An empty 3D scene with professional lighting where you can orbit, pan, and zoom smoothly. Adding a test cube temporarily will show shadows working. Later sections add terrain and buildings into this scene.",
+    "exactSteps": [
+      "Step 1: Create Scene.tsx with Canvas configuration",
+      "Step 2: Add PerspectiveCamera with initial position",
+      "Step 3: Add OrbitControls with limits and damping",
+      "Step 4: Create Lighting.tsx with ambient and directional lights",
+      "Step 5: Configure shadows on directional light",
+      "Step 6: Add CameraController for view preset integration",
+      "Step 7: Add optional development helpers (axes, stats)"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Canvas renders with 0x0 size",
+        "symptom": "Nothing visible, WebGL context may error",
+        "detection": "Check element size in DevTools",
+        "mitigation": "Parent container must have explicit height (h-full, or pixel value)"
+      },
+      {
+        "issue": "Camera flips upside down when orbiting",
+        "symptom": "Disorienting view inversion",
+        "detection": "Orbit past top of scene",
+        "mitigation": "Set minPolarAngle={0.1} and maxPolarAngle={Math.PI/2 - 0.1}"
+      },
+      {
+        "issue": "Shadows not appearing",
+        "symptom": "Objects look flat, no depth",
+        "detection": "Visual inspection",
+        "mitigation": "Check: Canvas shadows prop, light castShadow, object receiveShadow"
+      },
+      {
+        "issue": "OrbitControls not responding",
+        "symptom": "Can't rotate or zoom",
+        "detection": "Mouse events ignored",
+        "mitigation": "Add makeDefault prop, ensure inside Canvas"
+      }
+    ],
+    "assumptions": [
+      "React Three Fiber and drei installed from task-001",
+      "UIStore exists from task-003",
+      "Parent container provides explicit dimensions"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create Scene component with Canvas",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "Scene component",
+        "Canvas with shadows and antialias",
+        "Camera configuration"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "No TypeScript errors",
+        "specificChecks": [
+          "Canvas renders without errors",
+          "Component exports correctly"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Add OrbitControls with limits",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "OrbitControls integration"
+      ],
+      "modifies": [
+        "Scene.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-004",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Open preview URL",
+          "Left-drag to orbit - should be smooth",
+          "Try to flip camera underground - should be blocked",
+          "Scroll to zoom - should stop at min/max distance",
+          "Right-drag to pan"
+        ],
+        "expected": "Controls work smoothly with limits",
+        "consoleChecks": [
+          "No errors about OrbitControls"
+        ],
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Create Lighting component",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Lighting.tsx",
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "Lighting component",
+        "Ambient light",
+        "Directional light with shadows"
+      ],
+      "modifies": [
+        "Scene.tsx to include Lighting"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-004",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Add temporary test cube mesh",
+          "Verify lighting creates visible shading",
+          "Verify shadow renders on ground plane"
+        ],
+        "expected": "Lighting and shadows visible on test object",
+        "consoleChecks": [
+          "No WebGL warnings about shadows"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-004-lighting.png"
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Add CameraController for view presets",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/3d/CameraController.tsx",
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "CameraController component",
+        "View preset camera positions"
+      ],
+      "modifies": [
+        "Scene.tsx to include CameraController"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- CameraController.test.ts",
+        "expected": "Position calculations correct",
+        "specificChecks": [
+          "Top view: camera at [0, 40, 0.01] looking down",
+          "Front view: camera at [0, 10, 30] looking at origin",
+          "Isometric: camera at [25, 20, 25]"
+        ]
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Add development helpers",
+      "timeEstimate": "10min",
+      "files": [
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "AxesHelper (togglable)",
+        "GridHelper (togglable)",
+        "Stats panel (optional)"
+      ],
+      "modifies": [
+        "Scene.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-004",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify axes helper shows X/Y/Z",
+          "Verify grid helper visible",
+          "Toggle showGrid in store - grid should hide/show"
+        ],
+        "expected": "Helpers visible and togglable",
+        "screenshotRequired": true,
+        "screenshotName": "task-004-helpers.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup",
+      "task-003-state-management"
+    ],
+    "enables": [
+      "task-005-terrain",
+      "task-006-buildings",
+      "task-007-camera-controls"
+    ],
+    "sharedState": [
+      "uiStore.currentView",
+      "uiStore.showGrid"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-004",
+    "description": "Scene setup is foundational but isolated. Can revert and retry with different settings.",
+    "alternativeApproach": "If drei OrbitControls cause issues, can use vanilla Three.js OrbitControls"
+  },
+
+  "estimatedTotalTime": "75min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Shadow camera frustum may need adjustment when terrain is added",
+    "Stats panel from drei shows FPS - helpful for performance debugging",
+    "Top view needs slight Z offset (0.01) to avoid gimbal lock",
+    "Consider adding 'reset view' button later"
+  ]
+}

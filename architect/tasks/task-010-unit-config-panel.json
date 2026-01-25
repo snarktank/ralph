@@ -1,0 +1,160 @@
+{
+  "id": "task-010",
+  "section": "unit-config-panel",
+  "title": "Create Unit Configuration Controls",
+  "description": "Build left panel UI with unit count slider (1-8), layout preset selector, spacing control, and calculated area display",
+
+  "deepThinking": {
+    "actuallyBuilding": "Unit configuration panel with: unit count slider (1-8), layout preset radio group (Villa/Duplex/Studios/Custom), spacing slider (0-5m), and calculated area display that shows parcel/units area. All connected to buildingStore for reactive updates.",
+    "visualOutcome": "Controls in left panel below parcel config. Changing unit count triggers building recalculation. Selecting preset updates count and triggers layout. Area display updates in real-time.",
+    "exactSteps": [
+      "Step 1: Create UnitConfigPanel component",
+      "Step 2: Add unit count slider with value display",
+      "Step 3: Add layout preset radio group",
+      "Step 4: Add spacing slider",
+      "Step 5: Add calculated area display",
+      "Step 6: Connect preset selection to unit count"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Preset doesn't update unit count",
+        "symptom": "Select Duplex but count stays at 1",
+        "detection": "Visual inspection of count and buildings",
+        "mitigation": "Ensure preset handler calls setUnitCount"
+      },
+      {
+        "issue": "Area calculation wrong",
+        "symptom": "Displayed area doesn't match expected",
+        "detection": "Calculate manually and compare",
+        "mitigation": "Use correct formula: (width * depth) / unitCount"
+      }
+    ],
+    "assumptions": [
+      "buildingStore exists from task-003",
+      "parcelStore exists for area calculation",
+      "LeftPanel exists from task-008"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create UnitConfigPanel component",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/panels/UnitConfigPanel.tsx"
+      ],
+      "creates": [
+        "UnitConfigPanel component",
+        "Unit count slider"
+      ],
+      "modifies": [
+        "LeftPanel.tsx to include UnitConfigPanel"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-010",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify unit count slider appears",
+          "Move slider - value updates"
+        ],
+        "expected": "Unit count control visible and working",
+        "screenshotRequired": true,
+        "screenshotName": "task-010-unit-count.png"
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Add layout preset selector",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/panels/UnitConfigPanel.tsx"
+      ],
+      "creates": [
+        "RadioGroup for layout presets",
+        "Preset options: Villa(1), Duplex(2), Studios(4), Custom"
+      ],
+      "modifies": [
+        "UnitConfigPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-010",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click 'Duplex' preset",
+          "Verify unit count updates to 2",
+          "Click 'Studios' preset",
+          "Verify unit count updates to 4"
+        ],
+        "expected": "Presets correctly set unit count",
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Add spacing and area display",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/panels/UnitConfigPanel.tsx"
+      ],
+      "creates": [
+        "Spacing slider (0-5m)",
+        "Calculated area display"
+      ],
+      "modifies": [
+        "UnitConfigPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-010",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Adjust spacing slider",
+          "Verify area display shows correct value",
+          "Change parcel size - area updates",
+          "Change unit count - area updates"
+        ],
+        "expected": "Spacing and area work correctly",
+        "screenshotRequired": true,
+        "screenshotName": "task-010-complete.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-003-state-management",
+      "task-008-app-layout"
+    ],
+    "enables": [
+      "task-012-flat-terrain-layout"
+    ],
+    "sharedState": [
+      "buildingStore.unitCount",
+      "buildingStore.layoutPreset",
+      "buildingStore.spacing",
+      "parcelStore.width",
+      "parcelStore.depth"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-010",
+    "description": "UI controls are isolated from positioning logic.",
+    "alternativeApproach": "Use simple buttons instead of radio group if styling issues"
+  },
+
+  "estimatedTotalTime": "50min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "Area calculation: (width * depth) / unitCount",
+    "Preset selection should update both layoutPreset and unitCount",
+    "Spacing affects positioning algorithm in later sections",
+    "Consider adding Select component from Shadcn for presets"
+  ]
+}

@@ -1,0 +1,195 @@
+{
+  "id": "task-012",
+  "section": "flat-terrain-layout",
+  "title": "Implement Flat Terrain Layout Algorithm",
+  "description": "Create positioning algorithm for flat/gentle slopes (≤10°) that arranges buildings in a grid pattern with buffer zones",
+
+  "deepThinking": {
+    "actuallyBuilding": "Layout algorithm for flat terrain: calculates grid dimensions (cols × rows) from unit count, determines unit sizes from parcel dimensions minus spacing, positions each building centered on its grid cell, and outputs Building array for buildingStore.",
+    "visualOutcome": "On flat terrain, buildings appear in a logical grid: 1 unit centered, 2 units side-by-side, 4 units in 2×2 grid, etc. All buildings same height, evenly spaced, centered on parcel.",
+    "exactSteps": [
+      "Step 1: Create layoutAlgorithms.ts with calculateFlatLayout function",
+      "Step 2: Implement grid dimension calculation",
+      "Step 3: Implement unit size calculation",
+      "Step 4: Implement position calculation for each building",
+      "Step 5: Add unit tests for all configurations",
+      "Step 6: Connect to store subscription for auto-update"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Buildings overlap",
+        "symptom": "Buildings visually intersecting",
+        "detection": "Visual inspection with multiple units",
+        "mitigation": "Check spacing is subtracted correctly from total area"
+      },
+      {
+        "issue": "Layout not centered",
+        "symptom": "Buildings offset to one side",
+        "detection": "Visual inspection, buildings not centered on terrain",
+        "mitigation": "Use -parcelWidth/2 offset in position calculation"
+      },
+      {
+        "issue": "Wrong grid dimensions",
+        "symptom": "5 units in 3x2 should have one empty, not overlap",
+        "detection": "Test with 5 units",
+        "mitigation": "Use Math.ceil for rows/cols, check i < unitCount"
+      },
+      {
+        "issue": "Subscription infinite loop",
+        "symptom": "Browser freezes on any config change",
+        "detection": "Change unit count, observe freeze",
+        "mitigation": "Add change detection guard in subscription"
+      }
+    ],
+    "assumptions": [
+      "Building type defined from task-002",
+      "buildingStore has setBuildings or similar from task-003",
+      "Building renderer exists from task-006",
+      "Flat terrain = slopeAngle ≤ 10°"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create layout algorithm function",
+      "timeEstimate": "25min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts",
+        "src/utils/layoutAlgorithms.test.ts"
+      ],
+      "creates": [
+        "calculateFlatLayout function",
+        "Grid dimension helper",
+        "generateBuildingId helper"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "All layout tests pass",
+        "specificChecks": [
+          "1 unit: single building at (0, height/2, 0)",
+          "2 units: two buildings side by side",
+          "4 units: 2x2 grid",
+          "Spacing correctly reduces unit size"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Implement position calculation",
+      "timeEstimate": "20min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts"
+      ],
+      "creates": [
+        "Position calculation for each grid cell"
+      ],
+      "modifies": [
+        "layoutAlgorithms.ts"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "Position tests pass",
+        "specificChecks": [
+          "Buildings centered on parcel origin",
+          "Correct spacing between buildings",
+          "Y position = height / 2"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Connect to store subscription",
+      "timeEstimate": "20min",
+      "files": [
+        "src/stores/subscriptions.ts",
+        "src/stores/buildingStore.ts"
+      ],
+      "creates": [
+        "Layout recalculation subscription",
+        "setBuildings action if not exists"
+      ],
+      "modifies": [
+        "subscriptions.ts"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-012",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set slope to 0°",
+          "Set units to 1 - single building appears",
+          "Set units to 4 - 2x2 grid appears",
+          "Adjust spacing - buildings move apart"
+        ],
+        "expected": "Buildings auto-update on config change",
+        "screenshotRequired": true,
+        "screenshotName": "task-012-flat-layout.png"
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Visual verification of all configurations",
+      "timeEstimate": "20min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-012",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Test 1 unit: centered building",
+          "Test 2 units: side-by-side",
+          "Test 3 units: 2x2 grid with one empty",
+          "Test 4 units: 2x2 grid",
+          "Test 5 units: 3x2 grid with one empty",
+          "Test 6 units: 3x2 grid full",
+          "Test 8 units: 4x2 or 3x3",
+          "Screenshot each configuration"
+        ],
+        "expected": "All configurations render correctly",
+        "screenshotRequired": true,
+        "screenshotName": "task-012-all-configs.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-002-type-definitions",
+      "task-003-state-management",
+      "task-006-building-blocks"
+    ],
+    "enables": [
+      "task-013-terraced-layout",
+      "task-014-privacy-optimization"
+    ],
+    "sharedState": [
+      "parcelStore (dimensions)",
+      "buildingStore (unitCount, spacing, buildings)"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-012",
+    "description": "Algorithm is pure function, easy to test and fix. If logic wrong, unit tests will catch it.",
+    "alternativeApproach": "Could use a simpler linear layout if grid proves problematic"
+  },
+
+  "estimatedTotalTime": "85min",
+  "complexity": "high",
+  "status": "pending",
+
+  "notes": [
+    "This is the CORE algorithm - must be well tested",
+    "Position is CENTER of building, not corner",
+    "Use consistent colors for visual distinction",
+    "Subscription must not cause infinite loops",
+    "Consider adding animation for position changes later"
+  ]
+}

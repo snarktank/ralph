@@ -1,0 +1,93 @@
+{
+  "id": "task-022",
+  "section": "test-scenario-duplex",
+  "title": "Verify Duplex Scenario",
+  "description": "End-to-end verification of duplex on 15×15m parcel with 15° slope showing terrace levels",
+
+  "deepThinking": {
+    "actuallyBuilding": "Verification task. Testing that duplex configuration shows two terraced buildings with correct height difference and roof garden on lower unit.",
+    "visualOutcome": "Two buildings on terrace levels, lower one has green roof, upper one elevated by correct height step, clear terracing visible from side.",
+    "exactSteps": [
+      "Step 1: Set parcel to 15×15",
+      "Step 2: Set slope to 15°, direction 0°",
+      "Step 3: Set units to 2 (Duplex preset)",
+      "Step 4: Verify terrace levels appear",
+      "Step 5: Verify roof garden on lower unit",
+      "Step 6: Capture verification screenshots"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "No terrace stepping",
+        "symptom": "Buildings at same height",
+        "detection": "Side view shows no height difference",
+        "mitigation": "Check terraced layout algorithm"
+      },
+      {
+        "issue": "Wrong terrace height",
+        "symptom": "Height difference incorrect",
+        "detection": "Calculate expected, compare visual",
+        "mitigation": "Check tan() calculation"
+      }
+    ],
+    "assumptions": [
+      "Terraced layout implemented from task-013",
+      "Roof garden rendering from task-015"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Configure and verify duplex scenario",
+      "timeEstimate": "20min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-022",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set parcel: 15×15m",
+          "Set slope: 15°, direction: 0° (North)",
+          "Set units: 2 (or Duplex preset)",
+          "Verify two buildings appear",
+          "View from side - clear terrace stepping",
+          "Calculate expected height: 7.5m × tan(15°) ≈ 2.0m",
+          "Verify lower building has green roof",
+          "Verify upper building does NOT have green roof",
+          "Screenshot each view"
+        ],
+        "expected": "Duplex with correct terrace levels and roof garden",
+        "screenshotRequired": true,
+        "screenshotName": "task-022-duplex.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-013-terraced-layout",
+      "task-015-roof-garden-logic"
+    ],
+    "enables": [],
+    "sharedState": []
+  },
+
+  "rollbackStrategy": {
+    "type": "investigate",
+    "checkpoint": "N/A",
+    "description": "If test fails, check terrace or roof garden implementation.",
+    "alternativeApproach": "N/A"
+  },
+
+  "estimatedTotalTime": "20min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "Height difference = depth/levels × tan(angle)",
+    "At 15°, this is significant but not extreme",
+    "Roof garden should only be on LOWER building"
+  ]
+}

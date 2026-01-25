@@ -1,0 +1,98 @@
+{
+  "id": "task-023",
+  "section": "test-scenario-studios",
+  "title": "Verify Studios Scenario",
+  "description": "End-to-end verification of 4 studios on 15×15m parcel with 2×2 grid across 2 terrace levels",
+
+  "deepThinking": {
+    "actuallyBuilding": "Verification task. Testing that 4 studios form a 2×2 grid with 2 terraces, lower row with roof gardens, correct spacing and positioning.",
+    "visualOutcome": "Four buildings in 2×2 pattern, 2 on lower terrace with green roofs, 2 on upper terrace, all evenly sized and spaced.",
+    "exactSteps": [
+      "Step 1: Set parcel to 15×15",
+      "Step 2: Set slope to 15°, direction 0°",
+      "Step 3: Set units to 4 (Studios preset)",
+      "Step 4: Verify 2×2 grid pattern",
+      "Step 5: Verify 2 terrace levels",
+      "Step 6: Verify lower 2 have roof gardens",
+      "Step 7: Capture verification screenshots"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Wrong grid layout",
+        "symptom": "Not 2×2 pattern",
+        "detection": "Top view shows different arrangement",
+        "mitigation": "Check grid calculation in layout algorithm"
+      },
+      {
+        "issue": "Wrong buildings have gardens",
+        "symptom": "Upper buildings have green roofs",
+        "detection": "Visual inspection",
+        "mitigation": "Check terrace level in garden logic"
+      }
+    ],
+    "assumptions": [
+      "Grid layout from task-012",
+      "Terraced layout from task-013",
+      "Roof gardens from task-015"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Configure and verify studios scenario",
+      "timeEstimate": "20min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-023",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set parcel: 15×15m",
+          "Set slope: 15°, direction: 0° (North)",
+          "Set units: 4 (or Studios preset)",
+          "Verify four buildings appear",
+          "View from top - 2×2 grid visible",
+          "View from side - 2 terrace levels",
+          "Count green roofs - should be 2 (lower row)",
+          "Verify spacing between all units",
+          "Select each building - verify IDs unique",
+          "Screenshot each view"
+        ],
+        "expected": "Four studios in 2×2 grid with correct terracing",
+        "screenshotRequired": true,
+        "screenshotName": "task-023-studios.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-012-flat-terrain-layout",
+      "task-013-terraced-layout",
+      "task-015-roof-garden-logic"
+    ],
+    "enables": [],
+    "sharedState": []
+  },
+
+  "rollbackStrategy": {
+    "type": "investigate",
+    "checkpoint": "N/A",
+    "description": "If test fails, identify grid, terrace, or garden issue.",
+    "alternativeApproach": "N/A"
+  },
+
+  "estimatedTotalTime": "20min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "This is the most complex test scenario",
+    "Tests grid layout, terracing, and roof gardens together",
+    "Each building should be approximately 6×6m with spacing",
+    "Stagger offset may apply if privacy optimization enabled"
+  ]
+}

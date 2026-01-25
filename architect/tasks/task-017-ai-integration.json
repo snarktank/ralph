@@ -1,0 +1,223 @@
+{
+  "id": "task-017",
+  "section": "ai-integration",
+  "title": "Integrate Claude API for Layout Suggestions",
+  "description": "Connect to Claude API to generate and display AI-powered layout suggestions with scores",
+
+  "deepThinking": {
+    "actuallyBuilding": "AI integration service: API call to Claude with structured parcel data, prompt that requests 3 layout options with positions and scores, response parsing into AILayoutSuggestion array, and connection to UI for display and application.",
+    "visualOutcome": "Click 'Get AI Suggestions' button, loading spinner appears, then 3 suggestion cards with scores. Click a card to preview layout in 3D. Click 'Apply' to use that layout permanently.",
+    "exactSteps": [
+      "Step 1: Create AI service with API call function",
+      "Step 2: Set up API key configuration (env variable)",
+      "Step 3: Build prompt template for layout suggestions",
+      "Step 4: Implement response parsing",
+      "Step 5: Create suggestion display UI",
+      "Step 6: Implement preview and apply flow"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "API key exposed in client",
+        "symptom": "Security vulnerability",
+        "detection": "Key visible in network tab",
+        "mitigation": "Use server-side proxy or Vercel serverless function"
+      },
+      {
+        "issue": "Response parsing fails",
+        "symptom": "Suggestions don't appear",
+        "detection": "Console error on API return",
+        "mitigation": "Add robust JSON parsing with validation"
+      },
+      {
+        "issue": "Positions out of bounds",
+        "symptom": "AI-suggested buildings outside parcel",
+        "detection": "Visual inspection",
+        "mitigation": "Clamp positions, add validation"
+      },
+      {
+        "issue": "Rate limiting",
+        "symptom": "API errors on repeated requests",
+        "detection": "429 status code",
+        "mitigation": "Add debounce, loading state prevents re-click"
+      }
+    ],
+    "assumptions": [
+      "Claude API key will be provided",
+      "Using Anthropic SDK or fetch",
+      "Server-side proxy for security"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create AI service and configuration",
+      "timeEstimate": "25min",
+      "files": [
+        "src/services/ai.ts",
+        ".env.local",
+        "src/config.ts"
+      ],
+      "creates": [
+        "AI service module",
+        "getLayoutSuggestions function",
+        "API configuration"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Service compiles correctly",
+        "specificChecks": [
+          "Function signature matches AIRequest/AIResponse",
+          "Config loads API key from env"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Build prompt template",
+      "timeEstimate": "20min",
+      "files": [
+        "src/services/ai.ts"
+      ],
+      "creates": [
+        "buildLayoutPrompt function",
+        "Prompt template string"
+      ],
+      "modifies": [
+        "ai.ts"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- ai.test.ts",
+        "expected": "Prompt builds correctly",
+        "specificChecks": [
+          "Prompt includes parcel dimensions",
+          "Prompt includes slope info",
+          "Prompt requests JSON output"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Implement response parsing",
+      "timeEstimate": "25min",
+      "files": [
+        "src/services/ai.ts",
+        "src/services/ai.test.ts"
+      ],
+      "creates": [
+        "parseAIResponse function",
+        "Validation logic"
+      ],
+      "modifies": [
+        "ai.ts"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- ai.test.ts",
+        "expected": "Parsing tests pass",
+        "specificChecks": [
+          "Valid JSON parsed correctly",
+          "Invalid JSON returns error",
+          "Buildings validated for bounds"
+        ]
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Create AI suggestion UI",
+      "timeEstimate": "30min",
+      "files": [
+        "src/components/panels/AISuggestionsPanel.tsx"
+      ],
+      "creates": [
+        "AISuggestionsPanel component",
+        "SuggestionCard component",
+        "Loading state"
+      ],
+      "modifies": [
+        "RightPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-017",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify 'Get Suggestions' button appears",
+          "Click button (mock response for testing)",
+          "Verify cards display with scores"
+        ],
+        "expected": "AI suggestion UI functional",
+        "screenshotRequired": true,
+        "screenshotName": "task-017-ai-ui.png"
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Implement preview and apply",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/panels/AISuggestionsPanel.tsx",
+        "src/stores/buildingStore.ts"
+      ],
+      "creates": [
+        "Preview mode for suggestions",
+        "Apply suggestion action"
+      ],
+      "modifies": [
+        "AISuggestionsPanel.tsx",
+        "buildingStore.ts"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-017",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click suggestion card - 3D preview updates",
+          "Click 'Apply' - layout committed",
+          "Click different card - layout changes"
+        ],
+        "expected": "Preview and apply flow works",
+        "screenshotRequired": false
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-002-type-definitions",
+      "task-003-state-management"
+    ],
+    "enables": [
+      "task-018-ai-suggestions-panel"
+    ],
+    "sharedState": [
+      "uiStore.isAILoading",
+      "uiStore.aiSuggestions",
+      "buildingStore.buildings"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-017",
+    "description": "AI is optional feature. Can mock for demo if API issues.",
+    "alternativeApproach": "Use hardcoded suggestions for demo mode"
+  },
+
+  "estimatedTotalTime": "120min",
+  "complexity": "high",
+  "status": "pending",
+
+  "notes": [
+    "IMPORTANT: API key must be secured server-side",
+    "Consider adding mock mode for development",
+    "Response parsing must be robust",
+    "Add timeout handling for slow API",
+    "Consider caching suggestions"
+  ]
+}

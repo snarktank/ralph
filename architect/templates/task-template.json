@@ -1,0 +1,146 @@
+{
+  "id": "task-XXX",
+  "section": "section-name",
+  "title": "Short descriptive title",
+  "description": "What this task accomplishes in one sentence",
+
+  "deepThinking": {
+    "actuallyBuilding": "Detailed description of what we're creating - be specific about components, functions, data structures",
+    "visualOutcome": "What the user will see or experience when this works",
+    "exactSteps": [
+      "Step 1: Create the base structure",
+      "Step 2: Add the core logic",
+      "Step 3: Connect to state management",
+      "Step 4: Add error handling"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Description of what could go wrong",
+        "symptom": "How you would notice this problem",
+        "detection": "Specific test or check to catch this",
+        "mitigation": "How to fix if it occurs"
+      }
+    ],
+    "assumptions": [
+      "Assumption 1: Previous task X completed successfully",
+      "Assumption 2: Store Y exists and has method Z"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create the component/function skeleton",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/MyComponent.tsx"
+      ],
+      "creates": [
+        "MyComponent functional component",
+        "Basic props interface"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck",
+          "npm run lint"
+        ],
+        "expected": "No errors",
+        "specificChecks": [
+          "Component exports correctly",
+          "Props interface is typed"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Implement core logic",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/MyComponent.tsx",
+        "src/utils/helper.ts"
+      ],
+      "creates": [
+        "Helper function for calculation"
+      ],
+      "modifies": [
+        "MyComponent to use helper"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- helper.test.ts",
+        "expected": "All tests pass",
+        "specificChecks": [
+          "Helper returns correct value for input X",
+          "Helper handles edge case Y"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Connect to UI and verify visually via Vercel",
+      "timeEstimate": "15min",
+      "files": [
+        "src/App.tsx",
+        "src/components/MyComponent.tsx"
+      ],
+      "creates": [],
+      "modifies": [
+        "App.tsx to include MyComponent"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-XXX",
+        "steps": [
+          "Deploy preview: .\\vercel-verify.ps1 task-XXX",
+          "Open the Vercel preview URL",
+          "Check browser DevTools console for errors",
+          "Navigate to the relevant page",
+          "Verify the component renders correctly",
+          "Test interaction X",
+          "Confirm expected behavior"
+        ],
+        "expected": "Component visible and functional on Vercel preview",
+        "consoleChecks": [
+          "No JavaScript errors in console",
+          "No failed network requests",
+          "No React warnings"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-XXX-vercel.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-setup",
+      "task-005-store"
+    ],
+    "enables": [
+      "task-015-integration",
+      "task-020-testing"
+    ],
+    "sharedState": [
+      "parcelStore",
+      "buildingStore"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-XXX",
+    "description": "If implementation fails, revert to checkpoint and try alternative approach",
+    "alternativeApproach": "Consider using library X instead of custom implementation"
+  },
+
+  "estimatedTotalTime": "55min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Remember to check for edge case X",
+    "This follows the pattern established in task-YYY"
+  ]
+}

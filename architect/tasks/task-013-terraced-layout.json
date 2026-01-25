@@ -1,0 +1,192 @@
+{
+  "id": "task-013",
+  "section": "terraced-layout",
+  "title": "Implement Terraced Layout Algorithm",
+  "description": "Create positioning algorithm for steep slopes (>10°) that arranges buildings on terrace levels with roof garden potential",
+
+  "deepThinking": {
+    "actuallyBuilding": "Terraced layout algorithm: calculates number of terrace levels from unit count, determines terrace step height from slope angle using tan(), positions buildings at appropriate heights per level, and marks lower units with hasRoofGarden=true for upper unit garden usage.",
+    "visualOutcome": "On steep terrain, buildings appear stacked on visible terrace levels. From side view, clear stepping pattern. Lower roofs align with upper ground levels. Color coding by level for clarity.",
+    "exactSteps": [
+      "Step 1: Add calculateTerracedLayout function",
+      "Step 2: Implement terrace level count calculation",
+      "Step 3: Implement terrace height calculation using tan()",
+      "Step 4: Handle slope direction for Z ordering",
+      "Step 5: Add algorithm selector (flat vs terraced)",
+      "Step 6: Visual verification with multiple configurations"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Wrong terrace height",
+        "symptom": "Buildings float above or sink into terrain",
+        "detection": "Side view shows gaps or overlap with terrain",
+        "mitigation": "Verify tan(angle) calculation, check radians conversion"
+      },
+      {
+        "issue": "Terraces go wrong direction",
+        "symptom": "Uphill is downhill or vice versa",
+        "detection": "Change slope direction, buildings move wrong way",
+        "mitigation": "Check sin/cos for direction vector, verify Z ordering"
+      },
+      {
+        "issue": "Roof/ground level mismatch",
+        "symptom": "Roof gardens don't align with upper building floors",
+        "detection": "Visual inspection from side",
+        "mitigation": "Ensure building height = terrace step height"
+      },
+      {
+        "issue": "Algorithm not switching",
+        "symptom": "Flat layout used on steep slope",
+        "detection": "30° slope shows side-by-side instead of terraced",
+        "mitigation": "Check slope threshold condition (>10°)"
+      }
+    ],
+    "assumptions": [
+      "calculateFlatLayout exists from task-012",
+      "Slope angle accessible from parcelStore",
+      "Building height is configurable (default 3-4m)",
+      "SLOPE_THRESHOLD = 10 degrees"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Implement terraced layout function",
+      "timeEstimate": "30min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts",
+        "src/utils/layoutAlgorithms.test.ts"
+      ],
+      "creates": [
+        "calculateTerracedLayout function",
+        "Terrace level calculation",
+        "Terrace height calculation"
+      ],
+      "modifies": [
+        "layoutAlgorithms.ts"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "Terraced layout tests pass",
+        "specificChecks": [
+          "2 units at 30°: 2 levels, height difference = depth * tan(30°)",
+          "4 units at 45°: 2 levels with 2 units each",
+          "Lower units have hasRoofGarden=true"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Add algorithm selector",
+      "timeEstimate": "15min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts",
+        "src/stores/subscriptions.ts"
+      ],
+      "creates": [
+        "selectLayoutAlgorithm function",
+        "SLOPE_THRESHOLD constant (10°)"
+      ],
+      "modifies": [
+        "subscriptions.ts to use selector"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "Selector tests pass",
+        "specificChecks": [
+          "slope=5° uses flat layout",
+          "slope=15° uses terraced layout",
+          "slope=10° is boundary (use flat)"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Handle slope direction",
+      "timeEstimate": "20min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts"
+      ],
+      "creates": [
+        "Direction-aware positioning"
+      ],
+      "modifies": [
+        "calculateTerracedLayout"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-013",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set slope 30°, direction 0° (North)",
+          "Higher terrace should be toward back",
+          "Change direction to 180° (South)",
+          "Higher terrace should be toward front"
+        ],
+        "expected": "Direction correctly affects terrace ordering",
+        "screenshotRequired": true,
+        "screenshotName": "task-013-direction.png"
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Visual verification of terraced layout",
+      "timeEstimate": "20min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-013",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set slope to 30°, units to 2",
+          "View from side - two terrace levels visible",
+          "Set units to 4 - two levels with 2 each",
+          "Verify lower roofs could serve as upper gardens",
+          "Screenshot from side and isometric views"
+        ],
+        "expected": "Clear terraced layout on steep slopes",
+        "screenshotRequired": true,
+        "screenshotName": "task-013-terraced.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-005-terrain-rendering",
+      "task-012-flat-terrain-layout"
+    ],
+    "enables": [
+      "task-015-roof-garden-logic"
+    ],
+    "sharedState": [
+      "parcelStore.slopeAngle",
+      "parcelStore.slopeDirection",
+      "buildingStore.buildings"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-013",
+    "description": "If terraced math is wrong, flat layout still works as fallback.",
+    "alternativeApproach": "Could use fixed terrace heights instead of slope-derived"
+  },
+
+  "estimatedTotalTime": "85min",
+  "complexity": "high",
+  "status": "pending",
+
+  "notes": [
+    "CRITICAL: tan(angle) is key to terrace height - must be correct",
+    "Slope direction = which way is uphill",
+    "Building height should match terrace step for roof garden alignment",
+    "Visual verification from SIDE view is essential",
+    "Consider adding debug visualization for terrace levels"
+  ]
+}

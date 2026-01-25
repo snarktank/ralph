@@ -1,0 +1,152 @@
+{
+  "id": "task-014",
+  "section": "privacy-optimization",
+  "title": "Add Privacy Optimization to Layouts",
+  "description": "Enhance layout algorithms with staggered placement, building rotation, and garden zone calculation for improved privacy",
+
+  "deepThinking": {
+    "actuallyBuilding": "Privacy optimization layer: staggered row offsets so units don't directly face each other, building rotation to face downhill (toward views), and garden zone marking for visual buffers between units.",
+    "visualOutcome": "Buildings on same level are staggered, not aligned. All buildings rotated to face downhill direction. Clear separation between units for privacy. More natural, less grid-like appearance.",
+    "exactSteps": [
+      "Step 1: Add stagger offset to grid placement (50% row offset)",
+      "Step 2: Add rotation based on slope direction",
+      "Step 3: Calculate and mark garden zones",
+      "Step 4: Integrate with flat and terraced layouts"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Stagger causes buildings to go outside parcel",
+        "symptom": "Buildings partially outside parcel boundary",
+        "detection": "Visual inspection from top view",
+        "mitigation": "Reduce unit width to account for stagger offset"
+      },
+      {
+        "issue": "Rotation looks wrong",
+        "symptom": "Buildings face uphill instead of downhill",
+        "detection": "Visual inspection on sloped terrain",
+        "mitigation": "Check rotation direction matches slopeDirection"
+      }
+    ],
+    "assumptions": [
+      "Base layouts from task-012 and task-013 work",
+      "Building rotation in degrees (0-360)",
+      "Garden zones are visual only for now"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Add stagger offset to layouts",
+      "timeEstimate": "20min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts"
+      ],
+      "creates": [
+        "Stagger offset calculation",
+        "Adjusted unit width for stagger"
+      ],
+      "modifies": [
+        "calculateFlatLayout",
+        "calculateTerracedLayout"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-014",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set 4 units (2x2 grid)",
+          "View from top - alternate rows should be offset",
+          "Not a perfect grid but staggered"
+        ],
+        "expected": "Staggered layout visible",
+        "screenshotRequired": true,
+        "screenshotName": "task-014-staggered.png"
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Add building rotation",
+      "timeEstimate": "15min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts",
+        "src/components/3d/BuildingBlock.tsx"
+      ],
+      "creates": [
+        "Rotation calculation based on slope direction"
+      ],
+      "modifies": [
+        "Layout algorithms",
+        "BuildingBlock to apply rotation"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-014",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set slope direction to 90° (East)",
+          "Buildings should rotate to face East (downhill)",
+          "Change direction - buildings should rotate"
+        ],
+        "expected": "Buildings rotate with slope direction",
+        "screenshotRequired": true,
+        "screenshotName": "task-014-rotation.png"
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Add garden zone calculation",
+      "timeEstimate": "20min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts",
+        "src/types/building.ts"
+      ],
+      "creates": [
+        "Garden zone area calculation per unit",
+        "gardenArea field population"
+      ],
+      "modifies": [
+        "Layout algorithms"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "Garden area calculated correctly",
+        "specificChecks": [
+          "Each unit has gardenArea > 0",
+          "Garden area accounts for spacing"
+        ]
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-012-flat-terrain-layout",
+      "task-013-terraced-layout"
+    ],
+    "enables": [],
+    "sharedState": [
+      "parcelStore.slopeDirection",
+      "buildingStore.buildings"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-014",
+    "description": "Privacy optimization is additive. If issues, disable and use base layouts.",
+    "alternativeApproach": "Make stagger/rotation optional via config"
+  },
+
+  "estimatedTotalTime": "55min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Start simple - stagger is most impactful",
+    "Rotation should face downhill (toward views)",
+    "Garden zones can be visualized later",
+    "Consider making these features toggleable"
+  ]
+}

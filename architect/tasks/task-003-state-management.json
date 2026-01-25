@@ -1,0 +1,228 @@
+{
+  "id": "task-003",
+  "section": "state-management",
+  "title": "Create Zustand Stores for Application State",
+  "description": "Implement ParcelStore, BuildingStore, and UIStore with actions, subscriptions, and DevTools integration",
+
+  "deepThinking": {
+    "actuallyBuilding": "Three Zustand stores: ParcelStore (width, depth, slope settings with validation), BuildingStore (buildings array, unit count, CRUD operations), UIStore (view presets, panel state, AI loading state). Plus cross-store subscriptions so parcel changes trigger building recalculation.",
+    "visualOutcome": "No direct visual outcome yet, but changing values in Redux DevTools will show state updates. Later sections will connect these stores to UI and 3D scene.",
+    "exactSteps": [
+      "Step 1: Create ParcelStore with validated setters",
+      "Step 2: Create BuildingStore with CRUD operations",
+      "Step 3: Create UIStore with view and panel state",
+      "Step 4: Create barrel export file",
+      "Step 5: Add cross-store subscriptions",
+      "Step 6: Add DevTools middleware"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "State mutations instead of new references",
+        "symptom": "Components don't re-render when state changes",
+        "detection": "Console.log state, compare old/new",
+        "mitigation": "Always use set({ ...state, field: value }) pattern"
+      },
+      {
+        "issue": "Infinite subscription loop",
+        "symptom": "Browser freezes, stack overflow",
+        "detection": "Debugger shows rapid re-entry",
+        "mitigation": "Add change detection guard in subscription"
+      },
+      {
+        "issue": "Type errors from partial Building updates",
+        "symptom": "TypeScript errors on updateBuilding",
+        "detection": "npm run typecheck fails",
+        "mitigation": "Use Partial<Building> correctly"
+      }
+    ],
+    "assumptions": [
+      "Zustand installed from task-001",
+      "Types defined from task-002",
+      "Browser has Redux DevTools extension (optional)"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create ParcelStore with validation",
+      "timeEstimate": "20min",
+      "files": [
+        "src/stores/parcelStore.ts",
+        "src/stores/parcelStore.test.ts"
+      ],
+      "creates": [
+        "ParcelState interface",
+        "useParcelStore hook",
+        "setWidth, setDepth, setSlopeAngle, setSlopeDirection actions",
+        "applyPreset action",
+        "reset action"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- parcelStore.test.ts",
+        "expected": "All tests pass",
+        "specificChecks": [
+          "setWidth(25) updates width to 25",
+          "setWidth(100) clamps to 50 (max)",
+          "setWidth(-5) clamps to 5 (min)",
+          "setSlopeAngle(45) updates slopeAngle to 45",
+          "setSlopeAngle(70) clamps to 60",
+          "applyPreset sets both width and depth",
+          "reset returns to defaults"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create BuildingStore with CRUD",
+      "timeEstimate": "25min",
+      "files": [
+        "src/stores/buildingStore.ts",
+        "src/stores/buildingStore.test.ts"
+      ],
+      "creates": [
+        "BuildingState interface",
+        "useBuildingStore hook",
+        "setUnitCount action",
+        "setLayoutPreset action",
+        "addBuilding, updateBuilding, removeBuilding actions",
+        "clearBuildings action",
+        "recalculatePositions stub"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- buildingStore.test.ts",
+        "expected": "All tests pass",
+        "specificChecks": [
+          "addBuilding increases buildings.length",
+          "removeBuilding decreases buildings.length",
+          "updateBuilding modifies specific building",
+          "clearBuildings empties array",
+          "setUnitCount clamps to 1-8 range"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Create UIStore",
+      "timeEstimate": "15min",
+      "files": [
+        "src/stores/uiStore.ts",
+        "src/stores/uiStore.test.ts"
+      ],
+      "creates": [
+        "UIState interface",
+        "useUIStore hook",
+        "setView action",
+        "toggleGrid, toggleLabels actions",
+        "selectBuilding action",
+        "AI state actions"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- uiStore.test.ts",
+        "expected": "All tests pass",
+        "specificChecks": [
+          "setView('top') updates currentView",
+          "toggleGrid flips showGrid",
+          "selectBuilding sets selectedBuildingId",
+          "setAILoading(true) sets isAILoading"
+        ]
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Create barrel export and DevTools integration",
+      "timeEstimate": "10min",
+      "files": [
+        "src/stores/index.ts",
+        "src/stores/parcelStore.ts",
+        "src/stores/buildingStore.ts",
+        "src/stores/uiStore.ts"
+      ],
+      "creates": [
+        "Barrel export file",
+        "DevTools middleware on each store"
+      ],
+      "modifies": [
+        "Each store file to add devtools"
+      ],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck",
+          "npm run build"
+        ],
+        "expected": "Build succeeds, imports work",
+        "specificChecks": [
+          "import { useParcelStore, useBuildingStore, useUIStore } from '@/stores' works",
+          "No circular import errors"
+        ]
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Add cross-store subscriptions",
+      "timeEstimate": "15min",
+      "files": [
+        "src/stores/subscriptions.ts",
+        "src/stores/subscriptions.test.ts"
+      ],
+      "creates": [
+        "initializeSubscriptions function",
+        "Parcel-to-Building subscription"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- subscriptions.test.ts",
+        "expected": "Integration test passes",
+        "specificChecks": [
+          "Parcel width change triggers recalculatePositions",
+          "No infinite loops occur"
+        ]
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup",
+      "task-002-type-definitions"
+    ],
+    "enables": [
+      "task-005-terrain",
+      "task-006-buildings",
+      "task-009-parcel-panel",
+      "task-010-unit-panel",
+      "task-017-ai-integration"
+    ],
+    "sharedState": [
+      "parcelStore",
+      "buildingStore",
+      "uiStore"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-003",
+    "description": "Stores are isolated - can fix individual store without affecting others",
+    "alternativeApproach": "If Zustand causes issues, could use React Context instead"
+  },
+
+  "estimatedTotalTime": "85min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Zustand devtools shows state in Redux DevTools browser extension",
+    "recalculatePositions is a stub - actual algorithm in section 012",
+    "Subscriptions initialized in App.tsx useEffect",
+    "Use shallow equality for store selectors to prevent extra renders"
+  ]
+}

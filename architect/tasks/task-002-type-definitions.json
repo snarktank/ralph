@@ -1,0 +1,261 @@
+{
+  "id": "task-002",
+  "section": "type-definitions",
+  "title": "Define TypeScript Interfaces for TerraNest",
+  "description": "Create all TypeScript interfaces and types for Parcel, Building, Unit, Amenity, Layout, and AI integration",
+
+  "deepThinking": {
+    "actuallyBuilding": "A comprehensive type system with: Position3D for 3D coordinates, Parcel for land configuration, Building for individual structures, Unit for subdivision info, Amenity for pools/parking, LayoutPreset and ViewPreset string literals, and AI-related types for Claude integration",
+    "visualOutcome": "No visual outcome - this is a compile-time construct. Success is measured by TypeScript autocompletion working and type errors catching bugs before runtime",
+    "exactSteps": [
+      "Step 1: Create Position3D and Parcel interfaces in src/types/parcel.ts",
+      "Step 2: Create Building and Unit interfaces in src/types/building.ts",
+      "Step 3: Create Amenity types in src/types/amenity.ts",
+      "Step 4: Create LayoutPreset and ViewPreset in src/types/layout.ts",
+      "Step 5: Create AI integration types in src/types/ai.ts",
+      "Step 6: Create barrel export in src/types/index.ts",
+      "Step 7: Add validation helpers in src/utils/validators.ts with tests"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Circular imports between type files",
+        "symptom": "tsc fails with 'Cannot access X before initialization'",
+        "detection": "npm run typecheck fails",
+        "mitigation": "Use barrel exports, import from index.ts only"
+      },
+      {
+        "issue": "Position coordinate confusion (y vs z for height)",
+        "symptom": "Buildings positioned incorrectly in 3D space",
+        "detection": "Visual inspection in 3D scene",
+        "mitigation": "Document that y is UP (Three.js convention) in type comments"
+      },
+      {
+        "issue": "Degrees vs radians confusion",
+        "symptom": "Rotations way off or barely visible",
+        "detection": "Visual inspection, angles don't match expected",
+        "mitigation": "Store in degrees, convert at render time only"
+      }
+    ],
+    "assumptions": [
+      "TypeScript strict mode is enabled from task-001",
+      "We're using Three.js coordinate system (y = up)",
+      "All measurements are in meters",
+      "Angles stored in degrees for human readability"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create Position3D and Parcel types",
+      "timeEstimate": "10min",
+      "files": [
+        "src/types/parcel.ts"
+      ],
+      "creates": [
+        "Position3D interface",
+        "Position2D interface",
+        "Parcel interface",
+        "ParcelPreset interface",
+        "PARCEL_PRESETS constant array"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "No TypeScript errors",
+        "specificChecks": [
+          "Position3D has x, y, z as numbers",
+          "Parcel has width, depth, slopeAngle, slopeDirection",
+          "PARCEL_PRESETS exports correctly"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create Building and Unit types",
+      "timeEstimate": "10min",
+      "files": [
+        "src/types/building.ts"
+      ],
+      "creates": [
+        "Building interface",
+        "UnitType literal type",
+        "Unit interface"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "No TypeScript errors",
+        "specificChecks": [
+          "Building has id, dimensions, position, rotation, terraceLevel",
+          "UnitType is 'villa' | 'duplex' | 'studio'",
+          "Unit references Building type correctly"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Create Amenity types",
+      "timeEstimate": "5min",
+      "files": [
+        "src/types/amenity.ts"
+      ],
+      "creates": [
+        "AmenityType literal type",
+        "Amenity interface"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "No TypeScript errors",
+        "specificChecks": [
+          "AmenityType includes pool, parking, access-road, garden",
+          "Amenity has position and dimensions"
+        ]
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Create Layout and View preset types",
+      "timeEstimate": "5min",
+      "files": [
+        "src/types/layout.ts"
+      ],
+      "creates": [
+        "LayoutPreset literal type",
+        "ViewPreset literal type",
+        "LayoutConfig interface"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "No TypeScript errors",
+        "specificChecks": [
+          "LayoutPreset includes single-villa, duplex, quad-studio, custom",
+          "ViewPreset includes top, front, side, isometric"
+        ]
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Create AI integration types",
+      "timeEstimate": "10min",
+      "files": [
+        "src/types/ai.ts"
+      ],
+      "creates": [
+        "AILayoutScore interface",
+        "AILayoutSuggestion interface",
+        "AIRequest interface",
+        "AIResponse interface"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "No TypeScript errors",
+        "specificChecks": [
+          "AILayoutSuggestion has buildings array of Building type",
+          "AIRequest includes parcel and priorities"
+        ]
+      }
+    },
+    {
+      "id": "ST-006",
+      "description": "Create barrel export file",
+      "timeEstimate": "5min",
+      "files": [
+        "src/types/index.ts"
+      ],
+      "creates": [
+        "Barrel export for all types"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "All types exportable from @/types",
+        "specificChecks": [
+          "import { Parcel, Building, Amenity } from '@/types' works",
+          "No circular dependency errors"
+        ]
+      }
+    },
+    {
+      "id": "ST-007",
+      "description": "Add validation helper functions with tests",
+      "timeEstimate": "15min",
+      "files": [
+        "src/utils/validators.ts",
+        "src/utils/validators.test.ts"
+      ],
+      "creates": [
+        "isValidParcel() function",
+        "isValidBuilding() function",
+        "generateBuildingId() function",
+        "degreesToRadians() helper",
+        "radiansToDegrees() helper"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- validators.test.ts",
+        "expected": "All tests pass",
+        "specificChecks": [
+          "isValidParcel rejects negative dimensions",
+          "isValidParcel rejects slope > 60",
+          "generateBuildingId creates unique IDs",
+          "degreesToRadians(180) returns Math.PI"
+        ]
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup"
+    ],
+    "enables": [
+      "task-003-state-management",
+      "task-005-terrain",
+      "task-006-buildings",
+      "task-017-ai-integration"
+    ],
+    "sharedState": []
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-002",
+    "description": "Types are low-risk. If issues occur, simply fix the type definitions.",
+    "alternativeApproach": "Could use type inference instead of explicit interfaces, but explicit is clearer"
+  },
+
+  "estimatedTotalTime": "60min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "Keep types simple - avoid over-engineering with generics",
+    "Document coordinate system (y = up) in comments",
+    "Use string literal types for presets for better autocomplete",
+    "Consider adding JSDoc comments for complex fields",
+    "PARCEL_PRESETS as const for readonly tuple type"
+  ]
+}

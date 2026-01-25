@@ -1,0 +1,227 @@
+{
+  "id": "task-008",
+  "section": "app-layout",
+  "title": "Create Three-Column App Layout with Collapsible Panels",
+  "description": "Implement main app layout with left sidebar (300px), center 3D canvas (flex), right sidebar (250px), and collapsible panel functionality",
+
+  "deepThinking": {
+    "actuallyBuilding": "A responsive three-column layout: left Panel (300px for config controls), center main area (flex-1 for 3D canvas), right Panel (250px for info/AI). Panels collapse to 40px with icons, smooth CSS transitions, state in uiStore.isPanelCollapsed.",
+    "visualOutcome": "Professional dark-themed layout with two sidebars flanking the 3D canvas. Clicking collapse buttons smoothly shrinks panels, giving more canvas space. Canvas resizes correctly when panels collapse.",
+    "exactSteps": [
+      "Step 1: Update App.tsx with flex container layout",
+      "Step 2: Create Panel component with collapse logic",
+      "Step 3: Create LeftPanel and RightPanel wrapper components",
+      "Step 4: Add CSS transitions for smooth collapse",
+      "Step 5: Connect to uiStore for collapse state"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Canvas doesn't resize on panel collapse",
+        "symptom": "3D view stays same size, cut off or distorted",
+        "detection": "Collapse panel, observe canvas",
+        "mitigation": "Use flex-1 on center, ensure Canvas has no fixed dimensions"
+      },
+      {
+        "issue": "Panel transition stutters",
+        "symptom": "Jerky animation during collapse/expand",
+        "detection": "Visual inspection",
+        "mitigation": "Use CSS transition on width, not JS animation"
+      },
+      {
+        "issue": "Z-index conflicts",
+        "symptom": "Panel appears behind canvas",
+        "detection": "Visual inspection",
+        "mitigation": "Set explicit z-index on panels"
+      },
+      {
+        "issue": "Content overflow issues",
+        "symptom": "Panel content hidden or spills out",
+        "detection": "Add lots of content to panel",
+        "mitigation": "Add overflow-y-auto to panel content"
+      }
+    ],
+    "assumptions": [
+      "Tailwind CSS configured from task-001",
+      "uiStore has isPanelCollapsed and togglePanel from task-003",
+      "Scene component exists from task-004"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create base layout in App.tsx",
+      "timeEstimate": "15min",
+      "files": [
+        "src/App.tsx",
+        "src/App.css"
+      ],
+      "creates": [
+        "Flex container layout",
+        "Left/Center/Right structure"
+      ],
+      "modifies": [
+        "App.tsx",
+        "App.css"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-008",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify three-column layout visible",
+          "Left and right panels have background color",
+          "Center shows 3D canvas"
+        ],
+        "expected": "Three-column layout visible",
+        "screenshotRequired": true,
+        "screenshotName": "task-008-layout-basic.png"
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create Panel component with collapse",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/layout/Panel.tsx"
+      ],
+      "creates": [
+        "Panel component",
+        "PanelProps interface",
+        "Collapse button",
+        "Transition styles"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Component compiles with correct types",
+        "specificChecks": [
+          "Props typed correctly",
+          "cn utility imported"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Create LeftPanel and RightPanel wrappers",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/layout/LeftPanel.tsx",
+        "src/components/layout/RightPanel.tsx",
+        "src/components/layout/index.ts"
+      ],
+      "creates": [
+        "LeftPanel component",
+        "RightPanel component",
+        "Barrel export"
+      ],
+      "modifies": [
+        "App.tsx to use new components"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-008",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify panels render with placeholder content",
+          "Panels have correct widths"
+        ],
+        "expected": "Both panels visible with content",
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Implement collapse functionality",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/layout/Panel.tsx",
+        "src/components/layout/LeftPanel.tsx",
+        "src/components/layout/RightPanel.tsx"
+      ],
+      "creates": [
+        "Collapse button UI",
+        "Store connection"
+      ],
+      "modifies": [
+        "Panel components"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-008",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click left panel collapse button",
+          "Panel should shrink to 40px",
+          "Click again to expand",
+          "Repeat for right panel",
+          "Verify transitions are smooth"
+        ],
+        "expected": "Panels collapse and expand smoothly",
+        "screenshotRequired": true,
+        "screenshotName": "task-008-collapsed.png"
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Verify canvas resizes correctly",
+      "timeEstimate": "10min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-008",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Note canvas size with panels open",
+          "Collapse both panels",
+          "Verify canvas expands to fill space",
+          "3D content should scale correctly",
+          "No distortion or clipping"
+        ],
+        "expected": "Canvas resizes correctly on collapse",
+        "screenshotRequired": true,
+        "screenshotName": "task-008-canvas-resize.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup",
+      "task-003-state-management",
+      "task-004-scene-setup"
+    ],
+    "enables": [
+      "task-009-parcel-panel",
+      "task-010-unit-panel",
+      "task-011-view-controls"
+    ],
+    "sharedState": [
+      "uiStore.isPanelCollapsed"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-008",
+    "description": "Layout is fundamental but isolated from 3D. Can revert and simplify if needed.",
+    "alternativeApproach": "If collapse causes issues, use fixed panels without collapse"
+  },
+
+  "estimatedTotalTime": "85min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "Using Tailwind's dark slate colors for professional look",
+    "CSS transitions preferred over JS for performance",
+    "Collapsed width = 40px, enough for icons",
+    "Panel content needs overflow-y-auto for scrolling",
+    "Consider adding min-width to prevent over-collapse"
+  ]
+}

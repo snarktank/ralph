@@ -1,0 +1,175 @@
+{
+  "id": "task-016",
+  "section": "amenity-system",
+  "title": "Implement Amenity System",
+  "description": "Add optional amenities (pool, parking, access road) with toggles and 3D visualization",
+
+  "deepThinking": {
+    "actuallyBuilding": "Amenity system: state in uiStore or separate amenityStore for enabled/position of pool/parking/access road, toggle UI in right panel, 3D mesh components for each amenity type, and positioning logic based on slope direction.",
+    "visualOutcome": "Toggle pool ON shows blue rectangle positioned downhill. Toggle parking shows gray area near access. Access road shows along selected edge. Amenities respect building positions.",
+    "exactSteps": [
+      "Step 1: Add amenity state to store",
+      "Step 2: Create amenity toggle UI in right panel",
+      "Step 3: Create Pool, Parking, AccessRoad 3D components",
+      "Step 4: Implement intelligent positioning logic",
+      "Step 5: Visual verification of each amenity"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Amenity overlaps with buildings",
+        "symptom": "Pool intersects with building",
+        "detection": "Visual inspection",
+        "mitigation": "Check building positions when placing amenities"
+      },
+      {
+        "issue": "Amenity outside parcel",
+        "symptom": "Pool beyond terrain edge",
+        "detection": "Visual inspection from top view",
+        "mitigation": "Clamp positions to parcel bounds"
+      }
+    ],
+    "assumptions": [
+      "This is OPTIONAL functionality",
+      "Basic positioning is sufficient for MVP",
+      "User can adjust via future drag feature"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Add amenity state",
+      "timeEstimate": "15min",
+      "files": [
+        "src/stores/uiStore.ts"
+      ],
+      "creates": [
+        "Amenity state: pool, parking, accessRoad",
+        "Toggle actions for each"
+      ],
+      "modifies": [
+        "uiStore.ts"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- uiStore.test.ts",
+        "expected": "Amenity state tests pass",
+        "specificChecks": [
+          "togglePool flips pool.enabled",
+          "Initial state has all disabled"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create amenity toggle UI",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/panels/AmenityPanel.tsx"
+      ],
+      "creates": [
+        "AmenityPanel component",
+        "Toggle switches for each amenity"
+      ],
+      "modifies": [
+        "RightPanel.tsx to include AmenityPanel"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-016",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify amenity toggles appear in right panel",
+          "Toggle each - state should update"
+        ],
+        "expected": "Amenity toggles visible and functional",
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Create 3D amenity components",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/3d/Amenities.tsx",
+        "src/components/3d/Pool.tsx",
+        "src/components/3d/Parking.tsx"
+      ],
+      "creates": [
+        "Pool mesh (blue)",
+        "Parking mesh (gray)",
+        "Amenities container"
+      ],
+      "modifies": [
+        "Scene.tsx to include Amenities"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-016",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Toggle pool ON - blue mesh appears",
+          "Toggle parking ON - gray mesh appears",
+          "Position should be reasonable"
+        ],
+        "expected": "Amenity meshes render correctly",
+        "screenshotRequired": true,
+        "screenshotName": "task-016-amenities.png"
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Implement positioning logic",
+      "timeEstimate": "20min",
+      "files": [
+        "src/utils/amenityPosition.ts"
+      ],
+      "creates": [
+        "calculatePoolPosition function",
+        "calculateParkingPosition function"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-016",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Pool should be positioned toward downhill (view)",
+          "Change slope direction - pool position should adjust"
+        ],
+        "expected": "Amenities positioned intelligently",
+        "screenshotRequired": false
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-003-state-management",
+      "task-004-scene-setup",
+      "task-008-app-layout"
+    ],
+    "enables": [],
+    "sharedState": [
+      "uiStore.amenities"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-016",
+    "description": "Amenities are optional features. Can skip or simplify.",
+    "alternativeApproach": "Use static positions if dynamic positioning complex"
+  },
+
+  "estimatedTotalTime": "80min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Pool is 4x3m default size",
+    "Parking is 5x3m default size",
+    "Access road is 3m wide along edge",
+    "Consider adding drag-to-reposition later"
+  ]
+}

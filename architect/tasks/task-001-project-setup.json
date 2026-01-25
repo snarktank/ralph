@@ -1,0 +1,360 @@
+{
+  "id": "task-001",
+  "section": "project-setup",
+  "title": "Initialize TerraNest Project with Full Stack",
+  "description": "Create a new Vite + React + TypeScript project with Three.js, R3F, Zustand, Tailwind, and Shadcn/ui configured",
+
+  "deepThinking": {
+    "actuallyBuilding": "A complete development environment for TerraNest: Vite dev server, React 18 with TypeScript strict mode, Three.js via React Three Fiber for 3D rendering, Zustand for state management, Tailwind CSS + Shadcn/ui for styling, and a basic three-column app layout with a working 3D canvas placeholder",
+    "visualOutcome": "A running app at localhost:5173 showing a three-column layout with a rotating 3D cube in the center canvas, proving all dependencies work together",
+    "exactSteps": [
+      "Step 1: Create Vite project with react-ts template",
+      "Step 2: Install Three.js, @react-three/fiber, @react-three/drei",
+      "Step 3: Install Zustand for state management",
+      "Step 4: Install and configure Tailwind CSS with proper content paths",
+      "Step 5: Initialize Shadcn/ui and add Button component",
+      "Step 6: Configure ESLint for React + TypeScript",
+      "Step 7: Create folder structure: components/3d, stores, utils, types",
+      "Step 8: Create App.tsx with three-column flexbox layout",
+      "Step 9: Create Scene.tsx with Canvas, OrbitControls, and test cube",
+      "Step 10: Verify full build pipeline passes"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "React version mismatch between R3F and React",
+        "symptom": "npm install fails with peer dependency errors",
+        "detection": "Error messages during npm install",
+        "mitigation": "Use --legacy-peer-deps or pin specific versions"
+      },
+      {
+        "issue": "Tailwind classes not applying",
+        "symptom": "Elements have no styling despite utility classes",
+        "detection": "Visual inspection, elements unstyled",
+        "mitigation": "Verify tailwind.config.js content array includes all file patterns"
+      },
+      {
+        "issue": "Shadcn init fails or components don't import",
+        "symptom": "TypeScript errors on component imports",
+        "detection": "npm run typecheck fails",
+        "mitigation": "Check components.json paths, manually verify component files exist"
+      },
+      {
+        "issue": "Three.js Canvas doesn't render",
+        "symptom": "Black or empty area where 3D should be",
+        "detection": "Visual inspection, console errors about WebGL",
+        "mitigation": "Ensure Canvas has explicit size, check WebGL support"
+      }
+    ],
+    "assumptions": [
+      "Node.js 18+ is installed",
+      "npm is available",
+      "Developer has internet access for package downloads",
+      "WebGL is supported in testing browser"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create Vite project and install base dependencies",
+      "timeEstimate": "10min",
+      "files": [
+        "package.json",
+        "vite.config.ts",
+        "tsconfig.json",
+        "index.html"
+      ],
+      "creates": [
+        "Complete Vite project scaffold",
+        "TypeScript configuration",
+        "Dev server capability"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm install",
+          "npm run dev"
+        ],
+        "expected": "Dev server starts at localhost:5173",
+        "specificChecks": [
+          "No npm install errors",
+          "Vite welcome page loads"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Install Three.js and React Three Fiber",
+      "timeEstimate": "5min",
+      "files": [
+        "package.json"
+      ],
+      "creates": [
+        "three dependency",
+        "@types/three dependency",
+        "@react-three/fiber dependency",
+        "@react-three/drei dependency"
+      ],
+      "modifies": [
+        "package.json dependencies"
+      ],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Three.js types resolve correctly",
+        "specificChecks": [
+          "Can import { Canvas } from '@react-three/fiber'",
+          "Can import { OrbitControls } from '@react-three/drei'",
+          "No TypeScript errors on imports"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Install Zustand for state management",
+      "timeEstimate": "2min",
+      "files": [
+        "package.json"
+      ],
+      "creates": [
+        "zustand dependency"
+      ],
+      "modifies": [
+        "package.json dependencies"
+      ],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Zustand imports work",
+        "specificChecks": [
+          "Can import { create } from 'zustand'"
+        ]
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Install and configure Tailwind CSS",
+      "timeEstimate": "10min",
+      "files": [
+        "package.json",
+        "tailwind.config.js",
+        "postcss.config.js",
+        "src/index.css"
+      ],
+      "creates": [
+        "tailwind.config.js with content paths",
+        "postcss.config.js",
+        "Tailwind directives in index.css"
+      ],
+      "modifies": [
+        "src/index.css"
+      ],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run dev"
+        ],
+        "expected": "Tailwind classes apply styling",
+        "specificChecks": [
+          "Add bg-red-500 class to element",
+          "Element turns red",
+          "No build warnings about Tailwind"
+        ]
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Initialize Shadcn/ui and add Button",
+      "timeEstimate": "10min",
+      "files": [
+        "components.json",
+        "src/lib/utils.ts",
+        "src/components/ui/button.tsx"
+      ],
+      "creates": [
+        "Shadcn configuration",
+        "cn() utility function",
+        "Button component"
+      ],
+      "modifies": [
+        "tailwind.config.js (Shadcn additions)"
+      ],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck",
+          "npm run build"
+        ],
+        "expected": "Button component imports and builds",
+        "specificChecks": [
+          "import { Button } from '@/components/ui/button' works",
+          "Button renders with correct styles"
+        ]
+      }
+    },
+    {
+      "id": "ST-006",
+      "description": "Configure ESLint and create folder structure",
+      "timeEstimate": "10min",
+      "files": [
+        "eslint.config.js",
+        ".prettierrc",
+        "src/components/3d/.gitkeep",
+        "src/components/panels/.gitkeep",
+        "src/stores/.gitkeep",
+        "src/utils/.gitkeep",
+        "src/types/.gitkeep"
+      ],
+      "creates": [
+        "ESLint configuration",
+        "Prettier configuration",
+        "Project folder structure"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run lint"
+        ],
+        "expected": "Lint passes with no errors",
+        "specificChecks": [
+          "All folders created",
+          "ESLint config valid"
+        ]
+      }
+    },
+    {
+      "id": "ST-007",
+      "description": "Create App layout shell with three columns",
+      "timeEstimate": "15min",
+      "files": [
+        "src/App.tsx",
+        "src/App.css"
+      ],
+      "creates": [
+        "Three-column flexbox layout",
+        "Left sidebar placeholder (300px)",
+        "Center content area (flex-1)",
+        "Right sidebar placeholder (200px)"
+      ],
+      "modifies": [
+        "App.tsx",
+        "App.css"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-001",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Open preview URL",
+          "Verify three-column layout visible",
+          "Resize browser to check responsiveness",
+          "Check DevTools console for errors"
+        ],
+        "expected": "Three-column layout renders correctly",
+        "consoleChecks": [
+          "No JavaScript errors",
+          "No React warnings"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-001-layout.png"
+      }
+    },
+    {
+      "id": "ST-008",
+      "description": "Create 3D Scene component with Canvas and test cube",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Scene.tsx",
+        "src/App.tsx"
+      ],
+      "creates": [
+        "Scene component with Canvas",
+        "OrbitControls",
+        "Test cube mesh",
+        "Basic lighting"
+      ],
+      "modifies": [
+        "App.tsx to render Scene"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-001",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Open preview URL",
+          "Verify 3D cube visible in center",
+          "Drag to rotate - OrbitControls work",
+          "Scroll to zoom",
+          "Check DevTools console for WebGL errors"
+        ],
+        "expected": "Interactive 3D canvas with cube",
+        "consoleChecks": [
+          "No WebGL errors",
+          "No React Three Fiber errors"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-001-3d-canvas.png"
+      }
+    },
+    {
+      "id": "ST-009",
+      "description": "Verify complete build pipeline",
+      "timeEstimate": "5min",
+      "files": [],
+      "creates": [
+        "dist/ folder with production build"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck",
+          "npm run lint",
+          "npm run build"
+        ],
+        "expected": "All pass, dist/ created",
+        "specificChecks": [
+          "No TypeScript errors",
+          "No ESLint errors",
+          "Build completes successfully",
+          "dist/ folder exists with assets"
+        ]
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [],
+    "enables": [
+      "task-002-types",
+      "task-003-state",
+      "task-004-scene",
+      "task-008-layout"
+    ],
+    "sharedState": []
+  },
+
+  "rollbackStrategy": {
+    "type": "git-clean",
+    "checkpoint": "before-task-001",
+    "description": "If setup fails completely, delete the terranest folder and start fresh. For partial failures, fix the specific step that failed.",
+    "alternativeApproach": "If Shadcn fails, use plain Tailwind components. If R3F fails, try vanilla Three.js first."
+  },
+
+  "estimatedTotalTime": "67min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "This is the foundation task - all other tasks depend on it",
+    "Take time to get the build pipeline right - it will save debugging later",
+    "The 3D canvas size should fill the center area - may need CSS adjustments",
+    "Commit after each major subtask for easy rollback"
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "id": "task-021",
+  "section": "test-scenario-villa",
+  "title": "Verify Single Villa Scenario",
+  "description": "End-to-end verification of single villa on 15×15m parcel with 15° slope",
+
+  "deepThinking": {
+    "actuallyBuilding": "Verification task, not code. Testing that single villa configuration produces correct output: one centered building maximizing footprint, correctly positioned on sloped terrain.",
+    "visualOutcome": "Single large building fills most of 15×15 parcel, sits correctly on 15° slope, front garden area visible toward downhill direction.",
+    "exactSteps": [
+      "Step 1: Set parcel to 15×15",
+      "Step 2: Set slope to 15°, direction 0°",
+      "Step 3: Set units to 1 (Villa preset)",
+      "Step 4: Verify building appears correctly",
+      "Step 5: Capture verification screenshots"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Building too small",
+        "symptom": "Lots of empty space on parcel",
+        "detection": "Top view shows gaps",
+        "mitigation": "Check spacing calculation"
+      },
+      {
+        "issue": "Building floating on slope",
+        "symptom": "Gap between building and terrain",
+        "detection": "Side view shows gap",
+        "mitigation": "Check Y position calculation"
+      }
+    ],
+    "assumptions": [
+      "All previous tasks completed",
+      "Parcel configuration works",
+      "Building rendering works"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Configure and verify villa scenario",
+      "timeEstimate": "15min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-021",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set parcel: 15×15m",
+          "Set slope: 15°, direction: 0° (North)",
+          "Set units: 1 (or Villa preset)",
+          "Verify single building centered on parcel",
+          "View from isometric - building on slope",
+          "View from side - no floating/sinking",
+          "View from top - building fills area",
+          "Screenshot each view"
+        ],
+        "expected": "Single villa renders correctly on sloped terrain",
+        "screenshotRequired": true,
+        "screenshotName": "task-021-villa.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-005-terrain-rendering",
+      "task-006-building-blocks",
+      "task-009-parcel-config-panel",
+      "task-010-unit-config-panel",
+      "task-012-flat-terrain-layout"
+    ],
+    "enables": [],
+    "sharedState": []
+  },
+
+  "rollbackStrategy": {
+    "type": "investigate",
+    "checkpoint": "N/A",
+    "description": "If test fails, identify which component is incorrect and fix that task.",
+    "alternativeApproach": "N/A"
+  },
+
+  "estimatedTotalTime": "15min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "This is a VERIFICATION task, not implementation",
+    "Screenshots are essential for documentation",
+    "Any failures should be traced back to specific implementation tasks"
+  ]
+}

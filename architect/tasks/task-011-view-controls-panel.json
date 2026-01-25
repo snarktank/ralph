@@ -1,0 +1,118 @@
+{
+  "id": "task-011",
+  "section": "view-controls-panel",
+  "title": "Create View Controls Panel",
+  "description": "Build right panel UI with view preset buttons, grid toggle, and fit-to-view functionality",
+
+  "deepThinking": {
+    "actuallyBuilding": "View controls in right panel: four view preset buttons (Top/Front/Side/Isometric) with active state, grid visibility toggle, labels toggle, and fit-to-view button. Connected to uiStore for state and camera controller for actions.",
+    "visualOutcome": "Button group in right panel. Clicking a view button smoothly animates camera. Toggle switches control grid visibility. Fit button centers the view on parcel.",
+    "exactSteps": [
+      "Step 1: Create ViewControlsPanel component",
+      "Step 2: Add view preset button group",
+      "Step 3: Add grid and labels toggles",
+      "Step 4: Add fit-to-view button"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Active button not highlighting",
+        "symptom": "All buttons look the same",
+        "detection": "Click button, observe no visual change",
+        "mitigation": "Check currentView state and apply active class"
+      }
+    ],
+    "assumptions": [
+      "uiStore has currentView and setView from task-003",
+      "CameraController listens to currentView from task-007",
+      "RightPanel exists from task-008"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create ViewControlsPanel with view buttons",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/panels/ViewControlsPanel.tsx"
+      ],
+      "creates": [
+        "ViewControlsPanel component",
+        "View preset buttons with active state"
+      ],
+      "modifies": [
+        "RightPanel.tsx to include ViewControlsPanel"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-011",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click 'Top' button - camera moves to top view",
+          "Click 'Front' button - camera moves to front",
+          "Verify active button is highlighted"
+        ],
+        "expected": "View buttons work with visual feedback",
+        "screenshotRequired": true,
+        "screenshotName": "task-011-view-buttons.png"
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Add toggles and fit button",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/panels/ViewControlsPanel.tsx"
+      ],
+      "creates": [
+        "Grid toggle switch",
+        "Fit-to-view button"
+      ],
+      "modifies": [
+        "ViewControlsPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-011",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Toggle grid switch - grid hides/shows",
+          "Click fit-to-view - camera frames parcel"
+        ],
+        "expected": "Toggles and fit button work",
+        "screenshotRequired": false
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-003-state-management",
+      "task-007-camera-controls",
+      "task-008-app-layout"
+    ],
+    "enables": [],
+    "sharedState": [
+      "uiStore.currentView",
+      "uiStore.showGrid"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-011",
+    "description": "UI is isolated from camera logic.",
+    "alternativeApproach": "Use simple buttons if Shadcn ToggleGroup issues"
+  },
+
+  "estimatedTotalTime": "35min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "Use Button with variant for active/inactive state",
+    "Consider using ToggleGroup from Shadcn",
+    "Switch component for toggles",
+    "Add aria-pressed for accessibility"
+  ]
+}

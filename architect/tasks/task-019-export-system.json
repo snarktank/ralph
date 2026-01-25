@@ -1,0 +1,182 @@
+{
+  "id": "task-019",
+  "section": "export-system",
+  "title": "Implement Export System",
+  "description": "Add OBJ export, JSON save/load, and screenshot capture functionality",
+
+  "deepThinking": {
+    "actuallyBuilding": "Export functionality: OBJ file generation from Three.js scene for CAD import, JSON serialization of complete state for save/load, canvas screenshot capture as PNG. All with download file triggers.",
+    "visualOutcome": "Export panel with 'Export OBJ', 'Save JSON', 'Load JSON', 'Screenshot' buttons. Clicking triggers file download or file picker. Loaded JSON restores complete state.",
+    "exactSteps": [
+      "Step 1: Implement OBJ exporter using Three.js OBJExporter",
+      "Step 2: Implement JSON serialization of stores",
+      "Step 3: Implement JSON loading and state restoration",
+      "Step 4: Implement canvas screenshot capture",
+      "Step 5: Create export panel UI with buttons"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "OBJ export missing objects",
+        "symptom": "Exported file doesn't have all buildings",
+        "detection": "Open in CAD, count objects",
+        "mitigation": "Traverse full scene graph"
+      },
+      {
+        "issue": "JSON version incompatibility",
+        "symptom": "Old saves don't load correctly",
+        "detection": "Load old config, errors occur",
+        "mitigation": "Add version field, migration logic"
+      },
+      {
+        "issue": "Screenshot captures low resolution",
+        "symptom": "Blurry image",
+        "detection": "Download and zoom in",
+        "mitigation": "Set renderer pixel ratio"
+      }
+    ],
+    "assumptions": [
+      "OBJExporter available from three/addons",
+      "FileSaver.js or native download",
+      "Canvas accessible for screenshot"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Implement OBJ export",
+      "timeEstimate": "30min",
+      "files": [
+        "src/utils/export.ts"
+      ],
+      "creates": [
+        "exportToOBJ function",
+        "OBJExporter usage"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-019",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Add some buildings to scene",
+          "Click 'Export OBJ'",
+          "File downloads",
+          "Open in 3D software - verify objects"
+        ],
+        "expected": "OBJ file downloads and is valid",
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Implement JSON save/load",
+      "timeEstimate": "35min",
+      "files": [
+        "src/utils/export.ts",
+        "src/utils/import.ts"
+      ],
+      "creates": [
+        "saveConfiguration function",
+        "loadConfiguration function",
+        "Configuration JSON schema"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-019",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Configure parcel and units",
+          "Click 'Save Config' - JSON downloads",
+          "Change config to something different",
+          "Click 'Load Config' - pick saved file",
+          "Verify original config restored"
+        ],
+        "expected": "Save/Load round-trip works",
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Implement screenshot capture",
+      "timeEstimate": "15min",
+      "files": [
+        "src/utils/export.ts"
+      ],
+      "creates": [
+        "captureScreenshot function"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-019",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Position camera for good view",
+          "Click 'Screenshot'",
+          "PNG file downloads",
+          "Open image - should match view"
+        ],
+        "expected": "Screenshot captures current view",
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Create export panel UI",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/panels/ExportPanel.tsx"
+      ],
+      "creates": [
+        "ExportPanel component",
+        "Export buttons"
+      ],
+      "modifies": [
+        "RightPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-019",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify export panel with buttons visible",
+          "All buttons clickable"
+        ],
+        "expected": "Export panel UI complete",
+        "screenshotRequired": true,
+        "screenshotName": "task-019-export-panel.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-003-state-management",
+      "task-004-scene-setup"
+    ],
+    "enables": [],
+    "sharedState": [
+      "All stores for JSON export"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-019",
+    "description": "Export is self-contained feature.",
+    "alternativeApproach": "Can simplify to JSON only if OBJ problematic"
+  },
+
+  "estimatedTotalTime": "100min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "OBJExporter from three/addons needs import",
+    "Consider adding MTL for materials with OBJ",
+    "JSON should include version for future compatibility",
+    "Screenshot uses canvas.toDataURL()"
+  ]
+}

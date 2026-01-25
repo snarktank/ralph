@@ -1,0 +1,227 @@
+{
+  "id": "task-007",
+  "section": "camera-controls",
+  "title": "Implement View Presets and Camera Animation",
+  "description": "Add view preset system (Top, Front, Side, Isometric) with smooth animated transitions and fit-to-view functionality",
+
+  "deepThinking": {
+    "actuallyBuilding": "A camera control system with: predefined view positions for Top/Front/Side/Isometric, smooth animated transitions using lerp and easing, fit-to-view calculation based on parcel dimensions, and integration with UIStore.currentView for state-driven camera position.",
+    "visualOutcome": "Clicking view preset buttons smoothly animates the camera to the new position. Top view looks straight down, Front view looks from +Z, Side from +X, Isometric at 45° angle. Fit-to-view always frames the entire parcel with margin.",
+    "exactSteps": [
+      "Step 1: Define view preset positions as Vector3 constants",
+      "Step 2: Create CameraController component with OrbitControls ref",
+      "Step 3: Add useFrame animation loop for smooth transitions",
+      "Step 4: Implement fit-to-view distance calculation",
+      "Step 5: Connect to UIStore.currentView for state changes"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Gimbal lock at top view",
+        "symptom": "Camera spins uncontrollably when at zenith",
+        "detection": "Orbit at top view causes wild rotation",
+        "mitigation": "Add small z offset (0.01) to top view position"
+      },
+      {
+        "issue": "Animation stuttering",
+        "symptom": "Camera moves jerkily during transition",
+        "detection": "Visual inspection during preset change",
+        "mitigation": "Use consistent delta-based progress increment in useFrame"
+      },
+      {
+        "issue": "Controls conflicting with animation",
+        "symptom": "Orbit input during animation causes jumps",
+        "detection": "Try orbiting during transition",
+        "mitigation": "Disable OrbitControls during animation"
+      },
+      {
+        "issue": "Fit-to-view doesn't fit",
+        "symptom": "Parcel cut off or too small",
+        "detection": "Test with 15m vs 50m parcel",
+        "mitigation": "Adjust distance calculation, consider aspect ratio"
+      }
+    ],
+    "assumptions": [
+      "OrbitControls from task-004 exists",
+      "UIStore.currentView and setView exist from task-003",
+      "View preset UI buttons will be added in UI panels section"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Define view preset positions",
+      "timeEstimate": "10min",
+      "files": [
+        "src/utils/cameraPresets.ts",
+        "src/utils/cameraPresets.test.ts"
+      ],
+      "creates": [
+        "VIEW_PRESET_POSITIONS constant",
+        "calculateFitPosition function"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- cameraPresets.test.ts",
+        "expected": "All preset tests pass",
+        "specificChecks": [
+          "Top view has z=0.01 not 0",
+          "All positions are valid Vector3",
+          "calculateFitPosition returns reasonable distance"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create CameraController component",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/3d/CameraController.tsx",
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "CameraController component",
+        "OrbitControls ref",
+        "Store connection"
+      ],
+      "modifies": [
+        "Scene.tsx to use CameraController"
+      ],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Component compiles correctly",
+        "specificChecks": [
+          "OrbitControls ref typed correctly",
+          "useFrame hook present"
+        ]
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Implement animated transitions",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/3d/CameraController.tsx",
+        "src/utils/easing.ts"
+      ],
+      "creates": [
+        "Animation state (targetPosition, progress)",
+        "useFrame animation logic",
+        "easeOutCubic function"
+      ],
+      "modifies": [
+        "CameraController.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-007",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Manually trigger setView('top') in console",
+          "Verify camera animates smoothly to top view",
+          "Repeat for other presets"
+        ],
+        "expected": "Smooth camera transitions",
+        "consoleChecks": [
+          "No animation errors"
+        ],
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Implement fit-to-view",
+      "timeEstimate": "20min",
+      "files": [
+        "src/utils/cameraPresets.ts",
+        "src/components/3d/CameraController.tsx"
+      ],
+      "creates": [
+        "fitToView function",
+        "parcelStore connection for dimensions"
+      ],
+      "modifies": [
+        "cameraPresets.ts",
+        "CameraController.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-007",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set parcel to 15x15",
+          "Trigger fit-to-view",
+          "Verify entire parcel visible with margin",
+          "Change to 30x30",
+          "Trigger fit-to-view again",
+          "Verify still fits"
+        ],
+        "expected": "Parcel centered and fully visible",
+        "screenshotRequired": true,
+        "screenshotName": "task-007-fit-to-view.png"
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Test all view presets visually",
+      "timeEstimate": "15min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-007",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Test Top view - looking straight down",
+          "Test Front view - looking from +Z axis",
+          "Test Side view - looking from +X axis",
+          "Test Isometric - 45° angle view",
+          "Verify no gimbal lock issues at top",
+          "Screenshot each view"
+        ],
+        "expected": "All presets work correctly",
+        "screenshotRequired": true,
+        "screenshotName": "task-007-presets.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-003-state-management",
+      "task-004-scene-setup"
+    ],
+    "enables": [
+      "task-011-view-controls-panel"
+    ],
+    "sharedState": [
+      "uiStore.currentView",
+      "parcelStore.width",
+      "parcelStore.depth"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-007",
+    "description": "Camera controls are self-contained. If animation causes issues, revert and use instant position changes.",
+    "alternativeApproach": "Could use drei's CameraControls instead of OrbitControls for built-in transitions"
+  },
+
+  "estimatedTotalTime": "90min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Top view z=0.01 prevents gimbal lock issue",
+    "lerp factor depends on delta for consistent speed",
+    "May need to disable controls during animation",
+    "Fit-to-view needs FOV for correct distance",
+    "Consider adding keyboard shortcuts later (1=top, 2=front, etc)"
+  ]
+}

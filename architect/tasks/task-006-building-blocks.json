@@ -1,0 +1,287 @@
+{
+  "id": "task-006",
+  "section": "building-blocks",
+  "title": "Create 3D Building Block Components",
+  "description": "Render buildings from buildingStore as BoxGeometry meshes with selection interaction, shadow casting, and roof garden indicators",
+
+  "deepThinking": {
+    "actuallyBuilding": "3D building representations: BoxGeometry meshes reading from buildingStore, positioned correctly on sloped terrain, clickable for selection with emissive highlight, shadow casting enabled, and optional green roof indicator for buildings with hasRoofGarden=true.",
+    "visualOutcome": "Colored box buildings sitting on the terrain. Clicking a building highlights it with a glow effect. Buildings correctly positioned even on sloped terrain at different terrace levels. Shadows visible on terrain.",
+    "exactSteps": [
+      "Step 1: Create BuildingBlock component with BoxGeometry",
+      "Step 2: Create Buildings container mapping from store",
+      "Step 3: Implement Y position calculation for terrain slope",
+      "Step 4: Add click handler for selection",
+      "Step 5: Add emissive highlight for selected building",
+      "Step 6: Add roof garden indicator (green plane on top)",
+      "Step 7: Enable shadow casting"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Buildings floating above terrain",
+        "symptom": "Visible gap between building and ground",
+        "detection": "Visual inspection from side view",
+        "mitigation": "Check height/2 offset calculation, verify terrain Y = 0 at origin"
+      },
+      {
+        "issue": "Buildings sinking into terrain",
+        "symptom": "Part of building below ground",
+        "detection": "Visual inspection",
+        "mitigation": "Check sign of slope calculation, ensure terrainHeight is added correctly"
+      },
+      {
+        "issue": "Click events not firing",
+        "symptom": "No selection on click",
+        "detection": "Add console.log to onClick, nothing logs",
+        "mitigation": "Ensure <Canvas> has eventSource or use drei's event system"
+      },
+      {
+        "issue": "Wrong slope direction in Y calculation",
+        "symptom": "Buildings at wrong height on rotated slopes",
+        "detection": "Test with 90° direction, building should be higher on right side",
+        "mitigation": "Check sin/cos usage for direction vector"
+      }
+    ],
+    "assumptions": [
+      "buildingStore.buildings contains Building objects with valid positions",
+      "Building.position stores final world coordinates (calculated elsewhere)",
+      "Scene and terrain already rendered from previous tasks",
+      "Selection state exists in uiStore"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create BuildingBlock component",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/BuildingBlock.tsx"
+      ],
+      "creates": [
+        "BuildingBlock component",
+        "BuildingBlockProps interface",
+        "BoxGeometry mesh with material"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Component compiles with correct types",
+        "specificChecks": [
+          "Building prop correctly typed",
+          "BoxGeometry args typed as tuple"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create Buildings container component",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Buildings.tsx",
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "Buildings component",
+        "Mapping of buildingStore to BuildingBlock"
+      ],
+      "modifies": [
+        "Scene.tsx to include Buildings"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-006",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Add test building to store manually",
+          "Verify building renders in scene",
+          "Building should be colored box"
+        ],
+        "expected": "Building visible in 3D scene",
+        "consoleChecks": [
+          "No errors about building rendering"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-006-building-basic.png"
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Implement terrain-aware Y positioning",
+      "timeEstimate": "25min",
+      "files": [
+        "src/utils/buildingPosition.ts",
+        "src/utils/buildingPosition.test.ts"
+      ],
+      "creates": [
+        "calculateBuildingYPosition function",
+        "Unit tests for slope calculations"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- buildingPosition.test.ts",
+        "expected": "All position tests pass",
+        "specificChecks": [
+          "Flat terrain: y = buildingHeight/2",
+          "45° slope, z=-5: y = 5 + height/2",
+          "Terrace level 1: adds 3m to y",
+          "90° direction: slope affects X not Z"
+        ]
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Add selection click handler",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/BuildingBlock.tsx",
+        "src/components/3d/Buildings.tsx"
+      ],
+      "creates": [
+        "onClick handler on mesh",
+        "Selection update in UIStore"
+      ],
+      "modifies": [
+        "BuildingBlock.tsx",
+        "Buildings.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-006",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click on building",
+          "Check console/store for selectedBuildingId update",
+          "Click different building - selection should change"
+        ],
+        "expected": "Click selects building in store",
+        "consoleChecks": [
+          "No pointer event errors"
+        ],
+        "screenshotRequired": false
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Add selection highlight effect",
+      "timeEstimate": "10min",
+      "files": [
+        "src/components/3d/BuildingBlock.tsx"
+      ],
+      "creates": [
+        "Emissive glow on selected building"
+      ],
+      "modifies": [
+        "BuildingBlock.tsx material props"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-006",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click building",
+          "Verify highlight/glow appears",
+          "Click elsewhere - highlight should disappear"
+        ],
+        "expected": "Selected building visually highlighted",
+        "screenshotRequired": true,
+        "screenshotName": "task-006-selection.png"
+      }
+    },
+    {
+      "id": "ST-006",
+      "description": "Add roof garden indicator",
+      "timeEstimate": "10min",
+      "files": [
+        "src/components/3d/BuildingBlock.tsx"
+      ],
+      "creates": [
+        "RoofGarden sub-component",
+        "Green plane on top of building"
+      ],
+      "modifies": [
+        "BuildingBlock.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-006",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Add building with hasRoofGarden=true",
+          "Verify green surface on top of building",
+          "Add building with hasRoofGarden=false - no green top"
+        ],
+        "expected": "Roof garden visible on marked buildings",
+        "screenshotRequired": true,
+        "screenshotName": "task-006-roof-garden.png"
+      }
+    },
+    {
+      "id": "ST-007",
+      "description": "Configure shadow casting",
+      "timeEstimate": "5min",
+      "files": [
+        "src/components/3d/BuildingBlock.tsx"
+      ],
+      "creates": [],
+      "modifies": [
+        "Add castShadow to mesh"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-006",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Position camera to see building shadow",
+          "Verify shadow renders on terrain"
+        ],
+        "expected": "Building shadows visible on terrain",
+        "screenshotRequired": true,
+        "screenshotName": "task-006-shadows.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup",
+      "task-002-type-definitions",
+      "task-003-state-management",
+      "task-004-scene-setup",
+      "task-005-terrain-rendering"
+    ],
+    "enables": [
+      "task-010-unit-panel",
+      "task-012-flat-terrain-layout",
+      "task-015-roof-gardens"
+    ],
+    "sharedState": [
+      "buildingStore.buildings",
+      "parcelStore (for slope)",
+      "uiStore.selectedBuildingId"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-006",
+    "description": "Building rendering is isolated. Issues here don't affect terrain or scene.",
+    "alternativeApproach": "Could use instanced meshes for many buildings, but overkill for 1-8 units"
+  },
+
+  "estimatedTotalTime": "95min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Buildings array starts empty - positioning algorithm populates it",
+    "For testing, manually add a building to store",
+    "Emissive highlight is simple but effective for selection",
+    "Roof garden is a visual indicator only - logic in section 015",
+    "Consider adding Edges from drei for better building outline later"
+  ]
+}

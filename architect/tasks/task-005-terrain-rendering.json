@@ -1,0 +1,265 @@
+{
+  "id": "task-005",
+  "section": "terrain-rendering",
+  "title": "Create 3D Terrain Mesh with Slope Rotation",
+  "description": "Build a PlaneGeometry terrain that reads from parcelStore, applies slope angle and direction rotations correctly, and includes a grid overlay",
+
+  "deepThinking": {
+    "actuallyBuilding": "A Three.js PlaneGeometry mesh representing the parcel land: dimensions from parcelStore (width/depth), green MeshStandardMaterial with DoubleSide, slope rotation using Euler angles in YXZ order (direction first, then angle), GridHelper overlay that follows terrain rotation, and receiveShadow enabled.",
+    "visualOutcome": "A green rectangular terrain that lies flat by default, tilts when slopeAngle is adjusted, and rotates to face different directions when slopeDirection changes. Grid lines overlay the terrain for scale reference. Real-time updates as sliders change.",
+    "exactSteps": [
+      "Step 1: Create Terrain component with basic PlaneGeometry",
+      "Step 2: Connect to parcelStore for width/depth",
+      "Step 3: Apply base rotation to lay plane flat (-90° on X)",
+      "Step 4: Calculate and apply slope rotation (direction + angle)",
+      "Step 5: Add GridHelper that follows terrain rotation",
+      "Step 6: Enable receiveShadow for building shadows",
+      "Step 7: Visual verification with multiple test cases"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Degrees vs radians confusion",
+        "symptom": "Terrain rotates wildly (360° in radians = massive rotation)",
+        "detection": "Set slopeAngle=45, terrain should be 45° not almost vertical",
+        "mitigation": "Always convert: angleRad = angle * (Math.PI / 180)"
+      },
+      {
+        "issue": "Wrong Euler rotation order",
+        "symptom": "Slope faces wrong direction relative to input",
+        "detection": "Set direction=90 (East), verify slope faces right",
+        "mitigation": "Use 'YXZ' order: apply Y rotation first (direction), then X (angle)"
+      },
+      {
+        "issue": "Plane invisible due to backface culling",
+        "symptom": "Terrain disappears at certain angles",
+        "detection": "Camera underneath terrain sees nothing",
+        "mitigation": "Set material side: THREE.DoubleSide"
+      },
+      {
+        "issue": "Store not updating reactively",
+        "symptom": "Moving slider doesn't change terrain",
+        "detection": "Console.log store values in component",
+        "mitigation": "Use proper Zustand selector: useParcelStore(s => s.width)"
+      },
+      {
+        "issue": "Grid doesn't match terrain",
+        "symptom": "Grid stays horizontal while terrain tilts",
+        "detection": "Visual inspection with non-zero slope",
+        "mitigation": "Apply same rotation to grid group/helper"
+      }
+    ],
+    "assumptions": [
+      "Scene component exists from task-004",
+      "parcelStore exists from task-003",
+      "uiStore.showGrid exists",
+      "Three.js DoubleSide import available"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Create Terrain component with PlaneGeometry",
+      "timeEstimate": "10min",
+      "files": [
+        "src/components/3d/Terrain.tsx"
+      ],
+      "creates": [
+        "Terrain functional component",
+        "Basic PlaneGeometry mesh",
+        "Green MeshStandardMaterial"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npm run typecheck"
+        ],
+        "expected": "Component compiles",
+        "specificChecks": [
+          "PlaneGeometry renders",
+          "No TypeScript errors"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Connect Terrain to parcelStore",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Terrain.tsx",
+        "src/components/3d/Scene.tsx"
+      ],
+      "creates": [
+        "Store connection for width/depth/slope"
+      ],
+      "modifies": [
+        "Scene.tsx to include Terrain"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-005",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Open preview URL",
+          "Verify terrain visible (green rectangle)",
+          "Terrain should be at default size (15x15)"
+        ],
+        "expected": "Green terrain visible in scene",
+        "consoleChecks": [
+          "No React errors",
+          "No Three.js errors"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-005-terrain-basic.png"
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Implement slope rotation math",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/3d/Terrain.tsx",
+        "src/utils/terrainMath.ts",
+        "src/utils/terrainMath.test.ts"
+      ],
+      "creates": [
+        "calculateTerrainRotation function",
+        "degreesToRadians helper (if not exists)",
+        "Unit tests for rotation calculation"
+      ],
+      "modifies": [
+        "Terrain.tsx to use rotation"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- terrainMath.test.ts",
+        "expected": "All rotation tests pass",
+        "specificChecks": [
+          "slopeAngle=0, direction=0 returns flat rotation",
+          "slopeAngle=45, direction=0 returns ~0.785 rad X rotation",
+          "slopeAngle=30, direction=90 returns correct YXZ euler"
+        ]
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Visual verification of slope rotation",
+      "timeEstimate": "20min",
+      "files": [],
+      "creates": [],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-005",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Test Case 1: Set slope=0 - terrain flat",
+          "Test Case 2: Set slope=30, direction=0 - tilts toward camera (north)",
+          "Test Case 3: Set slope=45, direction=90 - tilts right (east)",
+          "Test Case 4: Set slope=30, direction=180 - tilts away (south)",
+          "Screenshot each configuration",
+          "Verify rotation matches expected direction"
+        ],
+        "expected": "Terrain rotates correctly for all test cases",
+        "consoleChecks": [
+          "No math errors"
+        ],
+        "screenshotRequired": true,
+        "screenshotName": "task-005-slope-verification.png"
+      }
+    },
+    {
+      "id": "ST-005",
+      "description": "Add GridHelper overlay",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/3d/Terrain.tsx"
+      ],
+      "creates": [
+        "TerrainGrid sub-component",
+        "Grid that follows terrain rotation"
+      ],
+      "modifies": [
+        "Terrain.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-005",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify grid visible on terrain",
+          "Tilt terrain - grid should follow",
+          "Toggle showGrid in UIStore - grid should hide/show"
+        ],
+        "expected": "Grid overlays terrain correctly",
+        "screenshotRequired": true,
+        "screenshotName": "task-005-grid.png"
+      }
+    },
+    {
+      "id": "ST-006",
+      "description": "Enable shadow receiving",
+      "timeEstimate": "5min",
+      "files": [
+        "src/components/3d/Terrain.tsx"
+      ],
+      "creates": [],
+      "modifies": [
+        "Terrain mesh to receiveShadow"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-005",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Add temporary shadow-casting object above terrain",
+          "Verify shadow appears on terrain surface"
+        ],
+        "expected": "Shadows visible on terrain",
+        "screenshotRequired": true,
+        "screenshotName": "task-005-shadows.png"
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup",
+      "task-002-type-definitions",
+      "task-003-state-management",
+      "task-004-scene-setup"
+    ],
+    "enables": [
+      "task-006-building-blocks",
+      "task-012-flat-terrain-layout",
+      "task-013-terraced-layout"
+    ],
+    "sharedState": [
+      "parcelStore.width",
+      "parcelStore.depth",
+      "parcelStore.slopeAngle",
+      "parcelStore.slopeDirection",
+      "uiStore.showGrid"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-005",
+    "description": "If rotation math is wrong, the unit tests will catch it. If visual is wrong despite passing tests, check rotation order or euler convention.",
+    "alternativeApproach": "Could use quaternions instead of euler, but euler is more intuitive for this use case"
+  },
+
+  "estimatedTotalTime": "90min",
+  "complexity": "high",
+  "status": "pending",
+
+  "notes": [
+    "THIS IS A CRITICAL SECTION - slope math was a problem in previous attempts",
+    "Visual verification is essential - don't trust just build passing",
+    "The rotation order YXZ means: rotate Y first, then X on the new axes",
+    "Direction 0 = North = downhill toward camera (positive Z in Three.js)",
+    "Take screenshots of each test case for documentation"
+  ]
+}

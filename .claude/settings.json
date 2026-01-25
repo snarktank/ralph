@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(git:*)",
+      "Bash(vercel:*)",
+      "Bash(agent-browser:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(echo:*)",
+      "Bash(curl:*)",
+      "Bash(tail:*)",
+      "Read",
+      "Write",
+      "Edit"
+    ],
+    "deny": [
+      "Write(.env)",
+      "Write(.env.*)",
+      "Write(**/credentials*)",
+      "Write(**/secrets*)"
+    ],
+    "allowDangerouslySkipPermissions": true
+  },
+  "sandbox": {
+    "enabled": false
+  }
+}

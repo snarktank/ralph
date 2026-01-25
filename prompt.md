@@ -80,16 +80,106 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
-## Browser Testing (Required for Frontend Stories)
+## Verification Protocol (CRITICAL)
 
-For any story that changes UI, you MUST verify it works in the browser:
+After implementing a story, you MUST run verification before marking it complete:
 
-1. Load the `dev-browser` skill
-2. Navigate to the relevant page
-3. Verify the UI changes work as expected
-4. Take a screenshot if helpful for the progress log
+### Step 1: Build Verification
+```bash
+npm run typecheck   # Must pass with no errors
+npm run lint        # Must pass with no errors
+npm run build       # Must complete successfully
+```
 
-A frontend story is NOT complete until browser verification passes.
+### Step 2: Unit Test Verification (if applicable)
+```bash
+npm run test        # All tests must pass
+```
+
+### Step 3: Visual Verification with agent-browser (for UI changes)
+
+For any story that changes UI, use `agent-browser` to **LIVE TEST** the application:
+
+```bash
+# 1. Start dev server in background
+npm run dev &
+
+# 2. Wait for server and open the app
+agent-browser open http://localhost:5173
+
+# 3. Get interactive elements
+agent-browser snapshot -i
+
+# 4. Test specific interactions based on the story
+agent-browser click @e1                    # Click elements
+agent-browser fill @e2 "value"             # Fill inputs
+agent-browser select @e3 "option"          # Select dropdowns
+
+# 5. Take screenshot for verification
+agent-browser screenshot screenshots/[story-id].png
+
+# 6. Check for console errors
+agent-browser errors
+
+# 7. Close when done
+agent-browser close
+```
+
+**For TerraNest 3D app specifically, test these configs:**
+
+```bash
+# Test 1: Default state
+agent-browser open http://localhost:5173
+agent-browser screenshot screenshots/[story-id]-default.png
+
+# Test 2: Change parcel dimensions (find sliders/inputs)
+agent-browser snapshot -i
+agent-browser fill @[width-input] "20"
+agent-browser fill @[depth-input] "15"
+agent-browser screenshot screenshots/[story-id]-parcel-changed.png
+
+# Test 3: Change slope angle
+agent-browser fill @[slope-input] "30"
+agent-browser screenshot screenshots/[story-id]-sloped.png
+
+# Test 4: Add building units
+agent-browser click @[4-units-button]
+agent-browser screenshot screenshots/[story-id]-with-buildings.png
+
+# Check console for any Three.js or React errors
+agent-browser errors
+```
+
+**Verification Criteria:**
+- No JavaScript errors in console (`agent-browser errors` should be empty)
+- 3D scene renders (screenshot shows terrain and buildings)
+- UI controls are responsive (inputs change the view)
+- Buildings position correctly on slope
+
+### Step 4: Task-Specific Verification
+Check the story's `verification` field for specific requirements:
+- `type: "unit-test"` - Run the specified test command
+- `type: "browser-check"` - Use agent-browser for live testing
+- `type: "vercel-preview"` - Deploy and test on Vercel
+- `type: "build-check"` - Build must succeed
+- `type: "api-test"` - Test API endpoint if applicable
+
+### Verification Failure Protocol
+If verification fails:
+1. DO NOT mark the story as `passes: true`
+2. Log the failure in progress.txt
+3. Attempt to fix the issue
+4. Re-run verification
+5. Only proceed if all checks pass
+
+A story is NOT complete until ALL verification steps pass.
+
+## Vercel Preview (Optional)
+For major milestones, deploy a preview:
+```bash
+vercel --prod=false
+```
+This creates a shareable URL for human review.
 
 ## Stop Condition
 

@@ -1,0 +1,178 @@
+{
+  "id": "task-009",
+  "section": "parcel-config-panel",
+  "title": "Create Parcel Configuration Controls",
+  "description": "Build left panel UI with dimension sliders (width/depth), slope controls (angle/direction), and preset buttons",
+
+  "deepThinking": {
+    "actuallyBuilding": "A config panel with: dimension sliders (5-50m) using Shadcn Slider, slope angle slider (0-60°), slope direction control (0-360° with compass labels), preset buttons for common sizes (15×15, 20×20, 25×25, 30×30), all connected to parcelStore for reactive terrain updates.",
+    "visualOutcome": "Left panel shows labeled sliders and buttons. Moving any slider instantly updates the 3D terrain. Clicking a preset button sets dimensions immediately. Values displayed alongside controls.",
+    "exactSteps": [
+      "Step 1: Create ParcelConfigPanel component shell",
+      "Step 2: Add dimension sliders with labels and value display",
+      "Step 3: Add slope angle slider",
+      "Step 4: Add slope direction slider with compass labels",
+      "Step 5: Add preset buttons",
+      "Step 6: Connect all to parcelStore"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Slider performance lag",
+        "symptom": "Terrain updates slowly while dragging",
+        "detection": "Drag slider quickly, observe delay",
+        "mitigation": "Consider debouncing, but start without - R3F should handle it"
+      },
+      {
+        "issue": "Shadcn Slider not installed",
+        "symptom": "Import error",
+        "detection": "TypeScript error on import",
+        "mitigation": "Run npx shadcn@latest add slider"
+      }
+    ],
+    "assumptions": [
+      "Shadcn/ui initialized from task-001",
+      "parcelStore exists from task-003",
+      "LeftPanel exists from task-008"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Add Shadcn Slider component",
+      "timeEstimate": "5min",
+      "files": [
+        "src/components/ui/slider.tsx"
+      ],
+      "creates": [
+        "Slider component from Shadcn"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "build-check",
+        "commands": [
+          "npx shadcn@latest add slider",
+          "npm run typecheck"
+        ],
+        "expected": "Slider installed and typed",
+        "specificChecks": [
+          "Can import Slider from @/components/ui/slider"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Create ParcelConfigPanel with dimension sliders",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/panels/ParcelConfigPanel.tsx"
+      ],
+      "creates": [
+        "ParcelConfigPanel component",
+        "Width slider with label and value",
+        "Depth slider with label and value"
+      ],
+      "modifies": [],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-009",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Verify sliders appear in left panel",
+          "Move width slider - value updates",
+          "Move depth slider - value updates",
+          "Verify terrain size changes"
+        ],
+        "expected": "Dimension sliders work and update terrain",
+        "screenshotRequired": true,
+        "screenshotName": "task-009-dimension-sliders.png"
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Add slope controls",
+      "timeEstimate": "25min",
+      "files": [
+        "src/components/panels/ParcelConfigPanel.tsx"
+      ],
+      "creates": [
+        "Slope angle slider (0-60°)",
+        "Slope direction slider (0-360°)",
+        "Compass direction labels"
+      ],
+      "modifies": [
+        "ParcelConfigPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-009",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Move slope angle slider - terrain tilts",
+          "Move direction slider - slope rotates",
+          "Verify 0°=N, 90°=E, 180°=S, 270°=W labels"
+        ],
+        "expected": "Slope controls work correctly",
+        "screenshotRequired": true,
+        "screenshotName": "task-009-slope-controls.png"
+      }
+    },
+    {
+      "id": "ST-004",
+      "description": "Add preset buttons",
+      "timeEstimate": "15min",
+      "files": [
+        "src/components/panels/ParcelConfigPanel.tsx"
+      ],
+      "creates": [
+        "Preset button group",
+        "Buttons for 15×15, 20×20, 25×25, 30×30"
+      ],
+      "modifies": [
+        "ParcelConfigPanel.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-009",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Click 15×15 preset - sliders update to 15",
+          "Click 30×30 preset - sliders update to 30",
+          "Verify terrain updates with preset"
+        ],
+        "expected": "Preset buttons work correctly",
+        "screenshotRequired": false
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-001-project-setup",
+      "task-003-state-management",
+      "task-008-app-layout"
+    ],
+    "enables": [],
+    "sharedState": [
+      "parcelStore (all properties)"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-009",
+    "description": "UI controls are isolated. If Shadcn issues, fall back to native inputs.",
+    "alternativeApproach": "Use native range inputs if Shadcn Slider problematic"
+  },
+
+  "estimatedTotalTime": "70min",
+  "complexity": "low",
+  "status": "pending",
+
+  "notes": [
+    "Shadcn Slider needs to be added via CLI first",
+    "Use Label component for accessibility",
+    "Display current value next to slider",
+    "Consider adding Input for precise numeric entry"
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "id": "task-015",
+  "section": "roof-garden-logic",
+  "title": "Implement Roof Garden Visualization",
+  "description": "Add roof garden logic and visualization for terraced layouts where lower roofs serve as upper unit gardens",
+
+  "deepThinking": {
+    "actuallyBuilding": "Roof garden system: logic in terraced layout that marks lower level buildings with hasRoofGarden=true, green plane mesh rendering on top of those buildings, and garden area calculation per unit.",
+    "visualOutcome": "On terraced slopes, lower buildings have visible green roofs indicating they serve as gardens for upper units. Green color distinct from terrain. Clear visual of terraced living concept.",
+    "exactSteps": [
+      "Step 1: Update terraced layout to properly set hasRoofGarden",
+      "Step 2: Enhance BuildingBlock to render roof garden plane",
+      "Step 3: Add garden area calculation",
+      "Step 4: Visual verification on terraced layout"
+    ],
+    "potentialIssues": [
+      {
+        "issue": "Roof garden mesh z-fighting with building top",
+        "symptom": "Flickering green on building top",
+        "detection": "Visual inspection, especially when orbiting",
+        "mitigation": "Offset garden mesh slightly above building (0.01m)"
+      },
+      {
+        "issue": "Wrong buildings marked for gardens",
+        "symptom": "Top level buildings have green roofs",
+        "detection": "Visual inspection of top terrace",
+        "mitigation": "Check logic: only mark if upper level exists"
+      }
+    ],
+    "assumptions": [
+      "Terraced layout exists from task-013",
+      "BuildingBlock component exists from task-006",
+      "hasRoofGarden field exists on Building type"
+    ]
+  },
+
+  "subtasks": [
+    {
+      "id": "ST-001",
+      "description": "Update terraced layout hasRoofGarden logic",
+      "timeEstimate": "15min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts"
+      ],
+      "creates": [
+        "Proper hasRoofGarden assignment"
+      ],
+      "modifies": [
+        "calculateTerracedLayout"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "Roof garden logic tests pass",
+        "specificChecks": [
+          "2-level layout: level 0 has hasRoofGarden=true",
+          "2-level layout: level 1 has hasRoofGarden=false",
+          "Flat layout: all hasRoofGarden=false"
+        ]
+      }
+    },
+    {
+      "id": "ST-002",
+      "description": "Add roof garden mesh to BuildingBlock",
+      "timeEstimate": "20min",
+      "files": [
+        "src/components/3d/BuildingBlock.tsx"
+      ],
+      "creates": [
+        "RoofGarden sub-component",
+        "Green plane mesh on top"
+      ],
+      "modifies": [
+        "BuildingBlock.tsx"
+      ],
+      "verification": {
+        "type": "vercel-preview",
+        "command": ".\\vercel-verify.ps1 task-015",
+        "steps": [
+          "Deploy to Vercel preview",
+          "Set slope 30°, 4 units",
+          "Lower level buildings should have green roofs",
+          "Upper level buildings should NOT have green roofs",
+          "Rotate view - no z-fighting flicker"
+        ],
+        "expected": "Roof gardens visible on lower terraces",
+        "screenshotRequired": true,
+        "screenshotName": "task-015-roof-gardens.png"
+      }
+    },
+    {
+      "id": "ST-003",
+      "description": "Add garden area to unit info",
+      "timeEstimate": "15min",
+      "files": [
+        "src/utils/layoutAlgorithms.ts"
+      ],
+      "creates": [
+        "Garden area calculation"
+      ],
+      "modifies": [
+        "Layout algorithms"
+      ],
+      "verification": {
+        "type": "unit-test",
+        "command": "npm run test -- layoutAlgorithms.test.ts",
+        "expected": "Garden area calculated",
+        "specificChecks": [
+          "Upper units show garden area = lower roof area",
+          "Lower units show garden area = front yard space"
+        ]
+      }
+    }
+  ],
+
+  "dependencies": {
+    "requires": [
+      "task-006-building-blocks",
+      "task-013-terraced-layout"
+    ],
+    "enables": [],
+    "sharedState": [
+      "buildingStore.buildings.hasRoofGarden"
+    ]
+  },
+
+  "rollbackStrategy": {
+    "type": "git-revert",
+    "checkpoint": "commit-before-task-015",
+    "description": "Roof garden is visual enhancement. If issues, disable garden rendering.",
+    "alternativeApproach": "Could use texture instead of mesh for garden indication"
+  },
+
+  "estimatedTotalTime": "50min",
+  "complexity": "medium",
+  "status": "pending",
+
+  "notes": [
+    "Garden plane should be slightly smaller than building for inset look",
+    "Use different green than terrain (#4ade80 vs #3b7a57)",
+    "Consider adding grass texture later",
+    "Z-offset of 0.01m prevents z-fighting"
+  ]
+}
