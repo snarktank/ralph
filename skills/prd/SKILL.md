@@ -9,6 +9,18 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 
 ---
 
+## Prerequisites
+
+Before writing a PRD, verify that planning has been completed:
+
+1. **Check for planning summary:** Look for `tasks/planning-[feature].md` from the `/planning` skill
+2. **If no planning exists:** STOP. Tell the user to run `/planning` first to explore requirements
+3. **If planning exists:** Reference it to inform the PRD structure
+
+**Why this matters:** PRDs written without planning often miss edge cases, have vague requirements, or solve the wrong problem. The planning skill forces 5 rounds of questions that surface critical details.
+
+---
+
 ## The Job
 
 1. Receive a feature description from the user
