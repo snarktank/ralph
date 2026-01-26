@@ -8,6 +8,16 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
 
+## Security Warning
+
+**Ralph runs AI agents autonomously with full access to your codebase.** Before running:
+
+- **Never expose production credentials** - Ralph could accidentally commit, log, or transmit sensitive values like `AWS_ACCESS_KEY_ID`, `DATABASE_URL`, or API keys
+- **Use sandboxing** - Run Ralph in a Docker container, VM, or isolated sandbox environment to limit potential damage
+- **Review commits before pushing** - Always review what Ralph committed before pushing to remote
+
+See [docs/SECURITY.md](docs/SECURITY.md) for complete security guidance, including pre-flight checklists and emergency stop procedures.
+
 ## Prerequisites
 
 - One of the following AI coding tools installed and authenticated:
