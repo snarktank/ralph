@@ -87,6 +87,49 @@ For any story that changes UI, verify it works in the browser if you have browse
 
 If no browser tools are available, note in your progress report that manual browser verification is needed.
 
+## Lerty Integration (Human-in-the-Loop)
+
+If a story has `hitl.approvalRequired` in prd.json, output markers when approval is needed.
+
+### Approval Triggers
+
+Check the story's `hitl.approvalRequired` array for which triggers require approval:
+- `start` - Before starting work
+- `commit` - Before committing changes
+- `stuck` - When encountering errors you can't resolve
+- `complete` - Before marking story complete
+
+### Requesting Approval
+
+When approval is required, output this marker:
+
+```
+LERTY:APPROVAL_NEEDED:commit
+Summary of changes:
+- Added new component X
+- Modified file Y
+- Updated tests
+```
+
+The outer Ralph loop will pause and wait for approval via the Lerty app.
+If approved, continue with the action. If rejected, skip the action.
+
+### Example prd.json with HITL
+
+```json
+{
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Database migration",
+      "hitl": {
+        "approvalRequired": ["commit"]
+      }
+    }
+  ]
+}
+```
+
 ## Stop Condition
 
 After completing a user story, check if ALL stories have `passes: true`.

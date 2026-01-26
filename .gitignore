@@ -3,6 +3,9 @@ prd.json
 progress.txt
 .last-branch
 
+# Lerty config (contains API keys)
+.lerty/
+
 # Archive is optional to commit
 # archive/
 

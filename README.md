@@ -117,6 +117,8 @@ Ralph will:
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
+| `lerty.sh` | Lerty integration for notifications and approvals |
+| `lerty-setup.sh` | Setup wizard for Lerty API connection |
 | `skills/prd/` | Skill for generating PRDs |
 | `skills/ralph/` | Skill for converting PRDs to JSON |
 | `flowchart/` | Interactive visualization of how Ralph works |
@@ -182,6 +184,50 @@ Frontend stories must include "Verify in browser using dev-browser skill" in acc
 ### Stop Condition
 
 When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
+
+## Lerty Integration
+
+Ralph integrates with [Lerty](https://lerty.ai) for push notifications, Live Activities, and human-in-the-loop approval workflows.
+
+### Setup
+
+```bash
+./lerty-setup.sh
+```
+
+This will prompt for:
+- Lerty API URL (default: https://lerty.ai)
+- API key (from Settings > API Keys)
+- Agent ID for Ralph communications
+- Your email for notifications
+
+### Features
+
+- **Push notifications** when iterations start/complete
+- **Live Activities** showing real-time progress on iOS
+- **Approval workflows** - pause and wait for human approval before commits
+
+### Per-Story Approvals
+
+Add `hitl` config to stories that need approval:
+
+```json
+{
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Database migration",
+      "hitl": {
+        "approvalRequired": ["commit"]
+      }
+    }
+  ]
+}
+```
+
+Available triggers: `start`, `commit`, `stuck`, `complete`
+
+When triggered, Ralph pauses and sends an approval request to the Lerty app. Resume or reject from your phone.
 
 ## Debugging
 

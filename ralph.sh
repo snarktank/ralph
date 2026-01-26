@@ -39,6 +39,16 @@ PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 
+# Source Lerty integration if available
+LERTY_ENABLED=false
+if [ -f "$SCRIPT_DIR/lerty.sh" ]; then
+  source "$SCRIPT_DIR/lerty.sh"
+  if lerty_enabled; then
+    LERTY_ENABLED=true
+    echo "Lerty integration: enabled"
+  fi
+fi
+
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
@@ -81,11 +91,36 @@ fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
+# Get current story info for Lerty notifications
+get_current_story() {
+  if [ -f "$PRD_FILE" ]; then
+    jq -r '.userStories[] | select(.passes != true) | "\(.id)|\(.title)"' "$PRD_FILE" 2>/dev/null | head -1
+  fi
+}
+
+# Notify on start if Lerty enabled
+if [ "$LERTY_ENABLED" = true ]; then
+  STORY_INFO=$(get_current_story)
+  if [ -n "$STORY_INFO" ]; then
+    STORY_ID=$(echo "$STORY_INFO" | cut -d'|' -f1)
+    STORY_TITLE=$(echo "$STORY_INFO" | cut -d'|' -f2)
+    lerty_start_activity "$STORY_ID" "$STORY_TITLE"
+  fi
+fi
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
+
+  # Update Lerty Live Activity
+  if [ "$LERTY_ENABLED" = true ]; then
+    STORY_INFO=$(get_current_story)
+    STORY_TITLE=$(echo "$STORY_INFO" | cut -d'|' -f2)
+    PROGRESS=$((i * 100 / MAX_ITERATIONS))
+    lerty_update_progress "$i" "$MAX_ITERATIONS" "Iteration $i" "$PROGRESS" "$STORY_TITLE"
+  fi
 
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
@@ -94,15 +129,45 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   fi
-  
+
+  # Check for Lerty approval requests in output
+  if [ "$LERTY_ENABLED" = true ]; then
+    if echo "$OUTPUT" | grep -q "LERTY:APPROVAL_NEEDED"; then
+      # Extract approval details from output
+      APPROVAL_LINE=$(echo "$OUTPUT" | grep "LERTY:APPROVAL_NEEDED" | head -1)
+      TRIGGER=$(echo "$APPROVAL_LINE" | sed 's/.*LERTY:APPROVAL_NEEDED:\([^:]*\).*/\1/')
+
+      # Get commit message or details from output
+      DETAILS=$(echo "$OUTPUT" | grep -A5 "LERTY:APPROVAL_NEEDED" | tail -4 | head -4)
+
+      echo ""
+      echo "==============================================================="
+      echo "  Approval Required: $TRIGGER"
+      echo "==============================================================="
+
+      if ! lerty_request_approval "$TRIGGER" "Ralph: $TRIGGER approval" "$DETAILS"; then
+        echo "Approval rejected. Skipping this action."
+        # Notify about rejection
+        lerty_notify "Ralph: Rejected" "$TRIGGER was rejected" "medium"
+        continue
+      fi
+    fi
+  fi
+
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
+
+    if [ "$LERTY_ENABLED" = true ]; then
+      lerty_end_activity "completed"
+      lerty_notify "Ralph Complete" "All tasks finished successfully!" "high"
+    fi
+
     exit 0
   fi
-  
+
   echo "Iteration $i complete. Continuing..."
   sleep 2
 done
@@ -110,4 +175,10 @@ done
 echo ""
 echo "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
 echo "Check $PROGRESS_FILE for status."
+
+if [ "$LERTY_ENABLED" = true ]; then
+  lerty_end_activity "incomplete"
+  lerty_notify "Ralph Stopped" "Reached max iterations without completing" "high"
+fi
+
 exit 1
