@@ -77,6 +77,54 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+## Mandatory Quality Gates (Backpressure)
+
+Quality gates are **mandatory blockers**, not suggestions. You MUST NOT mark a story as complete until ALL gates pass.
+
+### Required Gates
+
+Before marking ANY story as `passes: true`, you MUST verify:
+
+1. **Typecheck MUST pass** - Run `npm run build` (or project equivalent) with zero errors
+2. **Lint MUST pass** - Run `npm run lint` (or project equivalent) with zero errors
+3. **Tests MUST pass** - Run `npm test` (or project equivalent) with zero failures
+
+If ANY gate fails, the story is NOT complete. Period.
+
+### Forbidden Shortcuts
+
+Never use these to bypass quality gates:
+
+| Forbidden | Why |
+|-----------|-----|
+| `@ts-ignore` | Hides type errors instead of fixing them |
+| `@ts-expect-error` | Same as above - masks real problems |
+| `eslint-disable` | Suppresses lint rules without fixing violations |
+| `eslint-disable-next-line` | Same as above - circumvents quality checks |
+| `// @nocheck` | Disables type checking for entire file |
+| `any` type | Defeats the purpose of TypeScript |
+
+If you find yourself reaching for these, STOP. Fix the actual issue.
+
+### 3-Attempt Limit
+
+If you cannot make a story pass quality gates after 3 attempts:
+
+1. **STOP** - Do not continue iterating on the same approach
+2. **Document** - Add detailed notes about what's failing and why
+3. **Skip** - Move to the next story and let a human investigate
+4. **Never** - Do not use forbidden shortcuts to force a pass
+
+This prevents infinite loops on fundamentally blocked stories.
+
+### Backpressure Mindset
+
+Think of quality gates as physical barriers, not speed bumps:
+- A speed bump slows you down but lets you pass
+- A barrier stops you completely until you have the right key
+
+You cannot "push through" a failing gate. You must fix it or stop.
+
 ## Browser Testing (If Available)
 
 For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
