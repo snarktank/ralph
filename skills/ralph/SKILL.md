@@ -79,9 +79,21 @@ Stories execute in priority order. Earlier stories must not depend on later ones
 
 ---
 
-## Acceptance Criteria: Must Be Verifiable
+## Acceptance Criteria: MACHINE-VERIFIABLE Required
 
-Each criterion must be something Ralph can CHECK, not something vague.
+**Every criterion must be MACHINE-VERIFIABLE.** If Ralph cannot verify it with a command, file check, or automated test, it is not a valid criterion.
+
+### Verification Types
+
+Each criterion should be checkable by one of these methods:
+
+| Type | How to Verify | Example Criterion |
+|------|---------------|-------------------|
+| **Command exit code** | Run command, check exit 0 | "Typecheck passes" → `npm run build` |
+| **File check** | Check file exists or has content | "File `docs/API.md` exists" → `ls docs/API.md` |
+| **Grep/content match** | Search file for pattern | "Contains 'export default'" → `grep -q 'export default' file.ts` |
+| **Database query** | Query returns expected result | "User table has email column" → `\d users` shows column |
+| **Browser automation** | Dev-browser skill verifies visually | "Button is visible" → navigate and screenshot |
 
 ### Good criteria (verifiable):
 - "Add `status` column to tasks table with default 'pending'"
@@ -90,11 +102,33 @@ Each criterion must be something Ralph can CHECK, not something vague.
 - "Typecheck passes"
 - "Tests pass"
 
-### Bad criteria (vague):
-- "Works correctly"
-- "User can do X easily"
-- "Good UX"
-- "Handles edge cases"
+### FORBIDDEN Criteria
+
+**Never use these vague terms** — they cannot be machine-verified:
+
+| Forbidden Term | Why It Fails |
+|----------------|--------------|
+| "Works correctly" | What does "correctly" mean? No verification command. |
+| "Good UX" | Subjective. Cannot be automated. |
+| "Handles edge cases" | Which edge cases? Unspecified = unverifiable. |
+| "Is performant" | What threshold? No measurable target. |
+| "User-friendly" | Subjective opinion, not a testable state. |
+| "Clean code" | Style preference, not machine-checkable. |
+| "Properly implemented" | Circular definition, no verification method. |
+
+### Vague to Specific Conversion
+
+When you encounter vague requirements, convert them:
+
+| Vague (FORBIDDEN) | Specific (VERIFIABLE) |
+|-------------------|----------------------|
+| "Works correctly" | "Returns 200 status code for valid input" |
+| "Good UX" | "Form shows inline validation errors within 100ms" |
+| "Handles edge cases" | "Returns 400 error when email is empty" |
+| "Is performant" | "Query completes in under 100ms for 1000 rows" |
+| "User-friendly error messages" | "Error div contains text 'Invalid email format'" |
+| "Secure authentication" | "Password is hashed with bcrypt before storage" |
+| "Responsive design" | "Component renders at 320px, 768px, and 1024px widths" |
 
 ### Always include as final criterion:
 ```
