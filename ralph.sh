@@ -7,6 +7,7 @@ set -e
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+SKIP_SECURITY="${SKIP_SECURITY_CHECK:-false}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +17,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --skip-security-check)
+      SKIP_SECURITY="true"
       shift
       ;;
     *)
@@ -33,6 +38,49 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
   echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
   exit 1
 fi
+
+# Security Pre-Flight Check
+if [[ "$SKIP_SECURITY" != "true" ]]; then
+  echo ""
+  echo "==============================================================="
+  echo "  Security Pre-Flight Check"
+  echo "==============================================================="
+  echo ""
+
+  SECURITY_WARNINGS=()
+
+  if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]]; then
+    SECURITY_WARNINGS+=("AWS_ACCESS_KEY_ID is set - production credentials may be exposed")
+  fi
+
+  if [[ -n "${DATABASE_URL:-}" ]]; then
+    SECURITY_WARNINGS+=("DATABASE_URL is set - database credentials may be exposed")
+  fi
+
+  if [[ ${#SECURITY_WARNINGS[@]} -gt 0 ]]; then
+    echo "WARNING: Potential credential exposure detected:"
+    echo ""
+    for warning in "${SECURITY_WARNINGS[@]}"; do
+      echo "  - $warning"
+    done
+    echo ""
+    echo "Running an autonomous agent with these credentials set could expose"
+    echo "them in logs, commit messages, or API calls."
+    echo ""
+    echo "See docs/SECURITY.md for sandboxing guidance."
+    echo ""
+    read -p "Continue anyway? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "Aborted. Unset credentials or use --skip-security-check to bypass."
+      exit 1
+    fi
+  else
+    echo "No credential exposure risks detected."
+  fi
+  echo ""
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
