@@ -74,7 +74,7 @@ response=$(curl -s -w "\n%{http_code}" "$api_url/api/v1/agents/$agent_id" \
   -H "Authorization: Bearer $api_key" 2>/dev/null)
 
 http_code=$(echo "$response" | tail -1)
-body=$(echo "$response" | head -n -1)
+body=$(echo "$response" | sed '$d')
 
 if [ "$http_code" != "200" ]; then
   echo "Error: Could not connect to Lerty API"
@@ -103,7 +103,7 @@ conv_response=$(curl -s -X POST "$api_url/api/v1/agents/$agent_id/conversations/
     "metadata": {"type": "ralph", "created_by": "lerty-setup"}
   }' 2>/dev/null)
 
-conversation_id=$(echo "$conv_response" | jq -r '.conversation_id // .id // empty')
+conversation_id=$(echo "$conv_response" | jq -r '.conversation.id // .conversation_id // .id // empty')
 
 if [ -z "$conversation_id" ]; then
   echo "Warning: Could not create conversation automatically"
