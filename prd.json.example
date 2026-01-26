@@ -2,6 +2,11 @@
   "project": "MyApp",
   "branchName": "ralph/task-priority",
   "description": "Task Priority System - Add priority levels to tasks",
+  "verificationCommands": {
+    "typecheck": "npm run build",
+    "lint": "npm run lint",
+    "test": "npm test"
+  },
   "userStories": [
     {
       "id": "US-001",
