@@ -1,12 +1,17 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--docker-sandbox [FLAGS]] [max_iterations]
+#
+# Docker Sandbox Example:
+#   ./ralph.sh --tool claude --docker-sandbox "--volume $PWD:/workspace --env FOO=bar --name ralph"
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+USE_DOCKER=false
+DOCKER_FLAGS=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +21,21 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --docker-sandbox)
+      USE_DOCKER=true
+      # Check if next arg is flags (doesn't start with -- or is not a number)
+      if [[ $# -gt 1 ]] && [[ ! "$2" =~ ^--[a-z] ]] && [[ ! "$2" =~ ^[0-9]+$ ]]; then
+        DOCKER_FLAGS="$2"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --docker-sandbox=*)
+      USE_DOCKER=true
+      DOCKER_FLAGS="${1#*=}"
       shift
       ;;
     *)
@@ -79,12 +99,21 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+if [[ "$USE_DOCKER" == true ]]; then
+  echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Docker: enabled"
+  [[ -n "$DOCKER_FLAGS" ]] && echo "Docker flags: $DOCKER_FLAGS"
+else
+  echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+fi
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
-  echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
+  if [[ "$USE_DOCKER" == true ]]; then
+    echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL - Docker)"
+  else
+    echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
+  fi
   echo "==============================================================="
 
   # Run the selected tool with the ralph prompt
@@ -92,7 +121,13 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    if [[ "$USE_DOCKER" == true ]]; then
+      # Run in Docker sandbox with optional additional flags
+      OUTPUT=$(docker sandbox run $DOCKER_FLAGS -- claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    else
+      # Run locally
+      OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    fi
   fi
   
   # Check for completion signal
