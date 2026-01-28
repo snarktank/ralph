@@ -2,12 +2,16 @@
 prd.json
 progress.txt
 .last-branch
+.ralph-task-list-id
 
 # Archive is optional to commit
 # archive/
 
 # OS files
 .DS_Store
+
+# Node.js
+node_modules/
 
 #Claude
 .claude/

@@ -99,13 +99,20 @@ Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI 
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
+2. **[Claude Code]** Convert PRD to hierarchical tasks (parent stories + child criteria)
+3. Pick the next pending task (respecting dependencies)
+4. Implement that single task (one acceptance criterion)
+5. Run quality checks (typecheck, tests, browser verification)
+6. Commit if checks pass
+7. Mark task complete; update `prd.json` when story fully complete
+8. Append learnings to `progress.txt`
+9. Repeat until all tasks complete or max iterations reached
+
+**Task System Benefits (Claude Code only):**
+- Granular progress tracking (per acceptance criterion, not just per story)
+- Automatic dependency management (schema → backend → UI)
+- Shared task list across iterations via `CLAUDE_CODE_TASK_LIST_ID`
+- Better visibility into what's done vs pending
 
 ## Key Files
 
@@ -118,8 +125,83 @@ Ralph will:
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
+| `skills/ralph/` | Skill for converting PRDs to JSON (+ tasks) |
 | `flowchart/` | Interactive visualization of how Ralph works |
+| `lib/task-converter.js` | **[New]** Converts PRD to hierarchical Claude Code tasks |
+| `lib/task-utils.sh` | **[New]** Bash utilities for task system initialization |
+| `scripts/prd-to-tasks.js` | **[New]** CLI tool to generate tasks from prd.json |
+
+## Task System Integration (Claude Code)
+
+Ralph now integrates with Claude Code's built-in task management system to provide hierarchical task tracking and dependency management.
+
+### How It Works
+
+**Hierarchical Tasks:**
+- Each user story → **Parent task** (e.g., `[US-001] Add status field to database`)
+- Each acceptance criterion → **Child task** (e.g., `[US-001-AC1] Add status column with migration`)
+- Child tasks are completed sequentially within a story
+- Parent task completes when all children complete
+
+**Smart Dependencies:**
+The system auto-detects dependencies based on keywords:
+- **Schema stories** (`database`, `migration`, `table`) → No dependencies (foundational)
+- **Backend stories** (`API`, `endpoint`, `server action`) → Depend on schema stories
+- **UI stories** (`component`, `page`, `form`) → Depend on backend + schema stories
+
+**Shared Task List:**
+All Ralph iterations work on the same task list via `CLAUDE_CODE_TASK_LIST_ID` environment variable. Task progress persists across sessions.
+
+### Using Tasks
+
+Tasks are automatically created when you run `./ralph.sh --tool claude`:
+
+```bash
+# Run Ralph with Claude Code (tasks auto-created)
+./ralph.sh --tool claude 10
+
+# View current tasks
+claude task list
+
+# Manual task generation (if needed)
+node scripts/prd-to-tasks.js prd.json
+```
+
+**Task List ID:**
+Generated from project name + branch name hash. Stored in `.ralph-task-list-id` file.
+
+### When Tasks Are Used
+
+- **Claude Code**: Tasks used automatically (fallback to prd.json if unavailable)
+- **Amp**: prd.json-only mode (tasks not supported)
+- **Fallback**: If `CLAUDE_CODE_ENABLE_TASKS=false` or Node.js not installed
+
+### Example Task Structure
+
+```
+Story US-001 (Parent Task)
+├── [US-001-AC1] Add status column to database (Child Task)
+├── [US-001-AC2] Generate and run migration (Child Task - blocked by AC1)
+└── [US-001-AC3] Typecheck passes (Child Task - blocked by AC1, AC2)
+
+Story US-002 (Parent Task - blocked by US-001)
+├── [US-002-AC1] Display status badge on cards (Child Task)
+├── [US-002-AC2] Badge colors match design (Child Task - blocked by AC1)
+└── [US-002-AC3] Browser verification (Child Task - blocked by AC1, AC2)
+```
+
+### Manual Dependency Override
+
+If auto-detection is insufficient, add `dependencies` field to prd.json:
+
+```json
+{
+  "id": "US-003",
+  "title": "Feature that depends on US-001 and US-002",
+  "dependencies": ["US-001", "US-002"],
+  "acceptanceCriteria": [...]
+}
+```
 
 ## Flowchart
 
@@ -188,15 +270,53 @@ When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>
 Check current state:
 
 ```bash
-# See which stories are done
+# See which stories are done (prd.json)
 cat prd.json | jq '.userStories[] | {id, title, passes}'
+
+# See task status (Claude Code)
+claude task list
+
+# See detailed task info
+claude task list --json | jq '.[] | select(.metadata.type == "parent")'
+
+# See which tasks are blocked
+claude task list --json | jq '.[] | select(.blockedBy | length > 0)'
+
+# Check task list ID
+cat .ralph-task-list-id
 
 # See learnings from previous iterations
 cat progress.txt
 
 # Check git history
-git log --oneline -10
+git log --online -10
+
+# Check current branch
+git branch
 ```
+
+### Task Troubleshooting
+
+**Tasks not being created:**
+- Check Node.js installed: `node --version`
+- Check Claude Code installed: `claude --version`
+- Check task system enabled: `echo $CLAUDE_CODE_ENABLE_TASKS`
+- Manually create: `node scripts/prd-to-tasks.js prd.json`
+
+**Task/PRD out of sync:**
+- Tasks are source of truth for execution
+- prd.json updated when parent task completes
+- To reset: delete `~/.claude/tasks/[task-list-id]` and re-run conversion
+
+**Circular dependency error:**
+- Check prd.json story ordering (dependencies → dependents)
+- Add manual `dependencies` field to override auto-detection
+- Ensure no story depends on a later-priority story
+
+**Wrong task list:**
+- Check `.ralph-task-list-id` matches expected ID
+- Delete `.ralph-task-list-id` to regenerate
+- Manually set: `export CLAUDE_CODE_TASK_LIST_ID=your-id`
 
 ## Customizing the Prompt
 

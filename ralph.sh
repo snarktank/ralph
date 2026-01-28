@@ -81,6 +81,37 @@ fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
+# Initialize task system (for Claude Code only)
+if [[ "$TOOL" == "claude" ]]; then
+  # Source task utilities
+  if [ -f "$SCRIPT_DIR/lib/task-utils.sh" ]; then
+    source "$SCRIPT_DIR/lib/task-utils.sh"
+
+    # Initialize task system
+    if init_task_system "$PRD_FILE"; then
+      echo "✓ Task system initialized"
+
+      # Convert PRD to tasks if tasks don't exist yet
+      if [ -f "$PRD_FILE" ] && ! tasks_exist_for_prd "$PRD_FILE"; then
+        echo "Converting PRD to tasks..."
+        if command -v node > /dev/null 2>&1; then
+          if node "$SCRIPT_DIR/scripts/prd-to-tasks.js" "$PRD_FILE"; then
+            echo "✓ Tasks created from PRD"
+          else
+            echo "⚠  Task creation failed, continuing with prd.json only"
+          fi
+        else
+          echo "⚠  Node.js not found, skipping task creation"
+        fi
+      fi
+    else
+      echo "⚠  Task system unavailable, using prd.json mode"
+    fi
+  else
+    echo "⚠  Task utilities not found, using prd.json mode"
+  fi
+fi
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
