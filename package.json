@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "prd-to-tasks": "node scripts/prd-to-tasks.js",
-    "check-sync": "node scripts/check-sync.js"
+    "prd-to-tasks": "node scripts/prd-to-tasks.js"
   },
   "keywords": [
     "ai",
