@@ -1,104 +1,358 @@
-# Ralph Agent Instructions
+# CLAUDE.md
 
-You are an autonomous coding agent working on a software project.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Your Task
+## Project Overview
 
-1. Read the PRD at `prd.json` (in the same directory as this file)
-2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
-3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. Pick the **highest priority** user story where `passes: false`
-5. Implement that single user story
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update CLAUDE.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `progress.txt`
+Ralph is an **autonomous AI agent loop system** that runs AI coding tools (Amp or Claude Code) repeatedly until all PRD items are complete. Each iteration spawns a **fresh AI instance** with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
-## Progress Report Format
+Key insight: Ralph solves the context window problem by breaking large features into small, completable stories that execute sequentially across multiple fresh instances.
 
-APPEND to progress.txt (never replace, always append):
+## Essential Commands
+
+### Running Ralph
+
+```bash
+# Run with Amp (default)
+./ralph.sh [max_iterations]
+
+# Run with Claude Code
+./ralph.sh --tool claude [max_iterations]
+
+# Default is 10 iterations
+```
+
+### Flowchart Development
+
+```bash
+# Run the interactive visualization locally
+cd flowchart
+npm install
+npm run dev
+
+# Build for production
+npm run build
+
+# Lint
+npm run lint
+```
+
+## Architecture & Key Files
+
+### Core Loop Files
+
+| File | Purpose | Modified By |
+|------|---------|-------------|
+| `ralph.sh` | Bash loop that spawns fresh AI instances | Manual |
+| `prompt.md` | Instructions template for Amp instances | Manual |
+| `CLAUDE.md` | Instructions template for Claude Code instances | Manual (this file) |
+| `prd.json` | User stories with `passes` status - the task list | AI agent updates `passes` field after each story |
+| `progress.txt` | Append-only learnings log | AI agent appends after each story |
+
+### Supporting Files
+
+| File | Purpose |
+|------|---------|
+| `prd.json.example` | Example PRD format for reference |
+| `AGENTS.md` | Repository-level patterns and learnings |
+| `skills/prd/SKILL.md` | Skill for generating PRDs from requirements |
+| `skills/ralph/SKILL.md` | Skill for converting markdown PRDs to prd.json |
+| `flowchart/` | Interactive React Flow visualization of how Ralph works |
+
+### Archive System
+
+When starting a new feature (different `branchName` in prd.json), Ralph automatically archives the previous run to `archive/YYYY-MM-DD-feature-name/` containing the old `prd.json` and `progress.txt`.
+
+## How Ralph Works
+
+### The Fresh Context Model
+
+**Critical concept:** Each iteration = fresh AI instance with no memory of previous iterations.
+
+Memory ONLY persists via:
+- **Git history** - Commits from previous iterations
+- **progress.txt** - Learnings and context (append-only)
+- **prd.json** - Which stories are done (`passes: true/false`)
+
+### Iteration Workflow
+
+When `ralph.sh` runs, each iteration:
+
+1. Reads `prd.json` to find the next incomplete story (`passes: false`)
+2. Reads `progress.txt` for context (especially "Codebase Patterns" section)
+3. Checks current git branch matches `prd.json` `branchName`
+4. Implements **one single story**
+5. Runs quality checks (typecheck, lint, tests)
+6. Commits changes: `feat: [Story ID] - [Story Title]`
+7. Updates `prd.json` to set `passes: true` for completed story
+8. Appends learnings to `progress.txt`
+9. If all stories pass, outputs `<promise>COMPLETE</promise>` to exit loop
+
+### Story Size Guidelines
+
+**Rule:** Each story must be completable in ONE context window.
+
+**Right-sized:**
+- Add a database column and migration
+- Add a UI component to an existing page
+- Update a server action with new logic
+- Add a filter dropdown to a list
+
+**Too big (split these):**
+- "Build the entire dashboard"
+- "Add authentication"
+- "Refactor the API"
+
+### Story Ordering Rules
+
+Stories execute in priority order. Dependencies must come first:
+
+1. Schema/database changes (migrations)
+2. Server actions / backend logic
+3. UI components using the backend
+4. Dashboard/summary views aggregating data
+
+## PRD Format (prd.json)
+
+```json
+{
+  "project": "ProjectName",
+  "branchName": "ralph/feature-name-kebab-case",
+  "description": "Feature description",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Story title",
+      "description": "As a [user], I want [feature] so that [benefit]",
+      "acceptanceCriteria": [
+        "Verifiable criterion 1",
+        "Verifiable criterion 2",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"  // For UI stories
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
+```
+
+### Acceptance Criteria Rules
+
+**Always include:**
+- `"Typecheck passes"` - Every story
+- `"Tests pass"` - Stories with testable logic
+- `"Verify in browser using dev-browser skill"` - UI stories (mandatory for frontend work)
+
+**Must be verifiable, not vague:**
+- ✅ "Filter dropdown has options: All, Active, Completed"
+- ✅ "Clicking delete shows confirmation dialog"
+- ❌ "Works correctly"
+- ❌ "Good UX"
+
+## Progress Log Format (progress.txt)
+
+The progress.txt file has two critical sections:
+
+### 1. Codebase Patterns (at top)
+
+Consolidated reusable patterns that ALL future iterations need:
+
+```
+## Codebase Patterns
+- Use `sql<number>` template for aggregations
+- Always use `IF NOT EXISTS` for migrations
+- Export types from actions.ts for UI components
+```
+
+### 2. Iteration Logs (chronological)
+
 ```
 ## [Date/Time] - [Story ID]
 - What was implemented
 - Files changed
 - **Learnings for future iterations:**
-  - Patterns discovered (e.g., "this codebase uses X for Y")
-  - Gotchas encountered (e.g., "don't forget to update Z when changing W")
-  - Useful context (e.g., "the evaluation panel is in component X")
+  - Patterns discovered
+  - Gotchas encountered
+  - Useful context
 ---
 ```
 
-The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
+## Skills System
 
-## Consolidate Patterns
+Ralph includes two skills for Amp/Claude Code:
 
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
+### /prd skill
+Generate a Product Requirements Document from natural language description.
 
+**Workflow:**
+1. Describe feature to AI
+2. AI asks clarifying questions
+3. AI generates structured PRD
+4. Saves to `tasks/prd-[feature-name].md`
+
+### /ralph skill
+Convert markdown PRD to `prd.json` format for autonomous execution.
+
+**Workflow:**
+1. Load skill: "Load the ralph skill and convert tasks/prd-X.md to prd.json"
+2. AI analyzes PRD and splits into right-sized stories
+3. AI generates `prd.json` with proper dependency ordering
+4. Archives previous run if different `branchName`
+
+## Critical Success Factors
+
+### 1. Small Stories
+If a story can't be completed in one context window, Ralph produces broken code. Size stories carefully.
+
+### 2. Feedback Loops Required
+Ralph ONLY works with automated quality checks:
+- Typecheck catches type errors
+- Tests verify behavior
+- CI must stay green (broken code compounds)
+
+### 3. AGENTS.md Updates
+After each iteration, update relevant AGENTS.md files with:
+- Patterns discovered ("this codebase uses X for Y")
+- Gotchas ("don't forget to update Z when changing W")
+- Useful context ("settings panel is in component X")
+
+AI coding tools automatically read AGENTS.md, so learnings propagate.
+
+### 4. Browser Verification for UI
+Frontend stories MUST include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph uses browser automation to verify UI changes actually work.
+
+## Debugging Ralph Runs
+
+```bash
+# Check which stories are done
+cat prd.json | jq '.userStories[] | {id, title, passes}'
+
+# View learnings from iterations
+cat progress.txt
+
+# Check recent commits
+git log --oneline -10
+
+# See current branch
+git branch
 ```
-## Codebase Patterns
-- Example: Use `sql<number>` template for aggregations
-- Example: Always use `IF NOT EXISTS` for migrations
-- Example: Export types from actions.ts for UI components
-```
 
-Only add patterns that are **general and reusable**, not story-specific details.
+## Common Patterns
 
-## Update CLAUDE.md Files
+### Starting a New Feature
 
-Before committing, check if any edited files have learnings worth preserving in nearby CLAUDE.md files:
+1. Generate PRD: Use `/prd` skill or manually create markdown PRD
+2. Convert to JSON: Use `/ralph` skill to create `prd.json`
+3. Run Ralph: `./ralph.sh --tool claude 10`
+4. Monitor: Ralph commits after each successful story
 
-1. **Identify directories with edited files** - Look at which directories you modified
-2. **Check for existing CLAUDE.md** - Look for CLAUDE.md in those directories or parent directories
-3. **Add valuable learnings** - If you discovered something future developers/agents should know:
-   - API patterns or conventions specific to that module
-   - Gotchas or non-obvious requirements
-   - Dependencies between files
-   - Testing approaches for that area
-   - Configuration or environment requirements
+### Customizing for Your Project
 
-**Examples of good CLAUDE.md additions:**
-- "When modifying X, also update Y to keep them in sync"
-- "This module uses pattern Z for all API calls"
-- "Tests require the dev server running on PORT 3000"
-- "Field names must match the template exactly"
+After copying Ralph to your project, customize `CLAUDE.md` (this file) with:
+- Project-specific quality check commands
+- Codebase conventions and patterns
+- Common gotchas for your stack
+- Where to find key components
 
-**Do NOT add:**
-- Story-specific implementation details
-- Temporary debugging notes
-- Information already in progress.txt
+### When Ralph Gets Stuck
 
-Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
+**Story too big:** Split into smaller stories in prd.json
+**Quality checks failing:** Fix manually, commit, Ralph continues from that point
+**Wrong branch:** Ralph auto-creates/checks out from `prd.json` `branchName`
+**Context too large:** Story size is too big, needs splitting
 
-## Quality Requirements
+## Implementation Guidelines for Autonomous Agents
 
-- ALL commits must pass your project's quality checks (typecheck, lint, test)
-- Do NOT commit broken code
-- Keep changes focused and minimal
-- Follow existing code patterns
+When working as Ralph (invoked via `ralph.sh --tool claude`):
 
-## Browser Testing (If Available)
+### Task-Based Workflow (Recommended)
 
-For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
+Ralph now uses Claude Code's Task system for hierarchical task tracking. Each user story becomes a parent task, and each acceptance criterion becomes a child task.
 
-1. Navigate to the relevant page
-2. Verify the UI changes work as expected
-3. Take a screenshot if helpful for the progress log
+**Iteration Workflow:**
 
-If no browser tools are available, note in your progress report that manual browser verification is needed.
+1. **Check for tasks** - Use `TaskList` to see if tasks exist
+   - If no tasks exist: Convert prd.json to tasks using `node scripts/prd-to-tasks.js prd.json`
+   - Tasks are automatically created when Ralph starts (if Node.js available)
 
-## Stop Condition
+2. **Find next task** - Use `TaskList` to find next pending child task
+   - Look for status=`pending` and type=`child` in metadata
+   - Check `blockedBy` is empty (no blocking dependencies)
+   - Pick the lowest task ID if multiple available
 
-After completing a user story, check if ALL stories have `passes: true`.
+3. **Read context**
+   - Read `progress.txt` for Codebase Patterns section
+   - Check git branch matches PRD `branchName`
+   - Review task description and metadata for requirements
 
-If ALL stories are complete and passing, reply with:
-<promise>COMPLETE</promise>
+4. **Mark task in progress** - `TaskUpdate` with `status: in_progress`
 
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
+5. **Implement the criterion**
+   - Work on ONLY this one acceptance criterion
+   - Follow existing code patterns
+   - Keep changes focused and minimal
 
-## Important
+6. **Run quality checks**
+   - Typecheck (if criterion requires it)
+   - Tests (if criterion requires it)
+   - Browser verification (if criterion requires it)
+   - Must pass before committing
 
-- Work on ONE story per iteration
-- Commit frequently
-- Keep CI green
-- Read the Codebase Patterns section in progress.txt before starting
+7. **Commit changes** - `feat: [Story ID-ACn] - [Criterion description]`
+   - Example: `feat: [US-001-AC1] - Add status column to database`
+   - Include Co-Authored-By trailer
+
+8. **Mark task completed** - `TaskUpdate` with `status: completed`
+
+9. **Check if story complete**
+   - Get parent task ID from child metadata (`parentTaskId`)
+   - Use `TaskList` to check all sibling child tasks (same `parentTaskId`)
+   - If ALL siblings are `completed`:
+     - Mark parent task `completed`
+     - Update prd.json: set story `passes: true`
+     - Commit prd.json update
+
+10. **Append to progress.txt**
+    - What was implemented (the criterion)
+    - Files changed
+    - Learnings for future iterations
+
+11. **Check completion**
+    - Use `TaskList` to get all tasks
+    - Filter for type=`parent` in metadata
+    - If ALL parent tasks have status=`completed`:
+      - Output `<promise>COMPLETE</promise>`
+    - Otherwise, continue (next iteration picks up next task)
+
+### Fallback: prd.json-Only Mode
+
+If task system is unavailable (no Claude Code, or `CLAUDE_CODE_ENABLE_TASKS=false`):
+
+1. **Read prd.json** - Find highest priority story where `passes: false`
+2. **Read progress.txt Codebase Patterns** - Essential context from previous iterations
+3. **Check branch** - Ensure on correct branch from `prd.json`
+4. **Work on ONE story only** - Complete it fully, don't start the next
+5. **Run quality checks** - Must pass before committing
+6. **Update AGENTS.md** if you discover reusable patterns
+7. **Commit** - `feat: [Story ID] - [Story Title]` (with Co-Authored-By trailer)
+8. **Update prd.json** - Set `passes: true` for completed story
+9. **Append to progress.txt** - What changed + learnings
+10. **Check completion** - If all `passes: true`, output `<promise>COMPLETE</promise>`
+
+### Key Differences: Task vs prd.json Mode
+
+**Task Mode Benefits:**
+- Granular tracking: Each acceptance criterion is a separate task
+- Dependency enforcement: Tasks are blocked automatically based on dependencies
+- Progress visibility: Can see which criteria are done vs pending
+- Collaboration: Multiple sessions can share same task list via `CLAUDE_CODE_TASK_LIST_ID`
+
+**When to Use Each:**
+- **Task mode**: Default for Claude Code (automatically enabled)
+- **prd.json mode**: Fallback when tasks unavailable, or for Amp compatibility
+
+## Deployment
+
+The `flowchart/` visualization auto-deploys to GitHub Pages via `.github/workflows/deploy.yml` when pushing to main.

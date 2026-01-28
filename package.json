@@ -1,0 +1,22 @@
+{
+  "name": "ralph",
+  "version": "1.0.0",
+  "description": "Autonomous AI agent loop for iterative feature development",
+  "type": "module",
+  "scripts": {
+    "prd-to-tasks": "node scripts/prd-to-tasks.js",
+    "check-sync": "node scripts/check-sync.js"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "automation",
+    "claude-code",
+    "prd"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

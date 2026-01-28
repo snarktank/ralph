@@ -244,6 +244,76 @@ Add ability to mark tasks with different statuses.
 
 ---
 
+## Task Generation (Claude Code Integration)
+
+**After writing prd.json, automatically create Claude Code tasks:**
+
+If Claude Code is available and Node.js is installed:
+
+1. **Run the conversion script**:
+   ```bash
+   node scripts/prd-to-tasks.js prd.json
+   ```
+
+2. **Verify task creation**:
+   - Script should output summary: "X parent tasks, Y child tasks, Z dependencies"
+   - Check for errors (circular dependencies, missing stories, etc.)
+
+3. **Display next steps**:
+   ```
+   Tasks created successfully!
+
+   Task Summary:
+     - User stories: X
+     - Acceptance criteria: Y
+     - Dependencies detected: Z
+
+   To run Ralph:
+     ./ralph.sh --tool claude [max_iterations]
+
+   To view tasks:
+     claude task list
+   ```
+
+**Task Structure Created:**
+- **Parent tasks**: One per user story (e.g., `[US-001] Add status field to database`)
+- **Child tasks**: One per acceptance criterion (e.g., `[US-001-AC1] Add status column with migration`)
+- **Dependencies**: Auto-detected based on keywords in story content
+  - Schema stories (database, migration, table) → No dependencies (foundational)
+  - Backend stories (API, endpoint, server action) → Depend on schema stories
+  - UI stories (component, page, form, button) → Depend on backend + schema stories
+
+**Dependency Detection Keywords:**
+- Explicit: `requires US-001`, `depends on US-002`, `after US-003`
+- Schema: `database`, `migration`, `table`, `column`, `schema`
+- Backend: `API`, `endpoint`, `server action`, `backend`, `service`
+- UI: `component`, `page`, `form`, `button`, `dropdown`, `modal`, `display`
+
+**Manual Dependency Override:**
+
+If automatic detection is insufficient, add `dependencies` field to stories in prd.json:
+
+```json
+{
+  "id": "US-003",
+  "title": "Add status toggle UI",
+  "dependencies": ["US-001", "US-002"],
+  "acceptanceCriteria": [...]
+}
+```
+
+**Error Handling:**
+
+If task creation fails:
+- **Node.js not installed**: Skip task creation, use prd.json-only mode
+- **Claude Code not available**: Skip task creation, use prd.json-only mode
+- **Circular dependency detected**: Script will error, fix prd.json story ordering
+- **Validation errors**: Script will error with details, fix prd.json structure
+
+Ralph will automatically fall back to prd.json-only mode if tasks are unavailable.
+
+---
+
 ## Checklist Before Saving
 
 Before writing prd.json, verify:
@@ -255,3 +325,4 @@ Before writing prd.json, verify:
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
+- [ ] **Task generation**: After saving prd.json, run `node scripts/prd-to-tasks.js prd.json` (if Claude Code available)
