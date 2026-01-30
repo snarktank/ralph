@@ -81,7 +81,31 @@ fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
-for i in $(seq 1 $MAX_ITERATIONS); do
+
+# Determine starting iteration by analyzing progress
+START_ITERATION=1
+if [ -f "$PROGRESS_FILE" ] && [ -f "$PRD_FILE" ]; then
+  echo "Analyzing progress to determine resume point..."
+  
+  RESUME_PROMPT="Read $PRD_FILE and $PROGRESS_FILE. Analyze which tasks have been completed. Output ONLY a single number representing which iteration to resume from (the next incomplete task number). If no tasks completed, output 1. Output nothing else, just the number."
+  
+  if [[ "$TOOL" == "amp" ]]; then
+    START_ITERATION=$(echo "$RESUME_PROMPT" | amp --dangerously-allow-all 2>/dev/null | grep -oE '^[0-9]+$' | head -1) || START_ITERATION=1
+  else
+    START_ITERATION=$(echo "$RESUME_PROMPT" | claude --dangerously-skip-permissions --print 2>/dev/null | grep -oE '^[0-9]+$' | head -1) || START_ITERATION=1
+  fi
+  
+  # Validate it's a number, default to 1 if not
+  if ! [[ "$START_ITERATION" =~ ^[0-9]+$ ]]; then
+    START_ITERATION=1
+  fi
+  
+  if [ "$START_ITERATION" -gt 1 ]; then
+    echo "Resuming from iteration $START_ITERATION (tasks 1-$((START_ITERATION-1)) already complete)"
+  fi
+fi
+
+for i in $(seq $START_ITERATION $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
