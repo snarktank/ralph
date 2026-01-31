@@ -16,11 +16,11 @@ cd flowchart && npm run build
 # Run Ralph with Amp (default)
 ./ralph.sh [max_iterations]
 
-# Run Ralph with Claude Code (cost-efficient mode)
+# Run Ralph with Claude Code (max quality mode - default)
 ./ralph.sh --tool claude [max_iterations]
 
-# Run Ralph with Claude Code (max quality mode - Opus for all)
-./ralph.sh --tool claude --mode max-quality [max_iterations]
+# Run Ralph with Claude Code (cost-efficient mode)
+./ralph.sh --tool claude --mode cost-efficient [max_iterations]
 ```
 
 ## Key Files

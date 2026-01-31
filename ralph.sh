@@ -6,7 +6,7 @@ set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
-MODE="cost-efficient"  # Default to cost-efficient mode
+MODE="max-quality"  # Default to max-quality mode (Opus for all)
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do

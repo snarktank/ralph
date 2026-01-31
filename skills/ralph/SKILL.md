@@ -277,13 +277,13 @@ Add ability to mark tasks with different statuses.
 
 After generating all user stories, assign a Claude model to each story based on complexity and risk. Ralph supports two modes:
 
-### Max Quality Mode
+### Max Quality Mode (Default)
 
-When the user specifies `mode=max-quality`, assign `"opus"` to every story. No analysis needed.
+When the user specifies `mode=max-quality` (or no mode specified), assign `"opus"` to every story. No analysis needed.
 
 ### Cost Efficient Mode
 
-When the user specifies `mode=cost-efficient` (or no mode specified), analyze each story and assign the appropriate model.
+When the user specifies `mode=cost-efficient`, analyze each story and assign the appropriate model.
 
 **Decision principle: When in doubt, round UP.**
 - If you're unsure between haiku and sonnet → assign `sonnet`

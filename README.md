@@ -113,18 +113,18 @@ This creates `prd.json` with user stories structured for autonomous execution.
 # Using Amp (default)
 ./scripts/ralph/ralph.sh [max_iterations]
 
-# Using Claude Code (cost-efficient mode - default)
+# Using Claude Code (max quality mode - default, Opus for all stories)
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 
-# Using Claude Code (max quality mode - Opus for all stories)
-./scripts/ralph/ralph.sh --tool claude --mode max-quality [max_iterations]
+# Using Claude Code (cost-efficient mode - uses assigned models)
+./scripts/ralph/ralph.sh --tool claude --mode cost-efficient [max_iterations]
 ```
 
 Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
 
 **Mode options (Claude Code only):**
-- `--mode cost-efficient` (default): Uses the model assigned to each story (opus/sonnet/haiku) based on complexity
-- `--mode max-quality`: Uses Opus for all stories regardless of assigned model
+- `--mode max-quality` (default): Uses Opus for all stories regardless of assigned model
+- `--mode cost-efficient`: Uses the model assigned to each story (opus/sonnet/haiku) based on complexity
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
