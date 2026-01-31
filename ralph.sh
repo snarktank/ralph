@@ -3,6 +3,7 @@
 # Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
 
 set -e
+set -o pipefail
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
@@ -33,7 +34,7 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
   echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
   exit 1
 fi
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || { echo "Error: Cannot determine script directory"; exit 1; }
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
@@ -49,13 +50,16 @@ if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
     # Archive the previous run
     DATE=$(date +%Y-%m-%d)
     # Strip "ralph/" prefix from branch name for folder
-    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
+    FOLDER_NAME="${LAST_BRANCH#ralph/}"
     ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
     
     echo "Archiving previous run: $LAST_BRANCH"
-    mkdir -p "$ARCHIVE_FOLDER"
-    [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
-    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
+    if ! mkdir -p "$ARCHIVE_FOLDER"; then
+      echo "Error: Failed to create archive folder: $ARCHIVE_FOLDER"
+      exit 1
+    fi
+    [ -f "$PRD_FILE" ] && { cp "$PRD_FILE" "$ARCHIVE_FOLDER/" || echo "Warning: Failed to archive prd.json"; }
+    [ -f "$PROGRESS_FILE" ] && { cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/" || echo "Warning: Failed to archive progress.txt"; }
     echo "   Archived to: $ARCHIVE_FOLDER"
     
     # Reset progress file for new run
@@ -111,9 +115,13 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   # Check for user hints file and prepend to prompt if present
   HINTS=""
   if [ -f "$HINTS_FILE" ]; then
-    HINTS=$(cat "$HINTS_FILE")
-    rm -f "$HINTS_FILE"  # Clean up after reading
-    echo "📌 Applying user hints to this iteration"
+    # Atomic read-and-delete: rename first, then read
+    HINTS_CONSUMED="${HINTS_FILE}.consumed"
+    if mv "$HINTS_FILE" "$HINTS_CONSUMED" 2>/dev/null; then
+      HINTS=$(cat "$HINTS_CONSUMED")
+      rm -f "$HINTS_CONSUMED"
+      echo "📌 Applying user hints to this iteration"
+    fi
   fi
 
   # Run the selected tool with the ralph prompt
@@ -121,7 +129,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   if [[ "$TOOL" == "amp" ]]; then
     if [ -n "$HINTS" ]; then
       # Prepend hints to prompt for amp
-      OUTPUT=$( (echo "$HINTS"; echo ""; cat "$SCRIPT_DIR/prompt.md") | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || TOOL_EXIT_CODE=$?
+      OUTPUT=$( (printf '%s\n' "$HINTS"; echo ""; cat "$SCRIPT_DIR/prompt.md") | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || TOOL_EXIT_CODE=$?
     else
       OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || TOOL_EXIT_CODE=$?
     fi
@@ -129,7 +137,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     if [ -n "$HINTS" ]; then
       # Prepend hints to CLAUDE.md for this iteration
-      OUTPUT=$( (echo "$HINTS"; echo ""; echo "---"; echo ""; cat "$SCRIPT_DIR/CLAUDE.md") | claude --dangerously-skip-permissions --print 2>&1 | tee /dev/stderr) || TOOL_EXIT_CODE=$?
+      OUTPUT=$( (printf '%s\n' "$HINTS"; echo ""; echo "---"; echo ""; cat "$SCRIPT_DIR/CLAUDE.md") | claude --dangerously-skip-permissions --print 2>&1 | tee /dev/stderr) || TOOL_EXIT_CODE=$?
     else
       OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || TOOL_EXIT_CODE=$?
     fi
@@ -146,7 +154,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
       echo "$(date '+%Y-%m-%d %H:%M:%S') - STOPPED: $MAX_CONSECUTIVE_ERRORS consecutive failures" >> "$PROGRESS_FILE"
       exit 1
     fi
-  elif [ -z "$OUTPUT" ] || [ ${#OUTPUT} -lt 50 ]; then
+  elif [ -z "$OUTPUT" ] || [ "${#OUTPUT}" -lt 50 ]; then
     # Tool succeeded but output suspiciously short
     ERROR_COUNT=$((ERROR_COUNT + 1))
     echo "⚠️  Warning: $TOOL returned minimal output (error $ERROR_COUNT of $MAX_CONSECUTIVE_ERRORS)"
