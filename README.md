@@ -297,6 +297,37 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your pro
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
 
+## Troubleshooting
+
+### Windows: Script cannot be loaded (Execution Policy)
+
+If you see an error like "cannot be loaded because running scripts is disabled", you need to allow script execution:
+
+```powershell
+# For current user only (recommended)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Or run the script bypassing the policy (one-time)
+powershell -ExecutionPolicy Bypass -File .\ralph.ps1
+```
+
+### Windows: Command not found (amp/claude)
+
+Ensure the AI tool is installed and in your PATH:
+- **Amp:** Download from https://ampcode.com
+- **Claude Code:** Run `npm install -g @anthropic-ai/claude-code`
+
+After installation, restart your terminal/PowerShell window.
+
+### Cross-platform: Line ending issues
+
+If you encounter issues with files created on different platforms, ensure your git is configured for automatic line ending conversion:
+
+```bash
+git config --global core.autocrlf true   # Windows
+git config --global core.autocrlf input  # macOS/Linux
+```
+
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)

@@ -59,8 +59,21 @@ if ($Tool -notin @('amp', 'claude')) {
     exit 1
 }
 
-# Set strict mode
+# Check if the selected tool is available
+$toolCommand = if ($Tool -eq 'amp') { 'amp' } else { 'claude' }
+$toolPath = Get-Command $toolCommand -ErrorAction SilentlyContinue
+if (-not $toolPath) {
+    Write-Error "Error: '$toolCommand' command not found. Please ensure it is installed and in your PATH."
+    Write-Host "For Amp: Visit https://ampcode.com"
+    Write-Host "For Claude Code: Run 'npm install -g @anthropic-ai/claude-code'"
+    exit 1
+}
+
+# Set strict mode (but we'll handle errors in the main loop with try/catch)
 $ErrorActionPreference = 'Stop'
+
+# Set UTF-8 encoding without BOM for cross-platform compatibility
+$Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
 # Script paths
 $ScriptDir = $PSScriptRoot
@@ -122,13 +135,13 @@ if ((Test-Path $PrdFile) -and (Test-Path $LastBranchFile)) {
         }
         Write-Host "   Archived to: $ArchiveFolder"
 
-        # Reset progress file for new run
+        # Reset progress file for new run (UTF-8 without BOM for cross-platform compatibility)
         $progressHeader = @"
 # Ralph Progress Log
 Started: $(Get-Date)
 ---
 "@
-        Set-Content -Path $ProgressFile -Value $progressHeader
+        [System.IO.File]::WriteAllText($ProgressFile, $progressHeader, $Utf8NoBom)
     }
 }
 
@@ -136,7 +149,7 @@ Started: $(Get-Date)
 if (Test-Path $PrdFile) {
     $CurrentBranch = Get-JsonProperty -FilePath $PrdFile -PropertyPath 'branchName'
     if ($CurrentBranch) {
-        Set-Content -Path $LastBranchFile -Value $CurrentBranch
+        [System.IO.File]::WriteAllText($LastBranchFile, $CurrentBranch, $Utf8NoBom)
     }
 }
 
@@ -147,7 +160,15 @@ if (-not (Test-Path $ProgressFile)) {
 Started: $(Get-Date)
 ---
 "@
-    Set-Content -Path $ProgressFile -Value $progressHeader
+    [System.IO.File]::WriteAllText($ProgressFile, $progressHeader, $Utf8NoBom)
+}
+
+# Verify prompt file exists
+$PromptFile = if ($Tool -eq 'amp') { Join-Path $ScriptDir 'prompt.md' } else { Join-Path $ScriptDir 'CLAUDE.md' }
+if (-not (Test-Path $PromptFile)) {
+    Write-Error "Error: Prompt file not found: $PromptFile"
+    Write-Host "Please ensure the prompt file exists in the same directory as ralph.ps1"
+    exit 1
 }
 
 Write-Host "Starting Ralph - Tool: $Tool - Max iterations: $MaxIterations"
@@ -159,11 +180,14 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     Write-Host "==============================================================="
 
     # Run the selected tool with the ralph prompt
+    # Use $ErrorActionPreference = 'Continue' locally to match bash's `|| true` behavior
     $Output = ""
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+
     try {
         if ($Tool -eq 'amp') {
-            $PromptFile = Join-Path $ScriptDir 'prompt.md'
-            $PromptContent = Get-Content $PromptFile -Raw
+            $PromptContent = Get-Content $PromptFile -Raw -Encoding UTF8
 
             # Run amp and capture output while displaying it
             $Output = $PromptContent | & amp --dangerously-allow-all 2>&1 | ForEach-Object {
@@ -172,10 +196,10 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
             } | Out-String
         } else {
             # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-            $ClaudeFile = Join-Path $ScriptDir 'CLAUDE.md'
+            $PromptContent = Get-Content $PromptFile -Raw -Encoding UTF8
 
             # Run claude and capture output while displaying it
-            $Output = Get-Content $ClaudeFile -Raw | & claude --dangerously-skip-permissions --print 2>&1 | ForEach-Object {
+            $Output = $PromptContent | & claude --dangerously-skip-permissions --print 2>&1 | ForEach-Object {
                 Write-Host $_
                 $_
             } | Out-String
@@ -183,6 +207,8 @@ for ($i = 1; $i -le $MaxIterations; $i++) {
     } catch {
         Write-Host "Warning: Tool execution had errors: $_"
         $Output = $_.ToString()
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
     }
 
     # Check for completion signal

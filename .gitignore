@@ -8,6 +8,8 @@ progress.txt
 
 # OS files
 .DS_Store
+Thumbs.db
+Desktop.ini
 
 #Claude
 .claude/
