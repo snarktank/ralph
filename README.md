@@ -11,7 +11,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 ## Prerequisites
 
 - One of the following AI coding tools installed and authenticated:
-  - [Amp CLI](https://ampcode.com) (default)
+  - [Amp CLI](https://ampcode.com)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
@@ -110,14 +110,14 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default)
+# Using Amp
 ./scripts/ralph/ralph.sh [max_iterations]
 
 # Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
+./scripts/ralph/ralph.sh --agent claude [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--agent amp`, `--agent claude`, or `--agent codex` to select your AI coding tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -129,11 +129,29 @@ Ralph will:
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
 
+## Testing
+
+Install dev dependencies:
+
+```bash
+uv pip install -r requirements-dev.txt
+```
+
+Run tests:
+
+```bash
+uv run pytest
+```
+
+The pytest harness exercises the `ralphython` CLI end-to-end (argument parsing,
+deprecated `--tool` handling, and PRD ingestion) without invoking Amp, Claude,
+or Codex so you can validate behavior locally before handing off to agents.
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--agent amp`, `--agent claude`, or `--agent codex`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |

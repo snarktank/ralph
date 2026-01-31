@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from fastmcp import FastMCP
 
@@ -22,7 +23,7 @@ from fastmcp import FastMCP
 mcp = FastMCP("Ralph Wiggum 🎯")
 
 
-def _warn_tool_deprecated():
+def _warn_tool_deprecated() -> None:
     print("⚠️  Warning: --tool is deprecated, use --agent instead", file=sys.stderr)
 
 
@@ -258,7 +259,7 @@ def run_ralph_iteration(
 
 
 @mcp.tool()
-def get_ralph_status() -> dict[str, any]:
+def get_ralph_status() -> dict[str, Any]:
     """
     Get current Ralph execution status from progress.txt.
     
@@ -283,7 +284,7 @@ def get_ralph_status() -> dict[str, any]:
 
 
 @mcp.tool()
-def get_prd_status(prd_path: str | None = None) -> dict[str, any]:
+def get_prd_status(prd_path: str | None = None) -> dict[str, Any]:
     """
     Get PRD completion status.
     
