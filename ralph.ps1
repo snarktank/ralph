@@ -7,11 +7,10 @@
     Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Code)
     repeatedly until all PRD items are complete.
 
-.PARAMETER Tool
-    The AI tool to use: 'amp' or 'claude'. Default: amp
-
-.PARAMETER MaxIterations
-    Maximum number of iterations to run. Default: 10
+    Supports multiple argument styles for flexibility:
+    - PowerShell style: -Tool claude -MaxIterations 5
+    - Bash style: --tool claude 5
+    - Positional: claude 5
 
 .EXAMPLE
     .\ralph.ps1
@@ -19,38 +18,78 @@
 
 .EXAMPLE
     .\ralph.ps1 -Tool claude -MaxIterations 5
-    Runs with Claude Code for 5 iterations
+    Runs with Claude Code for 5 iterations (PowerShell style)
 
 .EXAMPLE
     .\ralph.ps1 --tool claude 5
-    Alternative bash-style syntax
+    Bash-style syntax for compatibility
+
+.EXAMPLE
+    .\ralph.ps1 claude 5
+    Positional arguments (tool then iterations)
 #>
 
-[CmdletBinding()]
-param(
-    [Parameter()]
-    [ValidateSet('amp', 'claude')]
-    [string]$Tool = 'amp',
+# Note: We use manual argument parsing to support both PowerShell-style (-Tool)
+# and bash-style (--tool) arguments. PowerShell 5.1 doesn't support -- prefix.
 
-    [Parameter()]
-    [int]$MaxIterations = 10
-)
+# Initialize defaults
+$Tool = 'amp'
+$MaxIterations = 10
 
-# Support bash-style arguments for compatibility
-$scriptArgs = $args
-for ($i = 0; $i -lt $scriptArgs.Count; $i++) {
-    switch ($scriptArgs[$i]) {
-        '--tool' {
-            $Tool = $scriptArgs[$i + 1]
-            $i++
+# Parse all arguments manually to support both styles
+$i = 0
+while ($i -lt $args.Count) {
+    $arg = $args[$i]
+
+    switch -Regex ($arg) {
+        '^(-Tool|--tool)$' {
+            if ($i + 1 -lt $args.Count) {
+                $Tool = $args[$i + 1]
+                $i++
+            }
         }
-        { $_ -match '^--tool=' } {
-            $Tool = $_ -replace '^--tool=', ''
+        '^--tool=(.+)$' {
+            $Tool = $Matches[1]
         }
-        { $_ -match '^\d+$' } {
-            $MaxIterations = [int]$_
+        '^(-MaxIterations|--max-iterations)$' {
+            if ($i + 1 -lt $args.Count) {
+                $MaxIterations = [int]$args[$i + 1]
+                $i++
+            }
+        }
+        '^--max-iterations=(.+)$' {
+            $MaxIterations = [int]$Matches[1]
+        }
+        '^\d+$' {
+            # Bare number is max iterations (bash compatibility)
+            $MaxIterations = [int]$arg
+        }
+        '^(amp|claude)$' {
+            # Bare tool name (positional)
+            $Tool = $arg
+        }
+        '^(-h|--help|-\?)$' {
+            Write-Host @"
+Ralph Wiggum - Long-running AI agent loop (Windows PowerShell version)
+
+USAGE:
+    .\ralph.ps1 [OPTIONS]
+
+OPTIONS:
+    -Tool, --tool <amp|claude>       AI tool to use (default: amp)
+    -MaxIterations, --max-iterations Number of iterations (default: 10)
+    -h, --help                       Show this help message
+
+EXAMPLES:
+    .\ralph.ps1                          # Use amp with 10 iterations
+    .\ralph.ps1 -Tool claude             # Use Claude Code
+    .\ralph.ps1 --tool claude 5          # Bash-style: Claude with 5 iterations
+    .\ralph.ps1 claude 5                 # Positional: Claude with 5 iterations
+"@
+            exit 0
         }
     }
+    $i++
 }
 
 # Validate tool choice
