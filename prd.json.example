@@ -14,6 +14,7 @@
       ],
       "priority": 1,
       "model": "opus",
+      "failures": 0,
       "passes": false,
       "notes": ""
     },
@@ -29,6 +30,7 @@
       ],
       "priority": 2,
       "model": "sonnet",
+      "failures": 0,
       "passes": false,
       "notes": ""
     },
@@ -45,6 +47,7 @@
       ],
       "priority": 3,
       "model": "sonnet",
+      "failures": 0,
       "passes": false,
       "notes": ""
     },
@@ -61,6 +64,7 @@
       ],
       "priority": 4,
       "model": "sonnet",
+      "failures": 0,
       "passes": false,
       "notes": ""
     }

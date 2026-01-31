@@ -89,6 +89,16 @@ The model was assigned by Opus during PRD conversion, following this principle: 
 
 If you believe a story's assigned model is incorrect, you can manually edit `prd.json` before running Ralph.
 
+## Auto-Escalation
+
+If a story fails to complete, Ralph increments its `failures` count in `prd.json`. After 2 failures, it automatically escalates to a more capable model:
+
+- **haiku** → sonnet (after 2 failures) → opus (after 4 failures)
+- **sonnet** → opus (after 2 failures)
+- **opus** → stays opus
+
+This self-corrects when the assigned model can't handle a task.
+
 ## Browser Testing (If Available)
 
 For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):

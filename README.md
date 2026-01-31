@@ -211,6 +211,18 @@ The decision principle is **when in doubt, round up** - only use cheaper models 
 
 You can override any model assignment by editing `prd.json` before running Ralph. You can also use `--mode max-quality` to force Opus for all stories.
 
+### Auto-Escalation
+
+If a story fails to complete twice in a row, Ralph automatically escalates to a more capable model:
+
+| Starting Model | After 2 Failures | After 4 Failures |
+|---------------|------------------|------------------|
+| haiku | → sonnet | → opus |
+| sonnet | → opus | - |
+| opus | (stays opus) | - |
+
+This self-corrects when the assigned model can't handle a task, without requiring manual intervention.
+
 ### Feedback Loops
 
 Ralph only works if there are feedback loops:

@@ -35,6 +35,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
       ],
       "priority": 1,
       "model": "opus",
+      "failures": 0,
       "passes": false,
       "notes": ""
     }
@@ -45,6 +46,10 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
 ### Model Field
 
 The `model` field specifies which Claude model executes the story: `"opus"`, `"sonnet"`, or `"haiku"`. See the **Model Assignment** section below for assignment rules.
+
+### Failures Field
+
+The `failures` field (default `0`) tracks how many times a story has failed to complete. Ralph uses this for automatic model escalation - if a story fails twice, it escalates to a more capable model. See **Auto-Escalation** below.
 ```
 
 ---
@@ -127,7 +132,7 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 1. **Each user story becomes one JSON entry**
 2. **IDs**: Sequential (US-001, US-002, etc.)
 3. **Priority**: Based on dependency order, then document order
-4. **All stories**: `passes: false` and empty `notes`
+4. **All stories**: `passes: false`, `failures: 0`, and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
 6. **Always add**: "Typecheck passes" to every story's acceptance criteria
 7. **Model**: Assign `opus`, `sonnet`, or `haiku` based on complexity (see Model Assignment section)
@@ -186,6 +191,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 1,
       "model": "opus",
+      "failures": 0,
       "passes": false,
       "notes": ""
     },
@@ -201,6 +207,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 2,
       "model": "sonnet",
+      "failures": 0,
       "passes": false,
       "notes": ""
     },
@@ -217,6 +224,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 3,
       "model": "sonnet",
+      "failures": 0,
       "passes": false,
       "notes": ""
     },
@@ -232,6 +240,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 4,
       "model": "sonnet",
+      "failures": 0,
       "passes": false,
       "notes": ""
     }
@@ -322,6 +331,45 @@ Model assignments (cost-efficient mode):
   US-003: sonnet  - Add priority selector (form handling)
   US-004: haiku   - Update button text (trivial change)
 ```
+
+---
+
+## Auto-Escalation
+
+Ralph automatically escalates to more capable models when a story fails repeatedly. This self-corrects bad model assignments without manual intervention.
+
+### How It Works
+
+If a story doesn't complete in an iteration, Ralph increments its `failures` count. After 2 failures, it escalates to the next model tier:
+
+**Starting from haiku:**
+| Failures | Effective Model |
+|----------|-----------------|
+| 0-1 | haiku |
+| 2-3 | sonnet |
+| 4+ | opus |
+
+**Starting from sonnet:**
+| Failures | Effective Model |
+|----------|-----------------|
+| 0-1 | sonnet |
+| 2+ | opus |
+
+**Starting from opus:**
+| Failures | Effective Model |
+|----------|-----------------|
+| Any | opus (can't escalate) |
+
+### Example
+
+A story assigned `haiku` that keeps failing:
+- Attempt 1: haiku fails → failures: 1
+- Attempt 2: haiku fails → failures: 2
+- Attempt 3: sonnet (escalated) fails → failures: 3
+- Attempt 4: sonnet fails → failures: 4
+- Attempt 5: opus (escalated) → continues until success or max iterations
+
+This ensures Ralph eventually uses the most capable model if simpler ones can't handle the task.
 
 ---
 

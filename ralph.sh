@@ -49,10 +49,15 @@ if [[ "$MODE" != "max-quality" && "$MODE" != "cost-efficient" ]]; then
   exit 1
 fi
 
-# Helper function to get model for current story (Claude only)
+# Helper function to get current story info (Claude only)
+get_current_story_id() {
+  if [ -f "$PRD_FILE" ]; then
+    jq -r '[.userStories[] | select(.passes == false)][0].id // empty' "$PRD_FILE" 2>/dev/null
+  fi
+}
+
 get_current_story_model() {
   if [ -f "$PRD_FILE" ]; then
-    # Get model from first incomplete story
     local model=$(jq -r '[.userStories[] | select(.passes == false)][0].model // empty' "$PRD_FILE" 2>/dev/null)
     if [ -n "$model" ]; then
       echo "$model"
@@ -61,6 +66,50 @@ get_current_story_model() {
     fi
   else
     echo "sonnet"  # fallback default
+  fi
+}
+
+get_current_story_failures() {
+  if [ -f "$PRD_FILE" ]; then
+    local failures=$(jq -r '[.userStories[] | select(.passes == false)][0].failures // 0' "$PRD_FILE" 2>/dev/null)
+    echo "${failures:-0}"
+  else
+    echo "0"
+  fi
+}
+
+# Calculate effective model based on failures (auto-escalation)
+get_effective_model() {
+  local assigned=$1
+  local failures=$2
+  
+  if [ "$assigned" == "opus" ]; then
+    echo "opus"
+  elif [ "$assigned" == "sonnet" ]; then
+    if [ "$failures" -ge 2 ]; then
+      echo "opus"
+    else
+      echo "sonnet"
+    fi
+  else  # haiku
+    if [ "$failures" -ge 4 ]; then
+      echo "opus"
+    elif [ "$failures" -ge 2 ]; then
+      echo "sonnet"
+    else
+      echo "haiku"
+    fi
+  fi
+}
+
+# Increment failures for a story by ID
+increment_story_failures() {
+  local story_id=$1
+  if [ -f "$PRD_FILE" ] && [ -n "$story_id" ]; then
+    local tmp_file=$(mktemp)
+    jq --arg id "$story_id" '
+      .userStories = [.userStories[] | if .id == $id then .failures = ((.failures // 0) + 1) else . end]
+    ' "$PRD_FILE" > "$tmp_file" && mv "$tmp_file" "$PRD_FILE"
   fi
 }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -117,6 +166,12 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
+  # Track current story before running (for failure detection)
+  STORY_ID_BEFORE=""
+  if [[ "$TOOL" == "claude" ]]; then
+    STORY_ID_BEFORE=$(get_current_story_id)
+  fi
+
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
@@ -125,9 +180,16 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     if [[ "$MODE" == "max-quality" ]]; then
       MODEL="opus"
     else
-      MODEL=$(get_current_story_model)
+      ASSIGNED_MODEL=$(get_current_story_model)
+      FAILURES=$(get_current_story_failures)
+      MODEL=$(get_effective_model "$ASSIGNED_MODEL" "$FAILURES")
+      
+      if [ "$MODEL" != "$ASSIGNED_MODEL" ]; then
+        echo "  Assigned model: $ASSIGNED_MODEL (failures: $FAILURES) → Escalated to: $MODEL"
+      else
+        echo "  Using model: $MODEL (failures: $FAILURES)"
+      fi
     fi
-    echo "  Using model: $MODEL"
     
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     OUTPUT=$(claude --dangerously-skip-permissions --print --model "$MODEL" < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
@@ -139,6 +201,15 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
+  fi
+  
+  # Check if same story is still incomplete (failure detection)
+  if [[ "$TOOL" == "claude" ]] && [[ "$MODE" == "cost-efficient" ]]; then
+    STORY_ID_AFTER=$(get_current_story_id)
+    if [ -n "$STORY_ID_BEFORE" ] && [ "$STORY_ID_BEFORE" == "$STORY_ID_AFTER" ]; then
+      echo "  Story $STORY_ID_BEFORE did not complete. Incrementing failure count."
+      increment_story_failures "$STORY_ID_BEFORE"
+    fi
   fi
   
   echo "Iteration $i complete. Continuing..."
