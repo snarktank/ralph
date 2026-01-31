@@ -204,7 +204,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   fi
   
   # Check if same story is still incomplete (failure detection)
-  if [[ "$TOOL" == "claude" ]] && [[ "$MODE" == "cost-efficient" ]]; then
+  if [[ "$TOOL" == "claude" ]]; then
     STORY_ID_AFTER=$(get_current_story_id)
     if [ -n "$STORY_ID_BEFORE" ] && [ "$STORY_ID_BEFORE" == "$STORY_ID_AFTER" ]; then
       echo "  Story $STORY_ID_BEFORE did not complete. Incrementing failure count."
