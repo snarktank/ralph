@@ -13,7 +13,8 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- `jq` installed (`brew install jq` on macOS)
+- **macOS/Linux:** `jq` installed (`brew install jq` on macOS)
+- **Windows:** PowerShell 5.1+ (included with Windows 10+) or PowerShell Core
 - A git repository for your project
 
 ## Setup
@@ -22,6 +23,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 Copy the ralph files into your project:
 
+**macOS/Linux:**
 ```bash
 # From your project root
 mkdir -p scripts/ralph
@@ -35,20 +37,49 @@ cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
 chmod +x scripts/ralph/ralph.sh
 ```
 
+**Windows (PowerShell):**
+```powershell
+# From your project root
+New-Item -ItemType Directory -Path scripts\ralph -Force
+Copy-Item \path\to\ralph\ralph.ps1 scripts\ralph\
+Copy-Item \path\to\ralph\ralph.cmd scripts\ralph\  # Optional CMD wrapper
+
+# Copy the prompt template for your AI tool of choice:
+Copy-Item \path\to\ralph\prompt.md scripts\ralph\    # For Amp
+# OR
+Copy-Item \path\to\ralph\CLAUDE.md scripts\ralph\    # For Claude Code
+```
+
 ### Option 2: Install skills globally (Amp)
 
 Copy the skills to your Amp or Claude config for use across all projects:
 
-For AMP
+**macOS/Linux:**
+
+For Amp:
 ```bash
 cp -r skills/prd ~/.config/amp/skills/
 cp -r skills/ralph ~/.config/amp/skills/
 ```
 
-For Claude Code (manual)
+For Claude Code (manual):
 ```bash
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
+```
+
+**Windows (PowerShell):**
+
+For Amp:
+```powershell
+Copy-Item -Recurse skills\prd $env:USERPROFILE\.config\amp\skills\
+Copy-Item -Recurse skills\ralph $env:USERPROFILE\.config\amp\skills\
+```
+
+For Claude Code (manual):
+```powershell
+Copy-Item -Recurse skills\prd $env:USERPROFILE\.claude\skills\
+Copy-Item -Recurse skills\ralph $env:USERPROFILE\.claude\skills\
 ```
 
 ### Option 3: Use as Claude Code Marketplace
@@ -109,6 +140,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 ### 3. Run Ralph
 
+**macOS/Linux:**
 ```bash
 # Using Amp (default)
 ./scripts/ralph/ralph.sh [max_iterations]
@@ -117,7 +149,25 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+**Windows (PowerShell):**
+```powershell
+# Using Amp (default)
+.\scripts\ralph\ralph.ps1 -MaxIterations 10
+
+# Using Claude Code
+.\scripts\ralph\ralph.ps1 -Tool claude -MaxIterations 5
+
+# Bash-style syntax also works
+.\scripts\ralph\ralph.ps1 --tool claude 5
+```
+
+**Windows (CMD):**
+```cmd
+REM Using the CMD wrapper
+scripts\ralph\ralph.cmd --tool claude 10
+```
+
+Default is 10 iterations. Use `-Tool amp` or `-Tool claude` (PowerShell) or `--tool amp`/`--tool claude` (bash-style) to select your AI coding tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -133,7 +183,9 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop for macOS/Linux (supports `--tool amp` or `--tool claude`) |
+| `ralph.ps1` | The PowerShell script for Windows (supports `-Tool amp` or `-Tool claude`) |
+| `ralph.cmd` | CMD wrapper for Windows (calls ralph.ps1) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
@@ -210,12 +262,25 @@ When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>
 
 Check current state:
 
+**macOS/Linux:**
 ```bash
 # See which stories are done
 cat prd.json | jq '.userStories[] | {id, title, passes}'
 
 # See learnings from previous iterations
 cat progress.txt
+
+# Check git history
+git log --oneline -10
+```
+
+**Windows (PowerShell):**
+```powershell
+# See which stories are done
+(Get-Content prd.json | ConvertFrom-Json).userStories | Select-Object id, title, passes
+
+# See learnings from previous iterations
+Get-Content progress.txt
 
 # Check git history
 git log --oneline -10
