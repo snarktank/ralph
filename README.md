@@ -113,11 +113,18 @@ This creates `prd.json` with user stories structured for autonomous execution.
 # Using Amp (default)
 ./scripts/ralph/ralph.sh [max_iterations]
 
-# Using Claude Code
+# Using Claude Code (cost-efficient mode - default)
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Using Claude Code (max quality mode - Opus for all stories)
+./scripts/ralph/ralph.sh --tool claude --mode max-quality [max_iterations]
 ```
 
 Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+
+**Mode options (Claude Code only):**
+- `--mode cost-efficient` (default): Uses the model assigned to each story (opus/sonnet/haiku) based on complexity
+- `--mode max-quality`: Uses Opus for all stories regardless of assigned model
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -190,6 +197,19 @@ Examples of what to add to AGENTS.md:
 - Patterns discovered ("this codebase uses X for Y")
 - Gotchas ("do not forget to update Z when changing W")
 - Useful context ("the settings panel is in component X")
+
+### Model Routing (Claude Code)
+
+When using Claude Code, Ralph supports intelligent model routing to optimize cost and speed while maintaining quality.
+
+During PRD conversion (using the Ralph skill), Opus analyzes each story and assigns the appropriate execution model:
+- **opus** - Complex/critical work (schema changes, auth, business logic, uncertainty)
+- **sonnet** - Standard work (CRUD, typical UI, moderate complexity)
+- **haiku** - Simple work (text changes, copying patterns, trivial updates)
+
+The decision principle is **when in doubt, round up** - only use cheaper models when Opus is confident the task is straightforward.
+
+You can override any model assignment by editing `prd.json` before running Ralph. You can also use `--mode max-quality` to force Opus for all stories.
 
 ### Feedback Loops
 

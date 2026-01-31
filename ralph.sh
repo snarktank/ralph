@@ -6,6 +6,7 @@ set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
+MODE="cost-efficient"  # Default to cost-efficient mode
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do
@@ -16,6 +17,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --mode)
+      MODE="$2"
+      shift 2
+      ;;
+    --mode=*)
+      MODE="${1#*=}"
       shift
       ;;
     *)
@@ -33,6 +42,27 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
   echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
   exit 1
 fi
+
+# Validate mode choice
+if [[ "$MODE" != "max-quality" && "$MODE" != "cost-efficient" ]]; then
+  echo "Error: Invalid mode '$MODE'. Must be 'max-quality' or 'cost-efficient'."
+  exit 1
+fi
+
+# Helper function to get model for current story (Claude only)
+get_current_story_model() {
+  if [ -f "$PRD_FILE" ]; then
+    # Get model from first incomplete story
+    local model=$(jq -r '[.userStories[] | select(.passes == false)][0].model // empty' "$PRD_FILE" 2>/dev/null)
+    if [ -n "$model" ]; then
+      echo "$model"
+    else
+      echo "sonnet"  # fallback if no model specified
+    fi
+  else
+    echo "sonnet"  # fallback default
+  fi
+}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
@@ -79,7 +109,7 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo "Starting Ralph - Tool: $TOOL - Mode: $MODE - Max iterations: $MAX_ITERATIONS"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -91,8 +121,16 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   else
+    # Claude Code: determine model for this iteration
+    if [[ "$MODE" == "max-quality" ]]; then
+      MODEL="opus"
+    else
+      MODEL=$(get_current_story_model)
+    fi
+    echo "  Using model: $MODEL"
+    
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(claude --dangerously-skip-permissions --print --model "$MODEL" < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   fi
   
   # Check for completion signal

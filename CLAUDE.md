@@ -77,6 +77,18 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+## Model Routing
+
+Each user story in `prd.json` has a `model` field (`"opus"`, `"sonnet"`, or `"haiku"`) that was assigned during PRD conversion based on the story's complexity and risk.
+
+The `ralph.sh` script automatically uses the appropriate model for each iteration:
+- **Max quality mode** (`--mode max-quality`): Uses Opus for all stories regardless of the `model` field
+- **Cost efficient mode** (`--mode cost-efficient`): Uses the `model` field from each story
+
+The model was assigned by Opus during PRD conversion, following this principle: **when in doubt, round up** (prefer more capable models when complexity is uncertain).
+
+If you believe a story's assigned model is incorrect, you can manually edit `prd.json` before running Ralph.
+
 ## Browser Testing (If Available)
 
 For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):

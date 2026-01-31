@@ -34,11 +34,17 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
         "Typecheck passes"
       ],
       "priority": 1,
+      "model": "opus",
       "passes": false,
       "notes": ""
     }
   ]
 }
+```
+
+### Model Field
+
+The `model` field specifies which Claude model executes the story: `"opus"`, `"sonnet"`, or `"haiku"`. See the **Model Assignment** section below for assignment rules.
 ```
 
 ---
@@ -124,6 +130,7 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 4. **All stories**: `passes: false` and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
 6. **Always add**: "Typecheck passes" to every story's acceptance criteria
+7. **Model**: Assign `opus`, `sonnet`, or `haiku` based on complexity (see Model Assignment section)
 
 ---
 
@@ -178,6 +185,7 @@ Add ability to mark tasks with different statuses.
         "Typecheck passes"
       ],
       "priority": 1,
+      "model": "opus",
       "passes": false,
       "notes": ""
     },
@@ -192,6 +200,7 @@ Add ability to mark tasks with different statuses.
         "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
+      "model": "sonnet",
       "passes": false,
       "notes": ""
     },
@@ -207,6 +216,7 @@ Add ability to mark tasks with different statuses.
         "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
+      "model": "sonnet",
       "passes": false,
       "notes": ""
     },
@@ -221,11 +231,20 @@ Add ability to mark tasks with different statuses.
         "Verify in browser using dev-browser skill"
       ],
       "priority": 4,
+      "model": "sonnet",
       "passes": false,
       "notes": ""
     }
   ]
 }
+```
+
+**Model assignment summary (cost-efficient mode):**
+```
+  US-001: opus    - Database migration (schema change)
+  US-002: sonnet  - Display status badge (standard UI component)
+  US-003: sonnet  - Add status toggle (form handling)
+  US-004: sonnet  - Filter tasks (standard UI component)
 ```
 
 ---
@@ -245,6 +264,67 @@ Add ability to mark tasks with different statuses.
 
 ---
 
+## Model Assignment
+
+After generating all user stories, assign a Claude model to each story based on complexity and risk. Ralph supports two modes:
+
+### Max Quality Mode
+
+When the user specifies `mode=max-quality`, assign `"opus"` to every story. No analysis needed.
+
+### Cost Efficient Mode
+
+When the user specifies `mode=cost-efficient` (or no mode specified), analyze each story and assign the appropriate model.
+
+**Decision principle: When in doubt, round UP.**
+- If you're unsure between haiku and sonnet → assign `sonnet`
+- If you're unsure between sonnet and opus → assign `opus`
+
+Only assign a lower-tier model when you're **confident** the task is straightforward enough.
+
+#### Assign `opus` when story involves:
+- Database schema changes or migrations
+- Authentication/authorization logic
+- Payment, billing, or financial calculations
+- Security-sensitive code
+- Complex state management
+- New architectural patterns
+- Multi-service or multi-file coordination
+- First story in a critical dependency chain
+- **Any uncertainty about complexity or risk**
+
+#### Assign `sonnet` when story involves:
+- Standard CRUD operations
+- Typical UI components with clear patterns
+- Moderate business logic with well-defined scope
+- API endpoint implementation
+- Form handling and validation
+- Data fetching and display
+- **Confident the scope is clear and bounded**
+
+#### Assign `haiku` when story involves:
+- Trivial text or copy changes
+- Pure documentation updates
+- Config file tweaks
+- Obvious pattern repetition (copy-paste with minor changes)
+- Single-file, single-function changes with no business logic
+- Styling-only changes
+- **Confident the task is trivially simple**
+
+### Output Summary
+
+After assigning models, output a summary:
+
+```
+Model assignments (cost-efficient mode):
+  US-001: opus    - Database migration (schema change)
+  US-002: sonnet  - Display priority badge (standard UI)
+  US-003: sonnet  - Add priority selector (form handling)
+  US-004: haiku   - Update button text (trivial change)
+```
+
+---
+
 ## Checklist Before Saving
 
 Before writing prd.json, verify:
@@ -256,3 +336,4 @@ Before writing prd.json, verify:
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
+- [ ] **Every story has a model assigned** (opus, sonnet, or haiku)
