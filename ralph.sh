@@ -1,12 +1,14 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--webhook URL] [max_iterations]
+# Environment: RALPH_WEBHOOK_URL or DISCORD_WEBHOOK_URL - Discord webhook for notifications
 
 set -e
 
 # Parse arguments
-TOOL="amp"  # Default to amp for backwards compatibility
+TOOL="claude"  # Default to claude
 MAX_ITERATIONS=10
+WEBHOOK_URL="${RALPH_WEBHOOK_URL:-${DISCORD_WEBHOOK_URL:-}}"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +18,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --webhook)
+      WEBHOOK_URL="$2"
+      shift 2
+      ;;
+    --webhook=*)
+      WEBHOOK_URL="${1#*=}"
       shift
       ;;
     *)
@@ -33,6 +43,40 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
   echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
   exit 1
 fi
+
+# Function to send Discord notification
+send_discord_notification() {
+  local status="$1"
+  local message="$2"
+  local color="$3"  # Discord embed color (decimal)
+
+  if [[ -z "$WEBHOOK_URL" ]]; then
+    return 0
+  fi
+
+  local project_name="Unknown"
+  local branch_name=""
+  if [[ -f "$PRD_FILE" ]]; then
+    project_name=$(jq -r '.project // "Unknown"' "$PRD_FILE" 2>/dev/null || echo "Unknown")
+    branch_name=$(jq -r '.branchName // ""' "$PRD_FILE" 2>/dev/null || echo "")
+  fi
+
+  local timestamp
+  timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+  # Build JSON safely with jq to handle special characters
+  local payload
+  payload=$(jq -n \
+    --arg title "[$project_name] Ralph: $status" \
+    --arg desc "$message" \
+    --argjson color "$color" \
+    --arg branch "$branch_name" \
+    --arg tool "$TOOL" \
+    --arg ts "$timestamp" \
+    '{embeds: [{title: $title, description: $desc, color: $color, fields: [{name: "Branch", value: $branch, inline: true}, {name: "Tool", value: $tool, inline: true}], timestamp: $ts}]}')
+
+  curl -s --max-time 10 -H "Content-Type: application/json" -d "$payload" "$WEBHOOK_URL" > /dev/null 2>&1 || true
+}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
@@ -100,6 +144,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
+    send_discord_notification "Complete" "All tasks finished successfully at iteration $i of $MAX_ITERATIONS" "5763719"
     exit 0
   fi
   
@@ -110,4 +155,5 @@ done
 echo ""
 echo "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
 echo "Check $PROGRESS_FILE for status."
+send_discord_notification "Max Iterations" "Reached $MAX_ITERATIONS iterations without completing all tasks. Manual review needed." "15158332"
 exit 1
