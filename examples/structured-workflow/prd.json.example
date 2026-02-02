@@ -1,0 +1,155 @@
+{
+  "project": "MyApp",
+  "branchName": "ralph/user-notifications",
+  "description": "User Notification System - Allow users to receive and manage notifications",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add notifications table to database",
+      "description": "As a developer, I need to store notifications in the database so they persist across sessions.",
+      "acceptanceCriteria": [
+        "Create notifications table with: id, userId, type, title, message, read, createdAt",
+        "Add foreign key constraint to users table",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "stage": "foundation",
+      "focus": "data-model",
+      "responsibility": "schema"
+    },
+    {
+      "id": "US-002",
+      "title": "Create notification service functions",
+      "description": "As a developer, I need functions to create, read, and mark notifications as read.",
+      "acceptanceCriteria": [
+        "Create notification service with: createNotification, getUserNotifications, markAsRead",
+        "All functions properly typed",
+        "Service handles database errors gracefully",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "stage": "logic",
+      "focus": "business-rules",
+      "responsibility": "backend"
+    },
+    {
+      "id": "US-003",
+      "title": "Add notification bell icon to header",
+      "description": "As a user, I want to see a notification indicator in the header so I know when I have new notifications.",
+      "acceptanceCriteria": [
+        "Notification bell icon appears in header next to user menu",
+        "Badge shows unread count when > 0",
+        "Icon is clickable and opens dropdown (placeholder for now)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "stage": "interface",
+      "focus": "ui-component",
+      "responsibility": "frontend"
+    },
+    {
+      "id": "US-004",
+      "title": "Create notification dropdown panel",
+      "description": "As a user, I want to see my notifications in a dropdown when I click the bell icon.",
+      "acceptanceCriteria": [
+        "Dropdown panel opens when bell is clicked",
+        "Shows list of notifications (title and message)",
+        "Unread notifications visually distinct (bold or background color)",
+        "Empty state message when no notifications",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "stage": "interface",
+      "focus": "ui-component",
+      "responsibility": "frontend"
+    },
+    {
+      "id": "US-005",
+      "title": "Connect notification dropdown to backend",
+      "description": "As a user, I want to see my actual notifications from the database in the dropdown.",
+      "acceptanceCriteria": [
+        "Dropdown fetches notifications from getUserNotifications service",
+        "Notifications display in reverse chronological order (newest first)",
+        "Loading state while fetching",
+        "Error state if fetch fails",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "stage": "integration",
+      "focus": "data-fetching",
+      "responsibility": "frontend"
+    },
+    {
+      "id": "US-006",
+      "title": "Add mark-as-read functionality",
+      "description": "As a user, I want to mark notifications as read when I click on them.",
+      "acceptanceCriteria": [
+        "Clicking a notification calls markAsRead service",
+        "Notification updates to read state immediately (optimistic update)",
+        "Unread count badge updates",
+        "Read notifications no longer show as unread",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "stage": "integration",
+      "focus": "user-interaction",
+      "responsibility": "frontend"
+    },
+    {
+      "id": "US-007",
+      "title": "Handle notification creation events",
+      "description": "As a developer, I need the system to create notifications when relevant events occur.",
+      "acceptanceCriteria": [
+        "Create notification when user receives a message",
+        "Create notification when task is assigned to user",
+        "Notifications created with correct type and content",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "stage": "integration",
+      "focus": "event-handling",
+      "responsibility": "backend"
+    },
+    {
+      "id": "US-008",
+      "title": "Add error handling and edge cases",
+      "description": "As a user, I want the notification system to handle errors gracefully.",
+      "acceptanceCriteria": [
+        "Handle case where user has 100+ notifications (pagination or truncation)",
+        "Handle network errors when fetching notifications",
+        "Handle case where notification is deleted while viewing",
+        "All error states have user-friendly messages",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "stage": "polish",
+      "focus": "error-handling",
+      "responsibility": "full-stack"
+    }
+  ]
+}
+
