@@ -241,8 +241,9 @@ function App() {
   };
 
   const initialNodes = getNodes(1);
-  const initialEdges = edgeConnections.map((conn, index) =>
-    createEdge(conn, index < 0)
+  // All edges start invisible - they appear as user steps through the flowchart
+  const initialEdges = edgeConnections.map((conn) =>
+    createEdge(conn, false)
   );
 
   const [nodes, setNodes] = useNodesState(initialNodes);
@@ -319,7 +320,7 @@ function App() {
     setVisibleCount(1);
     nodePositions.current = { ...positions };
     setNodes(getNodes(1));
-    setEdges(edgeConnections.map((conn, index) => createEdge(conn, index < 0)));
+    setEdges(edgeConnections.map((conn) => createEdge(conn, false)));
   }, [setNodes, setEdges]);
 
   return (
