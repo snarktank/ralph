@@ -8,3 +8,6 @@ progress.txt
 
 # OS files
 .DS_Store
+
+#Claude
+.claude/
