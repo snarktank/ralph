@@ -2,6 +2,8 @@
 
 You are an autonomous coding agent working on a software project.
 
+**Important:** Each session starts fresh with no memory of previous sessions. Your only knowledge comes from reading files. This is why documenting learnings in `progress.txt` and `CLAUDE.md` is critical—future sessions will rely on what you write.
+
 ## Your Task
 
 1. Read the PRD at `prd.json` (in the same directory as this file)
@@ -22,18 +24,18 @@ APPEND to progress.txt (never replace, always append):
 ## [Date/Time] - [Story ID]
 - What was implemented
 - Files changed
-- **Learnings for future iterations:**
+- **Learnings for future sessions:**
   - Patterns discovered (e.g., "this codebase uses X for Y")
   - Gotchas encountered (e.g., "don't forget to update Z when changing W")
   - Useful context (e.g., "the evaluation panel is in component X")
 ---
 ```
 
-The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
+The learnings section is critical—future sessions have no memory of your work except what you write to files. Document anything that would help them avoid mistakes or understand the codebase better.
 
 ## Consolidate Patterns
 
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
+If you discover a **reusable pattern**, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
 
 ```
 ## Codebase Patterns
@@ -87,18 +89,25 @@ For any story that changes UI, verify it works in the browser if you have browse
 
 If no browser tools are available, note in your progress report that manual browser verification is needed.
 
+## Completion Criteria
+
+A story is **complete** when you have:
+- Implemented the code (step 5)
+- Passed all quality checks (step 6)
+- Committed with proper message format (step 8)
+- Set `passes: true` in prd.json (step 9)
+- Appended progress to progress.txt (step 10)
+
 ## Stop Condition
 
-After completing a user story, check if ALL stories have `passes: true`.
+After completing steps 1-10 for a user story, check if ALL stories have `passes: true`.
 
-If ALL stories are complete and passing, reply with:
-<promise>COMPLETE</promise>
-
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
+- **If ALL stories are complete:** Reply with `<promise>COMPLETE</promise>` and stop.
+- **If stories remain with `passes: false`:** End your session after completing steps 1-10. Your work is done for this session.
 
 ## Important
 
-- Work on ONE story per iteration
+- Work on ONE story per session
 - Commit frequently
 - Keep CI green
-- Read the Codebase Patterns section in progress.txt before starting
+- Read the Codebase Patterns section in progress.txt before starting—it contains knowledge from previous sessions
