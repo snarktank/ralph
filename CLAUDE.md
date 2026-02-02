@@ -77,6 +77,120 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
+## Mandatory Quality Gates (Backpressure)
+
+Quality gates are **mandatory blockers**, not suggestions. You MUST NOT mark a story as complete until ALL gates pass.
+
+### Required Gates
+
+Before marking ANY story as `passes: true`, you MUST verify:
+
+1. **Typecheck MUST pass** - Run `npm run build` (or project equivalent) with zero errors
+2. **Lint MUST pass** - Run `npm run lint` (or project equivalent) with zero errors
+3. **Tests MUST pass** - Run `npm test` (or project equivalent) with zero failures
+
+If ANY gate fails, the story is NOT complete. Period.
+
+### Forbidden Shortcuts
+
+Never use these to bypass quality gates:
+
+| Forbidden | Why |
+|-----------|-----|
+| `@ts-ignore` | Hides type errors instead of fixing them |
+| `@ts-expect-error` | Same as above - masks real problems |
+| `eslint-disable` | Suppresses lint rules without fixing violations |
+| `eslint-disable-next-line` | Same as above - circumvents quality checks |
+| `// @nocheck` | Disables type checking for entire file |
+| `any` type | Defeats the purpose of TypeScript |
+
+If you find yourself reaching for these, STOP. Fix the actual issue.
+
+### 3-Attempt Limit
+
+If you cannot make a story pass quality gates after 3 attempts:
+
+1. **STOP** - Do not continue iterating on the same approach
+2. **Document** - Add detailed notes about what's failing and why
+3. **Skip** - Move to the next story and let a human investigate
+4. **Never** - Do not use forbidden shortcuts to force a pass
+
+This prevents infinite loops on fundamentally blocked stories.
+
+### Backpressure Mindset
+
+Think of quality gates as physical barriers, not speed bumps:
+- A speed bump slows you down but lets you pass
+- A barrier stops you completely until you have the right key
+
+You cannot "push through" a failing gate. You must fix it or stop.
+
+## Verification Before Completion
+
+Before claiming ANY story is complete, you MUST verify your work systematically. Do not trust your memory or assumptions—run the checks.
+
+### Verification Checklist
+
+Before marking a story as `passes: true`, complete this checklist:
+
+```
+## Verification Checklist for [Story ID]
+
+### 1. Acceptance Criteria Check
+- [ ] Criterion 1: [How verified - command/file check/grep]
+- [ ] Criterion 2: [How verified]
+- [ ] Criterion 3: [How verified]
+... (one checkbox per criterion)
+
+### 2. Quality Gates
+- [ ] Typecheck passes: `npm run build` (or equivalent)
+- [ ] Lint passes: `npm run lint` (or equivalent)
+- [ ] Tests pass: `npm test` (or equivalent)
+
+### 3. Regression Check
+- [ ] Full test suite passes (not just new tests)
+- [ ] No unrelated failures introduced
+
+### 4. Final Verification
+- [ ] Re-read each acceptance criterion one more time
+- [ ] Confirmed each criterion is met with evidence
+```
+
+### How to Verify Each Criterion
+
+For each acceptance criterion, you must have **evidence**, not just belief:
+
+| Criterion Type | Verification Method |
+|----------------|---------------------|
+| "File X exists" | `ls -la path/to/X` or Read tool |
+| "Contains section Y" | `grep -n "Y" file` or Read tool |
+| "Command succeeds" | Run the command, check exit code |
+| "Output contains Z" | Run command, pipe to grep |
+| "Valid JSON" | `jq . file.json` succeeds |
+
+### Before Outputting COMPLETE
+
+When you believe ALL stories are done and you're about to output `<promise>COMPLETE</promise>`:
+
+1. **Re-verify the current story** - Run all quality gates one more time
+2. **Check prd.json** - Confirm all stories show `passes: true`
+3. **Run full verification** - `jq '.userStories[] | select(.passes == false) | .id' prd.json` should return nothing
+4. **Only then** output the COMPLETE signal
+
+If ANY verification fails at this stage, do NOT output COMPLETE. Fix the issue first.
+
+### Evidence Over Assertion
+
+Never claim something works without proving it:
+
+| Bad (Assertion) | Good (Evidence) |
+|-----------------|-----------------|
+| "I added the section" | "Verified with `grep -n 'Section Name' file` - found at line 42" |
+| "Tests pass" | "Ran `npm test` - 47 tests passed, 0 failed" |
+| "File is valid JSON" | "Ran `jq . file.json` - parsed successfully" |
+
+Run the command. See the output. Report the evidence.
+
 ## Browser Testing (If Available)
 
 For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
