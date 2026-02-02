@@ -28,10 +28,8 @@ if ! jq -e '.userStories | type == "array"' "$FILE" >/dev/null; then
   exit 1
 fi
 
-# Collect all user story IDs
-IDS=$(jq -r '.userStories[].id' "$FILE")
-
 # Check for duplicate IDs
+IDS=$(jq -r '.userStories[].id' "$FILE")
 DUP_IDS=$(echo "$IDS" | sort | uniq -d)
 if [ -n "$DUP_IDS" ]; then
   echo "✗ Duplicate userStory IDs:"
@@ -39,17 +37,15 @@ if [ -n "$DUP_IDS" ]; then
   ERROR=1
 fi
 
-# Validate each user story
+# Validate required fields exist (existence, not truthiness)
 COUNT=$(jq '.userStories | length' "$FILE")
-
 for ((i=0; i<COUNT; i++)); do
   for FIELD in "${REQUIRED_FIELDS[@]}"; do
     EXISTS=$(jq ".userStories[$i] | has(\"$FIELD\")" "$FILE")
-    # Fail fast on malformed PRDs before starting the agent loop
-    if [ -f "$SCRIPT_DIR/scripts/validate_prd.sh" ]; then
-      "$SCRIPT_DIR/scripts/validate_prd.sh" "$PRD_FILE"
+    if [ "$EXISTS" != "true" ]; then
+      echo "✗ Missing field '$FIELD' in userStory index $i"
+      ERROR=1
     fi
-
   done
 done
 
