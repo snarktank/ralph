@@ -54,11 +54,19 @@ send_discord_notification() {
     return 0
   fi
 
-  local project_name="Unknown"
+  local project_name=""
   local branch_name=""
   if [[ -f "$PRD_FILE" ]]; then
-    project_name=$(jq -r '.project // "Unknown"' "$PRD_FILE" 2>/dev/null || echo "Unknown")
+    project_name=$(jq -r '.project // empty' "$PRD_FILE" 2>/dev/null || echo "")
     branch_name=$(jq -r '.branchName // ""' "$PRD_FILE" 2>/dev/null || echo "")
+  fi
+  # Fallback: use git repo directory name if project is not set
+  if [[ -z "$project_name" ]]; then
+    project_name=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "Unknown")
+  fi
+  # Fallback: use current git branch if branchName is not set
+  if [[ -z "$branch_name" ]]; then
+    branch_name=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
   fi
 
   local timestamp
