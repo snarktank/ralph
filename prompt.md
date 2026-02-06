@@ -7,13 +7,15 @@ You are an autonomous coding agent working on a software project.
 1. Read the PRD at `prd.json` (in the same directory as this file)
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
 3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. Pick the **highest priority** user story where `passes: false`
-5. Implement that single user story
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `progress.txt`
+4. **Check if `reviewPending` is `true` in prd.json.** If so, run the Review Checkpoint (see below) and end this iteration.
+5. Pick the **highest priority** user story where `passes: false`
+6. Implement that single user story
+7. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
+8. Update AGENTS.md files if you discover reusable patterns (see below)
+9. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+10. Update the PRD to set `passes: true` for the completed story
+11. **If the completed story has `reviewAfter: true`, set `reviewPending: true` in prd.json**
+12. Append your progress to `progress.txt`
 
 ## Progress Report Format
 
@@ -72,6 +74,28 @@ Before committing, check if any edited files have learnings worth preserving in 
 - Information already in progress.txt
 
 Only update AGENTS.md if you have **genuinely reusable knowledge** that would help future work in that directory.
+
+## Review Checkpoint
+
+When `reviewPending` is `true` in prd.json, this iteration is a **review iteration** — do NOT implement any story.
+
+1. Identify the diff scope: run `git log main..HEAD --oneline` to see all commits on this branch
+2. Review all changes on the branch: run `git diff main..HEAD` and analyze the code for quality, security, and correctness issues
+3. Record the review results in `progress.txt`:
+   ```
+   ## [Date/Time] - Review Checkpoint (after [Story ID])
+   - **Review summary:** [key findings]
+   - **Issues found:** [list critical/high issues, or "None"]
+   - **Action taken:** [fixes applied, or "No blocking issues"]
+   ---
+   ```
+4. If the review finds **critical or high-severity issues**:
+   - Fix them immediately in this iteration
+   - Commit the fix: `fix: review feedback - [brief description]`
+5. Set `reviewPending` to `false` in prd.json
+6. End this iteration (the next iteration will pick up the next story)
+
+**Important:** Review iterations are lightweight. Do not implement new features during a review iteration.
 
 ## Quality Requirements
 

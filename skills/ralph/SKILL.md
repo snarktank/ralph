@@ -23,6 +23,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
   "project": "[Project Name]",
   "branchName": "ralph/[feature-name-kebab-case]",
   "description": "[Feature description from PRD title/intro]",
+  "reviewPending": false,
   "userStories": [
     {
       "id": "US-001",
@@ -35,6 +36,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
       ],
       "priority": 1,
       "passes": false,
+      "reviewAfter": false,
       "notes": ""
     }
   ]
@@ -116,14 +118,36 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 
 ---
 
+## Review Checkpoints
+
+Set `reviewAfter: true` on stories where Ralph should pause and run a code review before continuing. This triggers a dedicated review iteration using `/codex-review`.
+
+**When to place review checkpoints:**
+- After schema/migration stories (before building backend on top)
+- After backend logic is complete (before UI depends on it)
+- After the final story (final review before merge)
+- At any phase boundary where a wrong foundation would cascade
+
+**When NOT needed:**
+- Between tightly coupled consecutive stories in the same layer (e.g., two UI stories)
+- After trivial changes (renaming, small config tweaks)
+
+**Rule of thumb:** Place a checkpoint wherever "discovering a problem later would mean rewriting multiple stories."
+
+The top-level `reviewPending` field starts as `false`. Ralph sets it to `true` automatically after completing a `reviewAfter` story, then runs the review in the next iteration.
+
+---
+
 ## Conversion Rules
 
 1. **Each user story becomes one JSON entry**
 2. **IDs**: Sequential (US-001, US-002, etc.)
 3. **Priority**: Based on dependency order, then document order
-4. **All stories**: `passes: false` and empty `notes`
+4. **All stories**: `passes: false`, empty `notes`, and `reviewAfter: false` by default
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
 6. **Always add**: "Typecheck passes" to every story's acceptance criteria
+7. **Set `reviewAfter: true`** on phase-boundary stories (see Review Checkpoints above)
+8. **Always set** `reviewPending: false` at the top level
 
 ---
 
@@ -167,6 +191,7 @@ Add ability to mark tasks with different statuses.
   "project": "TaskApp",
   "branchName": "ralph/task-status",
   "description": "Task Status Feature - Track task progress with status indicators",
+  "reviewPending": false,
   "userStories": [
     {
       "id": "US-001",
@@ -179,6 +204,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 1,
       "passes": false,
+      "reviewAfter": true,
       "notes": ""
     },
     {
@@ -193,6 +219,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 2,
       "passes": false,
+      "reviewAfter": false,
       "notes": ""
     },
     {
@@ -208,6 +235,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 3,
       "passes": false,
+      "reviewAfter": false,
       "notes": ""
     },
     {
@@ -222,6 +250,7 @@ Add ability to mark tasks with different statuses.
       ],
       "priority": 4,
       "passes": false,
+      "reviewAfter": true,
       "notes": ""
     }
   ]
@@ -256,3 +285,5 @@ Before writing prd.json, verify:
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
+- [ ] `reviewAfter: true` set on phase-boundary stories
+- [ ] `reviewPending: false` set at the top level

@@ -2,6 +2,7 @@
   "project": "MyApp",
   "branchName": "ralph/task-priority",
   "description": "Task Priority System - Add priority levels to tasks",
+  "reviewPending": false,
   "userStories": [
     {
       "id": "US-001",
@@ -14,6 +15,7 @@
       ],
       "priority": 1,
       "passes": false,
+      "reviewAfter": true,
       "notes": ""
     },
     {
@@ -28,6 +30,7 @@
       ],
       "priority": 2,
       "passes": false,
+      "reviewAfter": false,
       "notes": ""
     },
     {
@@ -43,6 +46,7 @@
       ],
       "priority": 3,
       "passes": false,
+      "reviewAfter": false,
       "notes": ""
     },
     {
@@ -58,6 +62,7 @@
       ],
       "priority": 4,
       "passes": false,
+      "reviewAfter": true,
       "notes": ""
     }
   ]
