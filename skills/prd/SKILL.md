@@ -52,7 +52,7 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
    D. Just the UI
 ```
 
-This lets users respond with "1A, 2C, 3B" for quick iteration.
+This lets users respond with "1A, 2C, 3B" for quick iteration. Remember to indent the options.
 
 ---
 
