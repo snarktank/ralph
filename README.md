@@ -18,24 +18,49 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Setup
 
-### Option 1: Copy to your project
+### Option 1: Install from release (recommended)
 
-Copy the ralph files into your project:
+Install from the latest stable release:
 
 ```bash
-# From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
+# Using Amp (default)
+curl -sSL https://github.com/snarktank/ralph/releases/latest/download/install-from-release.sh | bash
 
-# Copy the prompt template for your AI tool of choice:
-cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
-# OR
-cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
-
-chmod +x scripts/ralph/ralph.sh
+# Using Claude Code
+curl -sSL https://github.com/snarktank/ralph/releases/latest/download/install-from-release.sh | bash -s -- --tool claude
 ```
 
-### Option 2: Install skills globally (Amp)
+Or download and inspect first:
+
+```bash
+curl -O https://github.com/snarktank/ralph/releases/latest/download/install-from-release.sh
+less install-from-release.sh  # inspect the script
+bash install-from-release.sh --tool claude  # add --tool claude for Claude Code
+```
+
+Or install a specific version:
+
+```bash
+curl -sSL https://github.com/snarktank/ralph/releases/download/v1.0.0/install-from-release.sh | bash -s 1.0.0
+```
+
+This will create a `scripts/ralph` directory in your project with the necessary files.
+
+### Option 2: Install from main branch (for testing)
+
+Install the latest development version from the main branch:
+
+```bash
+# Using Amp (default)
+curl -sSL https://raw.githubusercontent.com/snarktank/ralph/main/install.sh | bash
+
+# Using Claude Code
+curl -sSL https://raw.githubusercontent.com/snarktank/ralph/main/install.sh | bash -s -- --tool claude
+```
+
+> ⚠️ This pulls from the main branch which may contain untested changes.
+
+### Option 3: Install skills globally
 
 Copy the skills to your Amp or Claude config for use across all projects:
 
