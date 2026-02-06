@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--webhook URL] [--runner claude|codex] [--safe]
+# Usage: ./ralph.sh [--webhook URL] [--runner claude|codex]
 # Environment: RALPH_WEBHOOK_URL or DISCORD_WEBHOOK_URL - Discord webhook for notifications
 
 set -e
@@ -12,7 +12,6 @@ Usage: ./ralph.sh [OPTIONS]
 Options:
   --webhook URL            Discord webhook URL
   --runner claude|codex    Agent runner to use (default: claude)
-  --safe                   Disable dangerous bypass flags for runner commands
   -h, --help               Show this help message
 EOF
 }
@@ -20,12 +19,11 @@ EOF
 # Parse arguments
 WEBHOOK_URL="${RALPH_WEBHOOK_URL:-${DISCORD_WEBHOOK_URL:-}}"
 RUNNER="claude"
-SAFE_MODE=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --webhook)
-      if [[ -z "${2:-}" ]]; then
+      if [[ -z "${2:-}" || "${2:-}" == -* ]]; then
         echo "Error: --webhook requires a non-empty URL value."
         usage
         exit 1
@@ -43,7 +41,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --runner)
-      if [[ -z "${2:-}" ]]; then
+      if [[ -z "${2:-}" || "${2:-}" == -* ]]; then
         echo "Error: --runner requires a value: claude or codex."
         usage
         exit 1
@@ -53,10 +51,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --runner=*)
       RUNNER="${1#*=}"
-      shift
-      ;;
-    --safe)
-      SAFE_MODE=true
       shift
       ;;
     -h|--help)
@@ -77,6 +71,12 @@ if [[ "$RUNNER" != "claude" && "$RUNNER" != "codex" ]]; then
   exit 1
 fi
 
+# Preflight: verify runner binary exists
+if ! command -v "$RUNNER" &>/dev/null; then
+  echo "Error: Runner '$RUNNER' not found in PATH."
+  exit 1
+fi
+
 # Run selected agent runner and capture output/exit status
 run_runner() {
   local output_file
@@ -84,17 +84,9 @@ run_runner() {
   local exit_code=0
 
   if [[ "$RUNNER" == "claude" ]]; then
-    if [[ "$SAFE_MODE" == "true" ]]; then
-      claude --print < "$SCRIPT_DIR/CLAUDE.md" > "$output_file" 2>&1 || exit_code=$?
-    else
-      claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" > "$output_file" 2>&1 || exit_code=$?
-    fi
+    claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" > "$output_file" 2>&1 || exit_code=$?
   else
-    if [[ "$SAFE_MODE" == "true" ]]; then
-      codex exec --prompt "$(cat "$SCRIPT_DIR/CLAUDE.md")" > "$output_file" 2>&1 || exit_code=$?
-    else
-      codex exec --dangerously-bypass-approvals-and-sandbox --prompt "$(cat "$SCRIPT_DIR/CLAUDE.md")" > "$output_file" 2>&1 || exit_code=$?
-    fi
+    codex exec --dangerously-bypass-approvals-and-sandbox - < "$SCRIPT_DIR/CLAUDE.md" > "$output_file" 2>&1 || exit_code=$?
   fi
 
   cat "$output_file" >&2
