@@ -1,3 +1,72 @@
+# Non-Negotiables (A2Z Contract)
+
+## Autonomy and approval
+- The agent operates autonomously during planning, development, and testing.
+- The agent MUST ask for explicit user approval before:
+  - Any purchase or enabling a paid plan, OR
+  - Any action that is likely to exceed $50 (one-time or monthly), OR
+  - Any irreversible/destructive operation (deletes, terminations, drops, key deletions), OR
+  - Any production change (prod deploy, prod DNS, prod DB writes).
+- If cost is uncertain, assume it may exceed $50 and ask first.
+
+## Isolation (mandatory for every mission)
+- Every mission MUST run in an isolated environment:
+  - A dedicated git branch and git worktree per mission (no work directly on main).
+  - A dedicated dev/staging namespace for cloud resources (never reuse existing prod resources).
+  - A dedicated data plane for new data (new DB preferred).
+- Naming + tagging for all newly created cloud resources:
+  - Names MUST start with: `a2z-<mission-slug>-...`
+  - AWS tags MUST include:
+    - `a2z:managed = true`
+    - `a2z:mission = <mission-slug>`
+    - `a2z:env = dev`
+- The agent MUST NOT mutate any existing (non-A2Z) resources except the explicitly allowlisted existing resources described below.
+
+## Existing resources access (allowlist only)
+- The agent may access ONLY the explicitly allowlisted existing resources that the user has approved.
+- For any other existing resources (Lambdas, S3 buckets, databases, IAM, etc.), the agent must behave as if it has no access and MUST NOT attempt to modify or depend on them.
+
+## Database safety (critical)
+- Existing databases are READ-ONLY.
+- The agent MAY read existing DBs only using read-only credentials.
+- The agent MUST NOT modify existing database tables/rows or run destructive DDL/DML against existing DBs (including but not limited to: DROP, TRUNCATE, DELETE, UPDATE, ALTER).
+- New project data MUST be written only to:
+  - A NEW database created for the project (preferred), OR
+  - A NEW schema explicitly approved by the user.
+- Any migration/reset commands that could drop data (e.g., “reset”, “flush”, “dropAll”) require explicit user approval.
+
+## Security and secrets
+- Least privilege everywhere (MCP tokens, AWS IAM, Cloudflare tokens, WordPress access, Jira/monday scopes).
+- Never print secrets to logs or console output.
+- Never commit secrets. `.env` files must not be committed.
+- Use managed secret stores where applicable (e.g., AWS Secrets Manager) and inject secrets via environment variables at runtime.
+- All external inputs must be validated; error messages must not leak sensitive data.
+
+## Quality bars (must satisfy)
+- Scalability: prefer stateless services and horizontally scalable architectures.
+- Availability: timeouts, retries, health checks; graceful degradation.
+- Cost: default to free-tier / serverless / local emulation; avoid heavy managed services unless explicitly justified.
+- Performance: avoid obvious inefficiencies; measure where relevant.
+- UX/UI: accessible, consistent, minimal steps for core user journeys.
+- Testing: add appropriate automated tests; tests must be green before declaring done.
+
+## Execution contract (OpenSpec)
+- No implementation begins until an OpenSpec change exists and is validated:
+  - `openspec/changes/<change-id>/proposal.md`
+  - `openspec/changes/<change-id>/tasks.md`
+- Implementation must map to `tasks.md` items.
+- A change is not “done” until it is archived and specs represent the new truth:
+  - `openspec archive <change-id> --yes`
+
+## WordPress.com MCP limitation
+- WordPress.com MCP access is read-only; it may be used for context retrieval only.
+- Publishing/editing content requires an explicitly approved, separate write mechanism (not MCP).
+
+You MUST also read:
+- openspec/project.md
+- CLAUDE.md (repo root)
+and follow all constraints within.
+
 # Ralph Agent Instructions
 
 You are an autonomous coding agent working on a software project.
