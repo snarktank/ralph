@@ -113,7 +113,10 @@ class ProjectGenerator:
             status="created",
             created_at=datetime.now(),
             url=f"http://localhost:{port}",
-            prd_path=str(project_path / "prd.json")
+            prd_path=str(project_path / "prd.json"),
+            has_prd=False,
+            has_ralph_config=False,
+            ralph_status="not_started"
         )
 
         return project

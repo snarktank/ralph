@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Project, ProjectCreate } from '../types';
 import { ProjectCreationModal } from './ProjectCreationModal';
+import { PRDEditorModal } from './PRDEditorModal';
+import { RalphProgressViewer } from './RalphProgressViewer';
 import './ProjectsDashboard.css';
 
 export function ProjectsDashboard() {
@@ -9,6 +11,8 @@ export function ProjectsDashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [prdModalProjectId, setPrdModalProjectId] = useState<string | null>(null);
+  const [expandedProgressId, setExpandedProgressId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -38,8 +42,11 @@ export function ProjectsDashboard() {
       });
 
       if (response.ok) {
-        await fetchProjects();
+        const project = await response.json();
         setIsModalOpen(false);
+
+        // Navigate to PRD Builder for the new project
+        navigate(`/project/${project.id}/prd-builder`);
       }
     } catch (error) {
       console.error('Failed to create project:', error);
@@ -73,6 +80,37 @@ export function ProjectsDashboard() {
     } catch (error) {
       console.error('Failed to stop project:', error);
     }
+  };
+
+  const handleCreateRalphConfig = async (projectId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/projects/${projectId}/ralph-config`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        await fetchProjects();
+        alert('Ralph configuration created successfully!');
+      } else {
+        alert('Failed to create Ralph configuration. Make sure PRD exists first.');
+      }
+    } catch (error) {
+      console.error('Failed to create Ralph config:', error);
+      alert('Error creating Ralph configuration');
+    }
+  };
+
+  const handleOpenPrdEditor = (projectId: string) => {
+    setPrdModalProjectId(projectId);
+  };
+
+  const handleClosePrdEditor = () => {
+    setPrdModalProjectId(null);
+    fetchProjects();
+  };
+
+  const handleToggleProgress = (projectId: string) => {
+    setExpandedProgressId(expandedProgressId === projectId ? null : projectId);
   };
 
   const getStatusColor = (status: string) => {
@@ -170,15 +208,71 @@ export function ProjectsDashboard() {
                 </div>
               </div>
 
-              <div className="project-actions">
-                <button
-                  className="action-button ralph"
-                  onClick={() => navigate(`/project/${project.id}/ralph`)}
-                  title="Open Ralph AI Dashboard"
-                >
-                  🤖 Ralph
-                </button>
+              {/* Ralph Workflow Section */}
+              <div className="ralph-workflow">
+                <h4 className="workflow-title">🤖 Ralph AI Workflow</h4>
 
+                <div className="workflow-steps">
+                  {/* Step 1: Create PRD */}
+                  <div className={`workflow-step ${project.has_prd ? 'completed' : 'pending'}`}>
+                    <div className="step-header">
+                      <span className="step-number">1</span>
+                      <span className="step-label">Create PRD</span>
+                      {project.has_prd && <span className="step-check">✓</span>}
+                    </div>
+                    <button
+                      className="step-button"
+                      onClick={() => handleOpenPrdEditor(project.id)}
+                    >
+                      {project.has_prd ? '📝 Edit PRD' : '✨ Create PRD'}
+                    </button>
+                  </div>
+
+                  {/* Step 2: Create Ralph Config */}
+                  <div className={`workflow-step ${project.has_ralph_config ? 'completed' : project.has_prd ? 'ready' : 'disabled'}`}>
+                    <div className="step-header">
+                      <span className="step-number">2</span>
+                      <span className="step-label">Setup Ralph</span>
+                      {project.has_ralph_config && <span className="step-check">✓</span>}
+                    </div>
+                    <button
+                      className="step-button"
+                      onClick={() => handleCreateRalphConfig(project.id)}
+                      disabled={!project.has_prd}
+                      title={!project.has_prd ? 'Create PRD first' : ''}
+                    >
+                      {project.has_ralph_config ? '✅ Configured' : '⚙️ Setup'}
+                    </button>
+                  </div>
+
+                  {/* Step 3: Start Ralph Loop */}
+                  <div className={`workflow-step ${project.ralph_status === 'running' ? 'active' : project.has_ralph_config ? 'ready' : 'disabled'}`}>
+                    <div className="step-header">
+                      <span className="step-number">3</span>
+                      <span className="step-label">Run Ralph</span>
+                      {project.ralph_status === 'running' && <span className="step-active">●</span>}
+                    </div>
+                    <button
+                      className="step-button"
+                      onClick={() => handleToggleProgress(project.id)}
+                      disabled={!project.has_ralph_config}
+                      title={!project.has_ralph_config ? 'Complete setup first' : ''}
+                    >
+                      {expandedProgressId === project.id ? '👁️ Hide Progress' : '👀 View Progress'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Inline Ralph Progress Viewer */}
+              <RalphProgressViewer
+                projectId={project.id}
+                isExpanded={expandedProgressId === project.id}
+                onClose={() => setExpandedProgressId(null)}
+              />
+
+              {/* Project Actions */}
+              <div className="project-actions">
                 {project.status === 'running' ? (
                   <>
                     <a
@@ -187,13 +281,13 @@ export function ProjectsDashboard() {
                       rel="noopener noreferrer"
                       className="action-button primary"
                     >
-                      🚀 Open
+                      🚀 Open App
                     </a>
                     <button
                       className="action-button secondary"
                       onClick={() => handleStopProject(project.id)}
                     >
-                      Stop
+                      Stop App
                     </button>
                   </>
                 ) : project.status === 'stopped' || project.status === 'created' || project.status === 'ready' ? (
@@ -201,7 +295,7 @@ export function ProjectsDashboard() {
                     className="action-button primary"
                     onClick={() => handleStartProject(project.id)}
                   >
-                    ▶ Start
+                    ▶ Start App
                   </button>
                 ) : null}
 
@@ -222,6 +316,17 @@ export function ProjectsDashboard() {
         onClose={() => setIsModalOpen(false)}
         onCreate={handleCreateProject}
       />
+
+      {prdModalProjectId && (
+        <PRDEditorModal
+          isOpen={true}
+          projectId={prdModalProjectId}
+          projectName={projects.find(p => p.id === prdModalProjectId)?.name || ''}
+          projectDescription={projects.find(p => p.id === prdModalProjectId)?.description || ''}
+          onClose={handleClosePrdEditor}
+          onSave={handleClosePrdEditor}
+        />
+      )}
     </div>
   );
 }

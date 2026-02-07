@@ -3,12 +3,13 @@ import { RalphDashboard } from './components/RalphDashboard';
 import { Flowchart } from './components/Flowchart';
 import { ProjectsDashboard } from './components/ProjectsDashboard';
 import { ProjectRalphDashboard } from './components/ProjectRalphDashboard';
+import { PRDBuilderPage } from './components/PRDBuilderPage';
 import './App.css';
 
 function Navigation() {
   const location = useLocation();
 
-  // Hide navigation on project-specific Ralph dashboards
+  // Hide navigation on project-specific pages
   if (location.pathname.startsWith('/project/')) {
     return null;
   }
@@ -38,6 +39,7 @@ function App() {
           <Route path="/ralph" element={<RalphDashboard />} />
           <Route path="/flowchart" element={<Flowchart />} />
           <Route path="/project/:projectId/ralph" element={<ProjectRalphDashboard />} />
+          <Route path="/project/:projectId/prd-builder" element={<PRDBuilderPage />} />
         </Routes>
       </div>
     </BrowserRouter>

@@ -313,6 +313,163 @@
   }
 }
 
+/* Ralph Workflow Section */
+.ralph-workflow {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.1) 0%, rgba(124, 58, 237, 0.05) 100%);
+  border: 1px solid rgba(147, 51, 234, 0.2);
+  border-radius: 12px;
+}
+
+.workflow-title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #a855f7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.workflow-step {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 1rem;
+  transition: all 0.3s;
+}
+
+.workflow-step.completed {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.workflow-step.ready {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.workflow-step.active {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.workflow-step.disabled {
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: rgba(147, 51, 234, 0.2);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a855f7;
+}
+
+.workflow-step.completed .step-number {
+  background: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.workflow-step.active .step-number {
+  background: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+.step-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  flex: 1;
+}
+
+.step-check {
+  color: #10b981;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.step-active {
+  color: #f59e0b;
+  font-size: 1.25rem;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.step-button {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.step-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.step-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.workflow-step.completed .step-button {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.workflow-step.ready .step-button {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.workflow-step.active .step-button {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
 @media (max-width: 768px) {
   .dashboard-hero {
     flex-direction: column;
@@ -325,6 +482,10 @@
   }
 
   .projects-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-steps {
     grid-template-columns: 1fr;
   }
 }

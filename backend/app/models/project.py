@@ -22,8 +22,38 @@ class Project(BaseModel):
     created_at: datetime
     url: Optional[str] = None
     prd_path: Optional[str] = None
+    has_prd: bool = False
+    has_ralph_config: bool = False
+    ralph_status: str = "not_started"  # "not_started", "running", "stopped", "completed"
 
 
 class ProjectList(BaseModel):
     """List of projects"""
     projects: List[Project]
+
+
+class PRDUserStory(BaseModel):
+    """User story in a PRD"""
+    id: str
+    title: str
+    description: str
+    acceptanceCriteria: List[str]
+    priority: int
+    passes: bool = False
+
+
+class PRDCreate(BaseModel):
+    """Request to create a PRD for a project"""
+    projectName: str
+    branchName: str
+    description: str
+    userStories: List[PRDUserStory]
+
+
+class PRDResponse(BaseModel):
+    """PRD response"""
+    projectName: str
+    branchName: str
+    description: str
+    userStories: List[PRDUserStory]
+    prd_path: str

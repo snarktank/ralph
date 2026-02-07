@@ -33,10 +33,20 @@ class ProjectManager:
                 try:
                     with open(metadata_file, 'r') as f:
                         data = json.load(f)
+                        # Add default values for new fields if missing (backward compatibility)
+                        if 'has_prd' not in data:
+                            data['has_prd'] = (project_dir / "prd.json").exists()
+                        if 'has_ralph_config' not in data:
+                            data['has_ralph_config'] = (project_dir / "CLAUDE.md").exists()
+                        if 'ralph_status' not in data:
+                            data['ralph_status'] = "not_started"
+
                         project = Project(**data)
                         # Update status to stopped if it was running
                         if project.status == "running":
                             project.status = "stopped"
+                        if project.ralph_status == "running":
+                            project.ralph_status = "stopped"
                         self.projects[project.id] = project
                 except Exception as e:
                     print(f"Error loading project {project_dir.name}: {e}")

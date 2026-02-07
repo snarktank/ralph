@@ -1,0 +1,15 @@
+{
+  "id": "dashboard-for-tracking",
+  "name": "dashboard-for-tracking",
+  "description": "Create a dashboard for tracking my daily habits",
+  "path": "../projects/dashboard-for-tracking",
+  "port": 3285,
+  "stack": "react-vite",
+  "status": "created",
+  "created_at": "2026-02-07 19:49:24.093807",
+  "url": "http://localhost:3285",
+  "prd_path": "../projects/dashboard-for-tracking/prd.json",
+  "has_prd": false,
+  "has_ralph_config": false,
+  "ralph_status": "not_started"
+}

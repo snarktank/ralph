@@ -93,4 +93,23 @@ export interface Project {
   created_at: string;
   url?: string;
   prd_path?: string;
+  has_prd: boolean;
+  has_ralph_config: boolean;
+  ralph_status: 'not_started' | 'running' | 'stopped' | 'completed';
+}
+
+export interface PRDGenerateRequest {
+  user_prompt: string;
+}
+
+export interface PRDUpdateRequest {
+  update_prompt: string;
+}
+
+export interface PRDResponse {
+  projectName: string;
+  branchName: string;
+  description: string;
+  userStories: UserStory[];
+  prd_path: string;
 }
