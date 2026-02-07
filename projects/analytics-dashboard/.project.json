@@ -1,0 +1,12 @@
+{
+  "id": "analytics-dashboard",
+  "name": "analytics-dashboard",
+  "description": "Data analytics dashboard",
+  "path": "../projects/analytics-dashboard",
+  "port": 5978,
+  "stack": "react-vite",
+  "status": "running",
+  "created_at": "2026-02-07 19:11:05.912099",
+  "url": "http://localhost:5978",
+  "prd_path": "../projects/analytics-dashboard/prd.json"
+}

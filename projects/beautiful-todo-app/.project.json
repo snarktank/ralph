@@ -1,0 +1,12 @@
+{
+  "id": "beautiful-todo-app",
+  "name": "Beautiful Todo App",
+  "description": "A gorgeous todo application with modern design",
+  "path": "../projects/beautiful-todo-app",
+  "port": 5366,
+  "stack": "react-vite",
+  "status": "created",
+  "created_at": "2026-02-07 19:22:25.440844",
+  "url": "http://localhost:5366",
+  "prd_path": "../projects/beautiful-todo-app/prd.json"
+}

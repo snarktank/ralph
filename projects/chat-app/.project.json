@@ -1,0 +1,12 @@
+{
+  "id": "chat-app",
+  "name": "chat-app",
+  "description": "Real-time chat application",
+  "path": "../projects/chat-app",
+  "port": 7257,
+  "stack": "react-vite",
+  "status": "running",
+  "created_at": "2026-02-07 19:10:54.828284",
+  "url": "http://localhost:7257",
+  "prd_path": "../projects/chat-app/prd.json"
+}

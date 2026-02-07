@@ -13,6 +13,57 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+.view-switcher {
+  display: flex;
+  gap: 0;
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 2px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.view-switcher a,
+.view-switcher button {
+  padding: 10px 24px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.view-switcher a:first-child,
+.view-switcher button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.view-switcher a:not(:first-child),
+.view-switcher button:not(:first-child) {
+  border-left: none;
+}
+
+.view-switcher a:last-child,
+.view-switcher button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.view-switcher a:hover,
+.view-switcher button:hover {
+  background: #f9fafb;
+}
+
+.view-switcher a.active,
+.view-switcher button.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
 .header {
   text-align: center;
   padding: 24px 20px 16px;
@@ -31,66 +82,7 @@
   color: #666;
 }
 
-.flow-container {
-  flex: 1;
-  width: 100%;
-}
-
-.controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  border-top: 1px solid #eee;
-}
-
-.controls button {
-  padding: 12px 28px;
-  font-size: 16px;
-  font-weight: 500;
-  border: 2px solid #222;
-  background: #fff;
-  color: #222;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.controls button:hover:not(:disabled) {
-  background: #222;
-  color: #fff;
-}
-
-.controls button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.controls .reset-btn {
-  border-color: #888;
-  color: #888;
-}
-
-.controls .reset-btn:hover:not(:disabled) {
-  background: #888;
-  color: #fff;
-}
-
-.step-counter {
-  font-size: 16px;
-  color: #666;
-  min-width: 120px;
-  text-align: center;
-}
-
-.instructions {
-  text-align: center;
-  padding: 12px;
-  font-size: 14px;
-  color: #999;
-}
-
+/* React Flow nodes */
 .node-content {
   display: flex;
   flex-direction: column;

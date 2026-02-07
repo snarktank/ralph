@@ -1,0 +1,12 @@
+{
+  "id": "test-app",
+  "name": "test-app",
+  "description": "A test application",
+  "path": "../projects/test-app",
+  "port": 3246,
+  "stack": "react-vite",
+  "status": "created",
+  "created_at": "2026-02-07 19:03:46.852198",
+  "url": "http://localhost:3246",
+  "prd_path": "../projects/test-app/prd.json"
+}

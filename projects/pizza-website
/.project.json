@@ -1,0 +1,12 @@
+{
+  "id": "pizza-website\n",
+  "name": "pizza-website\n",
+  "description": "I want a pizza website\n",
+  "path": "../projects/pizza-website\n",
+  "port": 7879,
+  "stack": "react-vite",
+  "status": "created",
+  "created_at": "2026-02-07 19:15:31.682201",
+  "url": "http://localhost:7879",
+  "prd_path": "../projects/pizza-website\n/prd.json"
+}

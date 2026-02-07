@@ -1,0 +1,110 @@
+.subagent-viewer {
+  display: flex;
+  height: 100%;
+  gap: 1rem;
+}
+
+.iteration-tabs {
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.tabs-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tabs-header h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.tabs-count {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.tabs-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.iteration-tab {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.iteration-tab:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.iteration-tab.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.tab-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.tab-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.story-id {
+  font-size: 0.75rem;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.message-count {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.no-iterations {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.conversation-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.loading-state,
+.no-selection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: #9ca3af;
+  font-size: 0.875rem;
+}

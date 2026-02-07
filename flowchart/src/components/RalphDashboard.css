@@ -1,0 +1,115 @@
+.ralph-dashboard {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f9fafb;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.dashboard-header {
+  padding: 24px 32px;
+  background: white;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.dashboard-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 6px 0;
+}
+
+.dashboard-header p {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.dashboard-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  overflow: hidden;
+}
+
+.left-column,
+.right-column {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: white;
+}
+
+.left-column {
+  border-right: 2px solid #e5e7eb;
+}
+
+/* Left Column Sections */
+.prd-section {
+  flex: 2;
+  overflow: hidden;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.progress-section {
+  flex: 1;
+  overflow: hidden;
+  min-height: 300px;
+}
+
+/* Right Column Sections */
+.control-section {
+  flex-shrink: 0;
+}
+
+.orchestrator-section {
+  flex: 1;
+  overflow: hidden;
+  border-bottom: 1px solid #e5e7eb;
+  min-height: 250px;
+}
+
+.subagent-section {
+  flex: 2;
+  overflow: hidden;
+  min-height: 350px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .left-column {
+    border-right: none;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .prd-section,
+  .progress-section {
+    min-height: 200px;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

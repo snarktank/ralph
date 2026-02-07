@@ -70,6 +70,33 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
+## UI Design Excellence
+
+When working on UI/frontend features, prioritize creating **beautiful, modern, production-ready interfaces**:
+
+### Design Principles
+- **Modern Aesthetics**: Use gradients, smooth shadows, rounded corners, contemporary color palettes
+- **Component Libraries**: Prefer Tailwind CSS, shadcn/ui, Radix UI, or Lucide icons for consistent, professional look
+- **Micro-interactions**: Add hover effects, smooth transitions, loading states, success animations
+- **Responsive Design**: Mobile-first approach, test on multiple screen sizes
+- **Accessibility**: Proper ARIA labels, keyboard navigation, color contrast
+
+### Visual Polish
+- Beautiful typography (varied font sizes, weights, proper hierarchy)
+- Engaging color schemes (gradients, themed colors, proper contrast)
+- Smooth animations (fade-in, slide-up, scale transforms)
+- Professional spacing and layout (generous padding, balanced whitespace)
+- Interactive elements (hover states, active states, focus rings)
+
+### Code Quality for UI
+- Clean, semantic HTML structure
+- Reusable component patterns
+- CSS-in-JS or utility-first CSS (Tailwind)
+- Organized component hierarchy
+- Type-safe props and state
+
+**Remember**: Users should be impressed by the visual quality. Every UI element should feel polished and professional.
+
 ## Quality Requirements
 
 - ALL commits must pass your project's quality checks (typecheck, lint, test)

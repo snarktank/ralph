@@ -6,8 +6,23 @@ progress.txt
 # Archive is optional to commit
 # archive/
 
+# Backend
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/.env
+backend/.venv
+backend/venv/
+backend/*.log
+
+# Frontend
+flowchart/node_modules/
+flowchart/dist/
+flowchart/.env
+flowchart/.env.local
+
 # OS files
 .DS_Store
 
-#Claude
+# Claude
 .claude/
