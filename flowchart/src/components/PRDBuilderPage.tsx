@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { PRDResponse, UserStory } from '../types';
 import './PRDBuilderPage.css';
 
 interface ChatMessage {
@@ -17,7 +16,9 @@ export function PRDBuilderPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [prd, setPrd] = useState<PRDResponse | null>(null);
+  const [prdText, setPrdText] = useState('');
+  const [ralphJson, setRalphJson] = useState('');
+  const [showRalphJson, setShowRalphJson] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function PRDBuilderPage() {
     // Add welcome message
     setMessages([{
       role: 'assistant',
-      content: "Hi! I'm here to help you create a Product Requirements Document for your project. Tell me about what you want to build, and I'll help structure it into user stories with clear acceptance criteria.\n\nYou can describe features, functionality, or requirements, and I'll organize them into a PRD. Feel free to be as detailed or high-level as you like!",
+      content: "Hi! I'm here to help you create a Product Requirements Document. Tell me about what you want to build, and I'll help you draft a PRD.\n\nYou can also edit the PRD directly in the editor on the right. When you're ready, click 'Create Ralph Config' to generate the configuration for autonomous development.",
       timestamp: new Date().toISOString()
     }]);
   }, [projectId]);
@@ -45,7 +46,16 @@ export function PRDBuilderPage() {
         const prdResponse = await fetch(`http://localhost:8000/api/projects/${projectId}/prd`);
         if (prdResponse.ok) {
           const existingPrd = await prdResponse.json();
-          setPrd(existingPrd);
+          setPrdText(JSON.stringify(existingPrd, null, 2));
+        } else {
+          // Set initial empty PRD template
+          const template = {
+            projectName: project.name,
+            branchName: `feature/${project.name.toLowerCase().replace(/\s+/g, '-')}`,
+            description: project.description,
+            userStories: []
+          };
+          setPrdText(JSON.stringify(template, null, 2));
         }
       }
     } catch (error) {
@@ -71,8 +81,12 @@ export function PRDBuilderPage() {
     setLoading(true);
 
     try {
-      // If we don't have a PRD yet, generate one
-      if (!prd) {
+      // Check if PRD is empty or just template
+      const currentPrd = JSON.parse(prdText);
+      const isEmpty = !currentPrd.userStories || currentPrd.userStories.length === 0;
+
+      if (isEmpty) {
+        // Generate initial PRD
         const response = await fetch(`http://localhost:8000/api/projects/${projectId}/prd/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -81,11 +95,11 @@ export function PRDBuilderPage() {
 
         if (response.ok) {
           const newPrd = await response.json();
-          setPrd(newPrd);
+          setPrdText(JSON.stringify(newPrd, null, 2));
 
           const assistantMessage: ChatMessage = {
             role: 'assistant',
-            content: `Great! I've created a PRD with ${newPrd.userStories.length} user stories based on your description. You can see the document on the right.\n\nFeel free to:\n- Edit the document directly\n- Ask me to add, modify, or remove features\n- Refine the acceptance criteria\n\nWhen you're ready, click "Create Ralph Config" to set up autonomous development!`,
+            content: `Great! I've created a PRD with ${newPrd.userStories.length} user stories. You can see it in the editor on the right.\n\nFeel free to:\n- Edit the PRD directly in the editor\n- Ask me to add or modify features\n- Click "Create Ralph Config" when you're ready`,
             timestamp: new Date().toISOString()
           };
           setMessages(prev => [...prev, assistantMessage]);
@@ -100,11 +114,11 @@ export function PRDBuilderPage() {
 
         if (response.ok) {
           const updatedPrd = await response.json();
-          setPrd(updatedPrd);
+          setPrdText(JSON.stringify(updatedPrd, null, 2));
 
           const assistantMessage: ChatMessage = {
             role: 'assistant',
-            content: "I've updated the PRD based on your request. Check out the changes on the right!",
+            content: "I've updated the PRD based on your request. Check out the changes in the editor!",
             timestamp: new Date().toISOString()
           };
           setMessages(prev => [...prev, assistantMessage]);
@@ -114,7 +128,7 @@ export function PRDBuilderPage() {
       console.error('Error:', error);
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: "Sorry, I encountered an error. Please try again.",
+        content: "Sorry, I encountered an error. Please try again or edit the PRD directly in the editor.",
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -130,49 +144,44 @@ export function PRDBuilderPage() {
     }
   };
 
-  const handleUpdatePrdField = (field: string, value: any) => {
-    if (!prd) return;
-    setPrd({ ...prd, [field]: value });
-  };
-
-  const handleUpdateUserStory = (index: number, field: keyof UserStory, value: any) => {
-    if (!prd) return;
-    const updatedStories = [...prd.userStories];
-    updatedStories[index] = { ...updatedStories[index], [field]: value };
-    setPrd({ ...prd, userStories: updatedStories });
-  };
-
   const handleSavePrd = async () => {
-    if (!prd) return;
-
     try {
+      const prdData = JSON.parse(prdText);
       await fetch(`http://localhost:8000/api/projects/${projectId}/prd`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(prd)
+        body: JSON.stringify(prdData)
       });
     } catch (error) {
       console.error('Error saving PRD:', error);
+      alert('Error saving PRD. Please check the JSON format.');
     }
   };
 
   const handleCreateRalphConfig = async () => {
-    if (!prd) return;
-
-    // Save PRD first
-    await handleSavePrd();
-
     try {
-      const response = await fetch(`http://localhost:8000/api/projects/${projectId}/ralph-config`, {
+      // First save the current PRD
+      await handleSavePrd();
+
+      // Ralph.json is just a copy of the PRD
+      setRalphJson(prdText);
+      setShowRalphJson(true);
+
+      // Also save it to the file system
+      const prdData = JSON.parse(prdText);
+      await fetch(`http://localhost:8000/api/projects/${projectId}/ralph-config`, {
         method: 'POST'
       });
 
-      if (response.ok) {
-        // Navigate back to dashboard
-        navigate('/');
-      }
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: "✅ Ralph configuration created! I've generated ralph.json from your PRD. You can see it below. When you're ready, you can go back to the dashboard to start Ralph's autonomous development loop.",
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error creating Ralph config:', error);
+      alert('Error creating Ralph config. Please check the PRD format.');
     }
   };
 
@@ -182,7 +191,7 @@ export function PRDBuilderPage() {
       <div className="prd-builder-header">
         <div className="header-content">
           <button className="back-button" onClick={() => navigate('/')}>
-            ← Back to Projects
+            ← Back to Dashboard
           </button>
           <h1>{projectName}</h1>
           <div className="header-subtitle">PRD Builder</div>
@@ -223,7 +232,7 @@ export function PRDBuilderPage() {
           <div className="chat-input-container">
             <textarea
               className="chat-input"
-              placeholder={prd ? "Ask me to modify the PRD..." : "Describe what you want to build..."}
+              placeholder="Describe what you want to add to the PRD..."
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
@@ -239,128 +248,80 @@ export function PRDBuilderPage() {
           </div>
         </div>
 
-        {/* Right Panel - PRD Editor */}
+        {/* Right Panel - Text Editor */}
         <div className="prd-panel">
           <div className="prd-header">
             <div className="prd-title">
               <span className="prd-icon">📄</span>
-              <span>Product Requirements Document</span>
+              <span>PRD Document (JSON)</span>
             </div>
-            {prd && (
-              <button className="save-prd-button" onClick={handleSavePrd}>
-                💾 Save
-              </button>
-            )}
+            <button className="save-prd-button" onClick={handleSavePrd}>
+              💾 Save
+            </button>
           </div>
 
-          <div className="prd-content">
-            {!prd ? (
-              <div className="prd-empty">
-                <div className="empty-icon">📝</div>
-                <h3>No PRD Yet</h3>
-                <p>Start chatting with the AI assistant to generate your PRD</p>
-              </div>
-            ) : (
-              <div className="prd-document">
-                <div className="prd-field">
-                  <label>Project Name</label>
-                  <input
-                    type="text"
-                    value={prd.projectName}
-                    onChange={(e) => handleUpdatePrdField('projectName', e.target.value)}
-                    onBlur={handleSavePrd}
-                  />
-                </div>
-
-                <div className="prd-field">
-                  <label>Branch Name</label>
-                  <input
-                    type="text"
-                    value={prd.branchName}
-                    onChange={(e) => handleUpdatePrdField('branchName', e.target.value)}
-                    onBlur={handleSavePrd}
-                  />
-                </div>
-
-                <div className="prd-field">
-                  <label>Description</label>
-                  <textarea
-                    value={prd.description}
-                    onChange={(e) => handleUpdatePrdField('description', e.target.value)}
-                    onBlur={handleSavePrd}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="user-stories-section">
-                  <h3>User Stories ({prd.userStories.length})</h3>
-
-                  {prd.userStories.map((story, index) => (
-                    <div key={story.id} className="story-card">
-                      <div className="story-header-row">
-                        <input
-                          type="text"
-                          className="story-id-input"
-                          value={story.id}
-                          onChange={(e) => handleUpdateUserStory(index, 'id', e.target.value)}
-                          onBlur={handleSavePrd}
-                        />
-                        <span className="story-priority">Priority: {story.priority}</span>
-                      </div>
-
-                      <input
-                        type="text"
-                        className="story-title-input"
-                        value={story.title}
-                        onChange={(e) => handleUpdateUserStory(index, 'title', e.target.value)}
-                        onBlur={handleSavePrd}
-                        placeholder="Story title"
-                      />
-
-                      <textarea
-                        className="story-desc-input"
-                        value={story.description}
-                        onChange={(e) => handleUpdateUserStory(index, 'description', e.target.value)}
-                        onBlur={handleSavePrd}
-                        placeholder="Story description"
-                        rows={2}
-                      />
-
-                      <div className="acceptance-criteria-list">
-                        <label>Acceptance Criteria:</label>
-                        {story.acceptanceCriteria.map((criteria, cIndex) => (
-                          <div key={cIndex} className="criteria-item">
-                            <span className="criteria-bullet">•</span>
-                            <span>{criteria}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="prd-editor-container">
+            <textarea
+              className="prd-text-editor"
+              value={prdText}
+              onChange={(e) => setPrdText(e.target.value)}
+              onBlur={handleSavePrd}
+              spellCheck={false}
+              placeholder="Your PRD will appear here..."
+            />
           </div>
+
+          {/* Ralph JSON Display */}
+          {showRalphJson && (
+            <div className="ralph-json-container">
+              <div className="ralph-json-header">
+                <span className="ralph-icon">🤖</span>
+                <span>Ralph Configuration (ralph.json)</span>
+              </div>
+              <textarea
+                className="ralph-json-editor"
+                value={ralphJson}
+                readOnly
+                spellCheck={false}
+              />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Footer Action Bar */}
-      {prd && (
-        <div className="prd-builder-footer">
-          <div className="footer-content">
-            <div className="footer-info">
-              <span className="check-icon">✓</span>
-              <span>PRD ready with {prd.userStories.length} user stories</span>
-            </div>
+      <div className="prd-builder-footer">
+        <div className="footer-content">
+          <div className="footer-info">
+            {!showRalphJson ? (
+              <>
+                <span className="info-icon">📝</span>
+                <span>Edit your PRD above, then create Ralph config when ready</span>
+              </>
+            ) : (
+              <>
+                <span className="check-icon">✓</span>
+                <span>Ralph config created! You can now start autonomous development</span>
+              </>
+            )}
+          </div>
+          {!showRalphJson ? (
             <button
               className="create-ralph-button"
               onClick={handleCreateRalphConfig}
             >
-              🚀 Create Ralph Config & Continue
+              🚀 Create Ralph Config
             </button>
-          </div>
+          ) : (
+            <button
+              className="dashboard-button"
+              onClick={() => navigate('/')}
+            >
+              ← Back to Dashboard
+            </button>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -269,35 +269,75 @@
   background: rgba(16, 185, 129, 0.3);
 }
 
-.prd-content {
+.prd-editor-container {
   flex: 1;
-  overflow-y: auto;
-  padding: 2rem;
-}
-
-.prd-empty {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.prd-text-editor {
+  flex: 1;
+  width: 100%;
+  background: #0d0d12;
+  border: none;
+  color: #e2e8f0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 1.5rem;
+  resize: none;
+  overflow-y: auto;
+}
+
+.prd-text-editor:focus {
+  outline: none;
+}
+
+.prd-text-editor::placeholder {
+  color: #4a5568;
+}
+
+/* Ralph JSON Display */
+.ralph-json-container {
+  border-top: 2px solid #7c3aed;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%);
+  max-height: 40%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ralph-json-header {
+  padding: 1rem 1.5rem;
+  background: rgba(124, 58, 237, 0.2);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.3);
+  display: flex;
   align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #666;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #a78bfa;
 }
 
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  opacity: 0.5;
+.ralph-icon {
+  font-size: 1.25rem;
 }
 
-.prd-empty h3 {
-  margin: 0 0 0.5rem;
-  color: #999;
+.ralph-json-editor {
+  flex: 1;
+  width: 100%;
+  background: #0a0a0f;
+  border: none;
+  color: #34d399;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 1.5rem;
+  resize: none;
+  overflow-y: auto;
 }
 
-.prd-empty p {
-  margin: 0;
-  font-size: 0.875rem;
+.ralph-json-editor:focus {
+  outline: none;
 }
 
 .prd-document {

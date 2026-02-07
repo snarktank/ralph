@@ -25,6 +25,8 @@ class Project(BaseModel):
     has_prd: bool = False
     has_ralph_config: bool = False
     ralph_status: str = "not_started"  # "not_started", "running", "stopped", "completed"
+    ralph_events_path: Optional[str] = None  # Path to ralph_events.jsonl file
+    ralph_last_event_time: Optional[datetime] = None  # Timestamp of last event
 
 
 class ProjectList(BaseModel):

@@ -7,6 +7,7 @@ from datetime import datetime
 import subprocess
 import re
 from .websocket_manager import manager as ws_manager
+from .ralph_event_logger import ralph_event_logger
 
 
 class RalphRunner:
@@ -15,12 +16,14 @@ class RalphRunner:
     def __init__(self):
         self.running_processes: Dict[str, asyncio.Task] = {}
         self.project_conversations: Dict[str, dict] = {}
+        self.current_story_ids: Dict[str, Optional[str]] = {}  # Track current story per project
 
     async def start_ralph_loop(
         self,
         project_id: str,
         project_path: str,
-        on_message: Optional[Callable] = None
+        on_message: Optional[Callable] = None,
+        project_obj = None  # Optional project object to update
     ) -> bool:
         """
         Start Ralph autonomous loop for a project
@@ -36,6 +39,21 @@ class RalphRunner:
         if project_id in self.running_processes:
             return False
 
+        # Initialize event logger for this project
+        events_file = ralph_event_logger.initialize_project(project_id, project_path)
+
+        # Update project with events path if provided
+        if project_obj:
+            project_obj.ralph_events_path = str(events_file)
+            project_obj.ralph_last_event_time = datetime.now()
+
+        # Log system start event
+        ralph_event_logger.log_system(
+            project_id,
+            "Ralph autonomous agent started",
+            data={"project_path": project_path, "events_file": str(events_file)}
+        )
+
         # Initialize conversation storage
         self.project_conversations[project_id] = {
             "orchestrator": [],
@@ -43,6 +61,9 @@ class RalphRunner:
             "status": "running",
             "started_at": datetime.now().isoformat()
         }
+
+        # Initialize current story tracker
+        self.current_story_ids[project_id] = None
 
         # Create async task to run Ralph
         task = asyncio.create_task(
@@ -69,6 +90,13 @@ class RalphRunner:
 
         if project_id in self.project_conversations:
             self.project_conversations[project_id]["status"] = "stopped"
+
+        # Log stop event
+        ralph_event_logger.log_system(project_id, "Ralph autonomous agent stopped by user")
+
+        # Clean up current story tracker
+        if project_id in self.current_story_ids:
+            del self.current_story_ids[project_id]
 
         return True
 
@@ -145,6 +173,11 @@ class RalphRunner:
                     on_message
                 )
                 self.project_conversations[project_id]["status"] = "completed"
+                ralph_event_logger.log_system(
+                    project_id,
+                    "Ralph loop completed successfully",
+                    data={"exit_code": 0}
+                )
             else:
                 await self._send_message(
                     project_id,
@@ -153,6 +186,11 @@ class RalphRunner:
                     on_message
                 )
                 self.project_conversations[project_id]["status"] = "error"
+                ralph_event_logger.log_error(
+                    project_id,
+                    f"Ralph loop exited with code {process.returncode}",
+                    error_details=f"Process exit code: {process.returncode}"
+                )
 
         except asyncio.CancelledError:
             await self._send_message(
@@ -193,6 +231,17 @@ class RalphRunner:
                         "parsed": message
                     })
 
+                    # Log events based on output
+                    current_story = self.current_story_ids.get(project_id)
+                    ralph_event_logger.parse_claude_output_for_events(
+                        project_id,
+                        text,
+                        current_story_id=current_story
+                    )
+
+                    # Check for story ID updates
+                    self._update_current_story(project_id, text)
+
                     # Prepare message data
                     msg_data = {
                         "type": "message",
@@ -214,6 +263,16 @@ class RalphRunner:
                     )
         except Exception as e:
             print(f"Error streaming output: {e}")
+
+    def _update_current_story(self, project_id: str, text: str):
+        """Update the current story ID being worked on"""
+        # Look for story ID patterns like US-001, Story #1, etc.
+        story_pattern = r"(US-\d+|Story\s+#?(\d+))"
+        match = re.search(story_pattern, text, re.IGNORECASE)
+        if match:
+            story_id = match.group(1)
+            if self.current_story_ids.get(project_id) != story_id:
+                self.current_story_ids[project_id] = story_id
 
     def _parse_claude_output(self, text: str) -> Optional[dict]:
         """

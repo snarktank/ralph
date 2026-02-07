@@ -6,6 +6,7 @@ from ..services.project_generator import project_generator
 from ..services.project_manager import project_manager
 from ..services.ralph_runner import ralph_runner
 from ..services.prd_generator import prd_generator
+from ..services.ralph_event_logger import ralph_event_logger
 import json
 import os
 from pathlib import Path
@@ -119,7 +120,8 @@ async def start_ralph_loop(project_id: str):
     # Start Ralph loop (will send updates via WebSocket)
     success = await ralph_runner.start_ralph_loop(
         project_id=project_id,
-        project_path=project.path
+        project_path=project.path,
+        project_obj=project
     )
 
     if not success:
