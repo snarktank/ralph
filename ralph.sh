@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude|codex] [max_iterations]
 
 set -e
 
@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate tool choice
-if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
+if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "codex" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'codex'."
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -81,6 +81,22 @@ fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
 
+check_prd_completion() {
+  local remaining_stories
+
+  if [ ! -f "$PRD_FILE" ]; then
+    echo "Warning: Missing PRD file at $PRD_FILE. Treating as incomplete."
+    return 1
+  fi
+
+  if ! remaining_stories="$(jq '.userStories[] | select(.passes == false) | {id, title, passes}' "$PRD_FILE" 2>/dev/null)"; then
+    echo "Warning: Unable to parse $PRD_FILE for completion check. Treating as incomplete."
+    return 1
+  fi
+
+  [ -z "$remaining_stories" ]
+}
+
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
@@ -90,13 +106,17 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  else
+  elif [[ "$TOOL" == "claude" ]]; then
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+  else
+    # Codex: run non-interactively with sandbox/approval bypass for autonomous operation.
+    PROMPT_CONTENT="$(cat "$SCRIPT_DIR/prompt.md")"
+    OUTPUT=$(codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT_CONTENT" 2>&1 | tee /dev/stderr) || true
   fi
   
-  # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+  # Check completion based on PRD stories.
+  if check_prd_completion; then
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
