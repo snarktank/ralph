@@ -135,6 +135,14 @@ Default is 10 iterations. Use `--tool amp`, `--tool claude`, `--tool codex`, or 
 
 Ralph ships with sane defaults but different environments may require different CLI flags. You can override per-tool commands:
 
+```bash
+RALPH_AMP_CMD="amp --dangerously-allow-all" \
+RALPH_CLAUDE_CMD="claude --dangerously-skip-permissions --print" \
+RALPH_CODEX_CMD="codex exec --full-auto" \
+RALPH_COPILOT_CMD="gh copilot agent run" \
+./scripts/ralph/ralph.sh --tool codex
+```
+
 ### Security hardening for runner commands
 
 Ralph validates runner command overrides to reduce command-injection risk:
@@ -142,6 +150,7 @@ Ralph validates runner command overrides to reduce command-injection risk:
 - Commands are executed **without `eval`**
 - Override strings reject shell metacharacters (e.g. `;`, `|`, `&&`, `$()`)
 - Each runner must start with the expected binary (`amp`, `claude`, `codex`, or `gh`)
+- Overrides are split on whitespace into argv (quoted shell expressions are not supported)
 - Completion is only accepted when a successful run emits an exact `<promise>COMPLETE</promise>` line
 
 Use plain argument strings for overrides, for example:
@@ -149,14 +158,6 @@ Use plain argument strings for overrides, for example:
 ```bash
 RALPH_CODEX_CMD="codex exec --full-auto"
 RALPH_COPILOT_CMD="gh copilot agent run"
-```
-
-```bash
-RALPH_AMP_CMD="amp --dangerously-allow-all" \
-RALPH_CLAUDE_CMD="claude --dangerously-skip-permissions --print" \
-RALPH_CODEX_CMD="codex exec --full-auto" \
-RALPH_COPILOT_CMD="gh copilot agent run" \
-./scripts/ralph/ralph.sh --tool codex
 ```
 
 Ralph will:

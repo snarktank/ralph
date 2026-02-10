@@ -62,10 +62,17 @@ run_with_prompt() {
     return 1
   fi
 
+  if [[ -z "${command_string//[[:space:]]/}" ]]; then
+    echo "Error: Empty command provided for $expected_binary"
+    return 1
+  fi
+
   validate_command_string "$command_string" || return 1
 
-  # shellcheck disable=SC2206
-  command_parts=($command_string)
+  # Split on shell-style whitespace without eval and without pathname expansion.
+  set -f
+  read -r -a command_parts <<< "$command_string"
+  set +f
 
   if [[ ${#command_parts[@]} -eq 0 ]]; then
     echo "Error: Empty command provided for $expected_binary"
