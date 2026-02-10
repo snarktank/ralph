@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude|codex|copilot] [max_iterations]
 
 set -e
 
@@ -29,10 +29,22 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate tool choice
-if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
+if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "codex" && "$TOOL" != "copilot" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', 'codex', or 'copilot'."
   exit 1
 fi
+
+run_with_prompt() {
+  local prompt_file="$1"
+  local command="$2"
+
+  if [[ ! -f "$prompt_file" ]]; then
+    echo "Error: Prompt file not found: $prompt_file"
+    return 1
+  fi
+
+  cat "$prompt_file" | eval "$command"
+}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
@@ -87,12 +99,22 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-  # Run the selected tool with the ralph prompt
+  # Run the selected tool with the corresponding Ralph prompt.
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
+    AMP_CMD="${RALPH_AMP_CMD:-amp --dangerously-allow-all}"
+    OUTPUT=$(run_with_prompt "$SCRIPT_DIR/prompt.md" "$AMP_CMD" 2>&1 | tee /dev/stderr) || true
+  elif [[ "$TOOL" == "claude" ]]; then
+    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output.
+    CLAUDE_CMD="${RALPH_CLAUDE_CMD:-claude --dangerously-skip-permissions --print}"
+    OUTPUT=$(run_with_prompt "$SCRIPT_DIR/CLAUDE.md" "$CLAUDE_CMD" 2>&1 | tee /dev/stderr) || true
+  elif [[ "$TOOL" == "codex" ]]; then
+    # Override with RALPH_CODEX_CMD if your local Codex command differs.
+    CODEX_CMD="${RALPH_CODEX_CMD:-codex exec --full-auto}"
+    OUTPUT=$(run_with_prompt "$SCRIPT_DIR/CODEX.md" "$CODEX_CMD" 2>&1 | tee /dev/stderr) || true
   else
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    # GitHub Copilot runner command is environment-specific; override with RALPH_COPILOT_CMD as needed.
+    COPILOT_CMD="${RALPH_COPILOT_CMD:-gh copilot agent run}"
+    OUTPUT=$(run_with_prompt "$SCRIPT_DIR/COPILOT.md" "$COPILOT_CMD" 2>&1 | tee /dev/stderr) || true
   fi
   
   # Check for completion signal
