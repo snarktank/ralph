@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), Codex CLI, or GitHub Copilot) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -13,6 +13,8 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [Codex CLI](https://developers.openai.com/codex)
+  - GitHub Copilot CLI/Agent command (configured via `RALPH_COPILOT_CMD`)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -31,6 +33,10 @@ cp /path/to/ralph/ralph.sh scripts/ralph/
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+# OR
+cp /path/to/ralph/CODEX.md scripts/ralph/CODEX.md      # For Codex
+# OR
+cp /path/to/ralph/COPILOT.md scripts/ralph/COPILOT.md  # For GitHub Copilot
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -115,9 +121,43 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Using Codex CLI
+./scripts/ralph/ralph.sh --tool codex [max_iterations]
+
+# Using GitHub Copilot (configure command first)
+RALPH_COPILOT_CMD="gh copilot agent run" ./scripts/ralph/ralph.sh --tool copilot [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp`, `--tool claude`, `--tool codex`, or `--tool copilot` to select your AI coding tool.
+
+### Tool command overrides
+
+Ralph ships with sane defaults but different environments may require different CLI flags. You can override per-tool commands:
+
+### Security hardening for runner commands
+
+Ralph validates runner command overrides to reduce command-injection risk:
+
+- Commands are executed **without `eval`**
+- Override strings reject shell metacharacters (e.g. `;`, `|`, `&&`, `$()`)
+- Each runner must start with the expected binary (`amp`, `claude`, `codex`, or `gh`)
+- Completion is only accepted when a successful run emits an exact `<promise>COMPLETE</promise>` line
+
+Use plain argument strings for overrides, for example:
+
+```bash
+RALPH_CODEX_CMD="codex exec --full-auto"
+RALPH_COPILOT_CMD="gh copilot agent run"
+```
+
+```bash
+RALPH_AMP_CMD="amp --dangerously-allow-all" \
+RALPH_CLAUDE_CMD="claude --dangerously-skip-permissions --print" \
+RALPH_CODEX_CMD="codex exec --full-auto" \
+RALPH_COPILOT_CMD="gh copilot agent run" \
+./scripts/ralph/ralph.sh --tool codex
+```
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -133,9 +173,11 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, `--tool codex`, `--tool copilot`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
+| `CODEX.md` | Prompt template for Codex |
+| `COPILOT.md` | Prompt template for GitHub Copilot |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -162,7 +204,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (Amp, Claude Code, Codex, or Copilot) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -237,3 +279,5 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [Codex documentation](https://developers.openai.com/codex)
+- [GitHub Copilot documentation](https://docs.github.com/en/copilot)
