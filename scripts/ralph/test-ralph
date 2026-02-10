@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+echo "Checking dependencies..."
+
+MISSING=0
+
+if ! command -v jq &> /dev/null; then
+    echo "ERROR: 'jq' is not installed or not in PATH."
+    MISSING=1
+else
+    echo "OK: 'jq' found."
+fi
+
+if ! command -v claude &> /dev/null; then
+    echo "ERROR: 'claude' CLI is not installed or not in PATH."
+    MISSING=1
+else
+    echo "OK: 'claude' found."
+fi
+
+if [ $MISSING -eq 1 ]; then
+    echo "Please install missing dependencies and try again."
+    exit 1
+fi
+
+echo "Dependencies verified. Running Ralph..."
+cd ~/ralph-tools && ./ralph.sh --tool claude
