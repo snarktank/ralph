@@ -1,13 +1,21 @@
 # Ralph working files (generated during runs)
-prd.json
-progress.txt
-.last-branch
+scripts/ralph/prd.json
+scripts/ralph/progress.md
+scripts/ralph/state.json
+scripts/ralph/.last-branch
 
 # Archive is optional to commit
-# archive/
+# scripts/ralph/archive/
 
 # OS files
 .DS_Store
 
-#Claude
-.claude/
+# Claude Code - only exclude local settings (shared settings.json with hooks is tracked)
+.claude/settings.local.json
+
+# Build artifacts
+node_modules/
+dist/
+build/
+.next/
+out/

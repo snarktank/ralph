@@ -1,0 +1,53 @@
+{
+  "project": "MyProject",
+  "branchName": "ralph/user-preferences",
+  "description": "User Preferences - Add configurable user preferences with persistence",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add preferences table to database",
+      "description": "As a developer, I need a preferences table so that user settings persist across sessions.",
+      "acceptanceCriteria": [
+        "Preferences table created with user_id foreign key",
+        "Default row seeded on user creation via trigger",
+        "Migration runs without errors",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Build preferences UI panel",
+      "description": "As a user, I want a settings panel so that I can configure my preferences visually.",
+      "acceptanceCriteria": [
+        "Settings panel accessible from user menu",
+        "All preference fields rendered with correct input types",
+        "Save button persists changes to backend",
+        "Verify in browser: panel renders, fields are interactive, save works"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Audit configuration files for consistency",
+      "description": "As a developer, I want all configuration files audited so that they follow project conventions.",
+      "acceptanceCriteria": [
+        "Each configuration file checked against project conventions",
+        "Non-compliant files updated to match conventions",
+        "All changes documented in progress notes",
+        "Lint passes after each iteration"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "iterationMode": "fixed",
+      "maxIterations": 3,
+      "currentIteration": 0,
+      "validationCommand": "npm run lint"
+    }
+  ]
+}

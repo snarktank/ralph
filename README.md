@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each session is a fresh instance with clean context. Memory persists via git history, `state.json`, `progress.md`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -25,12 +25,17 @@ Copy the ralph files into your project:
 ```bash
 # From your project root
 mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/scripts/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/scripts/ralph/BOOTSTRAP.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/COMPACTION.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/PROGRESS-GUIDE.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/ITERATIVE.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/prd.json.example scripts/ralph/
 
 # Copy the prompt template for your AI tool of choice:
-cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
+cp /path/to/ralph/scripts/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
-cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+cp /path/to/ralph/scripts/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -41,13 +46,11 @@ Copy the skills to your Amp or Claude config for use across all projects:
 
 For AMP
 ```bash
-cp -r skills/prd ~/.config/amp/skills/
 cp -r skills/ralph ~/.config/amp/skills/
 ```
 
 For Claude Code (manual)
 ```bash
-cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
 ```
 
@@ -66,12 +69,10 @@ Then install the skills:
 ```
 
 Available skills after installation:
-- `/prd` - Generate Product Requirements Documents
-- `/ralph` - Convert PRDs to prd.json format
+- `/ralph` - Generate PRD markdown + Ralph-compatible `prd.json` in one step
 
 Skills are automatically invoked when you ask Claude to:
-- "create a prd", "write prd for", "plan this feature"
-- "convert this prd", "turn into ralph format", "create prd.json"
+- "create a prd", "write prd for", "plan this feature", "spec out"
 
 ### Configure Amp auto-handoff (recommended)
 
@@ -85,62 +86,91 @@ Add to `~/.config/amp/settings.json`:
 
 This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
 
+## Terminology
+
+| Term | Definition |
+|------|------------|
+| **Session** | One top-level loop cycle in `ralph.sh`. Each session is a fresh context window with no memory of prior sessions except what is persisted in the memory layers below. |
+| **Iteration** | Repeating the SAME user story across multiple sessions (ITERATIVE feature). One iteration = one session = one context window. Used for batch/multi-pass work with a predetermined count. |
+
 ## Workflow
 
 ### 1. Create a PRD
 
-Use the PRD skill to generate a detailed requirements document:
+Use the `/ralph` skill to generate both artifacts in one step:
 
 ```
-Load the prd skill and create a PRD for [your feature description]
+Load the ralph skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+Answer the clarifying questions. The skill produces two outputs:
+- `tasks/prd-[feature-name].md` — human-readable requirements document
+- `scripts/ralph/prd.json` — machine-readable story list for Ralph
 
-### 2. Convert PRD to Ralph format
-
-Use the Ralph skill to convert the markdown PRD to JSON:
-
-```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
-```
-
-This creates `prd.json` with user stories structured for autonomous execution.
-
-### 3. Run Ralph
+### 2. Run Ralph
 
 ```bash
 # Using Amp (default)
-./scripts/ralph/ralph.sh [max_iterations]
+./scripts/ralph/ralph.sh [max_sessions]
 
 # Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
+./scripts/ralph/ralph.sh --tool claude [max_sessions]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 sessions. Use `--tool amp` or `--tool claude` to select your AI coding tool.
 
 Ralph will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
+1. Read `state.json` for current story, branch, and next action
+2. Create/checkout the feature branch (from `state.json`)
+3. Pick the current story (from `state.json`, NOT by scanning prd.json)
+4. Implement that single story (or one iteration of an iterative story)
+5. Run quality checks (typecheck, tests)
+6. Commit if checks pass
+7. Append learnings to `progress.md`
+8. Update `prd.json` to mark story as `passes: true`
+9. Update `state.json` with next story
+10. Repeat until all stories pass or max sessions reached
+
+## Standard vs Iterative Stories
+
+| Mode | When to Use | Behavior |
+|------|-------------|----------|
+| **Standard** | Most stories -- single-pass work that fits in one session | Story is implemented and marked `passes: true` in one session |
+| **Iterative** | Batch/multi-pass work with a predetermined count | Story has `iterationMode` + `maxIterations` in `prd.json`; one iteration per session; `passes: true` only when `currentIteration >= maxIterations` |
+
+Iterative mode is for work that is inherently batched (e.g., audit N sections, process N files), **NOT** for stories that are too large. Stories that are too large should be split into smaller stories.
+
+When a story has `iterationMode`, the agent loads `scripts/ralph/ITERATIVE.md` as a delta-only supplement to `scripts/ralph/CLAUDE.md`. See `scripts/ralph/ITERATIVE.md` for the full rules.
+
+## Memory Model
+
+Ralph persists knowledge across sessions via four layers:
+
+| Layer | File | Purpose | Lifespan |
+|-------|------|---------|----------|
+| **Operational** | `state.json` | Current story, next action, branch, compaction status | Per-session (updated every session) |
+| **Structural** | `prd.json` | Story status, iteration counters, notes | Per-PRD |
+| **Experiential** | `progress.md` | Session logs, codebase patterns, learnings | Per-PRD, append-only (auto-compacted) |
+| **Institutional** | `scripts/ralph/CLAUDE.md` | Reusable conventions, gotchas, cross-file dependencies | Permanent — survives across PRDs |
+
+See the "Institutional Memory" section in `scripts/ralph/CLAUDE.md` for details on what goes where.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
-| `prompt.md` | Prompt template for Amp |
-| `CLAUDE.md` | Prompt template for Claude Code |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
-| `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+| `scripts/ralph/ralph.sh` | The bash loop that spawns fresh AI sessions (supports `--tool amp` or `--tool claude`) |
+| `scripts/ralph/prompt.md` | Prompt template for Amp |
+| `scripts/ralph/CLAUDE.md` | Core agent instructions for Claude Code (includes institutional memory) |
+| `scripts/ralph/BOOTSTRAP.md` | State bootstrap for first session (loaded conditionally) |
+| `scripts/ralph/COMPACTION.md` | Progress compaction rules (loaded conditionally) |
+| `scripts/ralph/PROGRESS-GUIDE.md` | Progress report format and learnings guide (reference) |
+| `scripts/ralph/ITERATIVE.md` | Supplemental rules for iterative stories (loaded conditionally) |
+| `scripts/ralph/prd.json` | User stories with `passes` status (the task list) |
+| `scripts/ralph/prd.json.example` | Example PRD format for reference |
+| `scripts/ralph/progress.md` | Append-only learnings for future sessions |
+| `scripts/ralph/state.json` | Session orientation file — tells the agent which story, branch, and action to take |
+| `skills/ralph/` | Skill for generating PRD markdown + `prd.json` (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
@@ -160,11 +190,12 @@ npm run dev
 
 ## Critical Concepts
 
-### Each Iteration = Fresh Context
+### Each Session = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
-- Git history (commits from previous iterations)
-- `progress.txt` (learnings and context)
+Each session spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between sessions is:
+- Git history (commits from previous sessions)
+- `state.json` (current story orientation and next action)
+- `progress.md` (learnings and context)
 - `prd.json` (which stories are done)
 
 ### Small Tasks
@@ -182,11 +213,11 @@ Too big (split these):
 - "Add authentication"
 - "Refactor the API"
 
-### AGENTS.md Updates Are Critical
+### Institutional Memory
 
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
+After each session, Ralph updates the institutional memory section in `scripts/ralph/CLAUDE.md` with reusable patterns and gotchas. This is key because AI coding tools automatically read these files, so future sessions (and future human developers) benefit from discovered conventions and gotchas.
 
-Examples of what to add to AGENTS.md:
+Examples of what to persist:
 - Patterns discovered ("this codebase uses X for Y")
 - Gotchas ("do not forget to update Z when changing W")
 - Useful context ("the settings panel is in component X")
@@ -196,7 +227,7 @@ Examples of what to add to AGENTS.md:
 Ralph only works if there are feedback loops:
 - Typecheck catches type errors
 - Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
+- CI must stay green (broken code compounds across sessions)
 
 ### Browser Verification for UI Stories
 
@@ -204,18 +235,21 @@ Frontend stories must include "Verify in browser using dev-browser skill" in acc
 
 ### Stop Condition
 
-When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
+When all stories have `passes: true`, `ralph.sh` detects completion by checking `prd.json` directly and the loop exits.
 
 ## Debugging
 
 Check current state:
 
 ```bash
-# See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
+# See current state
+cat scripts/ralph/state.json | jq .
 
-# See learnings from previous iterations
-cat progress.txt
+# See which stories are done
+cat scripts/ralph/prd.json | jq '.userStories[] | {id, title, passes}'
+
+# See learnings from previous sessions
+cat scripts/ralph/progress.md
 
 # Check git history
 git log --oneline -10
@@ -223,14 +257,14 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `scripts/ralph/prompt.md` (for Amp) or `scripts/ralph/CLAUDE.md` (for Claude Code) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
 
 ## Archiving
 
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `scripts/ralph/archive/YYYY-MM-DD-feature-name/`.
 
 ## References
 

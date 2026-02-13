@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');try{const p=JSON.parse(fs.readFileSync('scripts/ralph/prd.json','utf8'));const s=JSON.parse(fs.readFileSync('scripts/ralph/state.json','utf8'));if(!s.currentStory)process.exit(0);const story=p.userStories.find(u=>u.id===s.currentStory);if(story&&!story.passes){console.log('WARNING: story '+s.currentStory+' not yet marked passes:true in prd.json')}}catch(e){}\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');try{const s=JSON.parse(fs.readFileSync('scripts/ralph/state.json','utf8'));const today=new Date().toISOString().slice(0,10);if(s.lastUpdated!==today){console.log('state.json not updated today ('+s.lastUpdated+' vs '+today+')');process.exit(2)}}catch(e){}\""
+          }
+        ]
+      }
+    ]
+  }
+}

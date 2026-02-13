@@ -1,0 +1,28 @@
+# Archives (not relevant to agent work)
+archive/
+scripts/ralph/archive/
+
+# Flowchart source (visualization, not agent work)
+flowchart/
+
+# Binary/media files
+*.png
+*.jpg
+*.gif
+*.svg
+*.ico
+*.webp
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# Build artifacts
+node_modules/
+.next/
+dist/
+build/
+out/
+
+# Environment files
+.env*
