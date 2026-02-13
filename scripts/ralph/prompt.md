@@ -1,108 +1,80 @@
 # Ralph Agent Instructions
 
-You are an autonomous coding agent working on a software project.
+> **Ralph directory: `scripts/ralph/`** — All Ralph files live here. Your working directory is the repo root; always use the `scripts/ralph/` prefix for Ralph file operations.
+
+## Step 0: Read State (ALWAYS FIRST)
+
+1. Read `scripts/ralph/state.json`.
+   - If it exists: orient from `currentStory`, `nextAction`, `branch`, `compactionNeeded`.
+   - If missing: read `scripts/ralph/BOOTSTRAP.md` and follow it to create `scripts/ralph/state.json`, then continue.
+2. If `compactionNeeded` is `true`: read `scripts/ralph/COMPACTION.md` and follow it. Do NOT work on stories. STOP after.
+3. Proceed to **Your Task** below.
 
 ## Your Task
 
-1. Read the PRD at `scripts/ralph/prd.json`
-2. Read the progress log at `scripts/ralph/progress.md` (check Codebase Patterns section first)
-3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. Pick the **highest priority** user story where `passes: false`
-5. Implement that single user story
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `scripts/ralph/progress.md`
+1. Check you're on the correct branch from `state.json`. If not, check it out or create from main.
+2. Read `scripts/ralph/progress.md` in two reads: the `## Codebase Patterns` section from the top (~60 lines), then recent sessions from the bottom (last ~80 lines). Never read the entire file.
+3. Read `scripts/ralph/prd.json` and locate the story matching `state.json.currentStory` — read its acceptance criteria and description.
+4. **If story has `iterationMode` field**: read `scripts/ralph/ITERATIVE.md` BEFORE starting work.
+5. Implement that single user story.
+6. Run quality checks (typecheck, lint, test; plus `validationCommand` if defined). Fix failures before committing. If unfixable: document in `scripts/ralph/progress.md`, do NOT set `passes: true`, end session.
+7. **Frontend verification** (if UI): load the `dev-browser` skill, navigate to the relevant page, verify changes work, take a screenshot if helpful.
+8. Update AGENTS.md files if you discover reusable conventions or gotchas in directories you modified. Optionally update directory-scoped AGENTS.md files for module-specific knowledge.
+   - When AGENTS.md files grow large: merge duplicate or overlapping entries into single combined lines.
+   - Only add patterns that are **genuinely reusable** across stories.
+   - Never add: story-specific details, temporary debugging notes, or info already in `scripts/ralph/progress.md`.
+9. Commit ALL changes: `feat: [Story ID] - [Story Title]`
+10. **APPEND** to `scripts/ralph/progress.md`: date, story ID, thread URL, what was done, files changed, learnings for future sessions.
+    **PROMOTE (mandatory)**: re-read your learnings — any learning useful beyond the current story MUST go to `## Codebase Patterns` (top of `scripts/ralph/progress.md`). Cross-PRD conventions → AGENTS.md files. Format: `scripts/ralph/PROGRESS-GUIDE.md`.
+11. Update PRD: set `passes: true` for the completed story in `scripts/ralph/prd.json`. If final iteration, compact notes to max 2 lines (~200 chars). Details in `scripts/ralph/PROGRESS-GUIDE.md`.
+12. **Update `scripts/ralph/state.json`** (see State Update Rules below).
+13. **STOP** — end response immediately. The shell loop detects completion from `scripts/ralph/prd.json`; a new session handles remaining work.
 
 ## Progress Report Format
 
-APPEND to scripts/ralph/progress.md (never replace, always append):
+APPEND to `scripts/ralph/progress.md` (NEVER replace, ALWAYS append):
 ```
 ## [Date/Time] - [Story ID]
 Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - What was implemented
 - Files changed
-- **Learnings for future iterations:**
+- **Learnings for future sessions:**
   - Patterns discovered (e.g., "this codebase uses X for Y")
   - Gotchas encountered (e.g., "don't forget to update Z when changing W")
   - Useful context (e.g., "the evaluation panel is in component X")
 ---
 ```
 
-Include the thread URL so future iterations can use the `read_thread` tool to reference previous work if needed.
+Include the thread URL so future sessions can use the `read_thread` tool to reference previous work if needed.
 
-The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
+## State Update Rules
 
-## Consolidate Patterns
+At END of every session, update `scripts/ralph/state.json`:
 
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of scripts/ralph/progress.md (create it if it doesn't exist). This section should consolidate the most important learnings:
+1. Scan `scripts/ralph/prd.json` for the next incomplete story (first with `passes: false`, ordered by `priority`)
+2. `currentStory`: that story's ID (or `null` if all complete)
+3. `storyTitle`: that story's title (or `"all stories complete"`)
+4. `nextAction`:
+   - If iterative with `currentIteration > 0`: `"iteration N/M (review pass)"` or `"iteration N/M"`
+   - If iterative with `currentIteration == 0`: `"iteration 1/M"`
+   - If standard: `"implement"`
+   - If all complete: `"all stories complete"`
+5. `branch`: keep as-is unless the PRD changes
+6. `progressTokens`: estimate current size of `scripts/ralph/progress.md` (~15 tokens/line)
+7. `compactionNeeded`: set to `true` if `progressTokens` exceeds `compactionThreshold`
+8. `lastUpdated`: current date
 
-```
-## Codebase Patterns
-- Example: Use `sql<number>` template for aggregations
-- Example: Always use `IF NOT EXISTS` for migrations
-- Example: Export types from actions.ts for UI components
-```
+## Critical Rules
 
-Only add patterns that are **general and reusable**, not story-specific details.
+These rules MUST be followed every session, even if earlier context is summarized.
 
-## Update AGENTS.md Files
-
-Before committing, check if any edited files have learnings worth preserving in nearby AGENTS.md files:
-
-1. **Identify directories with edited files** - Look at which directories you modified
-2. **Check for existing AGENTS.md** - Look for AGENTS.md in those directories or parent directories
-3. **Add valuable learnings** - If you discovered something future developers/agents should know:
-   - API patterns or conventions specific to that module
-   - Gotchas or non-obvious requirements
-   - Dependencies between files
-   - Testing approaches for that area
-   - Configuration or environment requirements
-
-**Examples of good AGENTS.md additions:**
-- "When modifying X, also update Y to keep them in sync"
-- "This module uses pattern Z for all API calls"
-- "Tests require the dev server running on PORT 3000"
-- "Field names must match the template exactly"
-
-**Do NOT add:**
-- Story-specific implementation details
-- Temporary debugging notes
-- Information already in scripts/ralph/progress.md
-
-Only update AGENTS.md if you have **genuinely reusable knowledge** that would help future work in that directory.
-
-## Quality Requirements
-
-- ALL commits must pass your project's quality checks (typecheck, lint, test)
-- Do NOT commit broken code
-- Keep changes focused and minimal
-- Follow existing code patterns
-
-## Browser Testing (Required for Frontend Stories)
-
-For any story that changes UI, you MUST verify it works in the browser:
-
-1. Load the `dev-browser` skill
-2. Navigate to the relevant page
-3. Verify the UI changes work as expected
-4. Take a screenshot if helpful for the progress log
-
-A frontend story is NOT complete until browser verification passes.
-
-## Stop Condition
-
-After completing a user story, check if ALL stories have `passes: true`.
-
-If ALL stories are complete and passing, reply with:
-<promise>COMPLETE</promise>
-
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
-
-## Important
-
-- Work on ONE story per iteration
-- Commit frequently
-- Keep CI green
-- Read the Codebase Patterns section in scripts/ralph/progress.md before starting
+1. **ALWAYS** read `scripts/ralph/state.json` FIRST, before any other file.
+2. **ALWAYS** read `scripts/ralph/progress.md` (Codebase Patterns first) before starting work.
+3. **ALWAYS** work on exactly ONE story per session.
+4. The story to work on comes from `state.json.currentStory` — NEVER scan `scripts/ralph/prd.json` to find it.
+5. **ALWAYS** append to `scripts/ralph/progress.md` before ending a session. NEVER replace its contents (except during compaction — see Step 0.2).
+6. **ALWAYS** commit all changes before ending a session. Commits MUST pass quality checks.
+7. For iterative stories, all iteration-specific rules are in `scripts/ralph/ITERATIVE.md`.
+8. After steps 9-13, **STOP**. End the session. A new session handles remaining work.
+9. **ALWAYS** update `scripts/ralph/state.json` at the end of every session.
+10. If `compactionNeeded` is true, follow `scripts/ralph/COMPACTION.md` — do NOT work on stories.
