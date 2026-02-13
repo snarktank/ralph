@@ -14,18 +14,18 @@ cd flowchart && npm run dev
 cd flowchart && npm run build
 
 # Run Ralph with Amp (default)
-./ralph.sh [max_iterations]
+./scripts/ralph/ralph.sh [max_sessions]
 
 # Run Ralph with Claude Code
-./ralph.sh --tool claude [max_iterations]
+./scripts/ralph/ralph.sh --tool claude [max_sessions]
 ```
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
-- `prompt.md` - Instructions given to each AMP instance
--  `CLAUDE.md` - Instructions given to each Claude Code instance
-- `prd.json.example` - Example PRD format
+- `scripts/ralph/ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
+- `scripts/ralph/prompt.md` - Instructions given to each AMP instance
+- `scripts/ralph/CLAUDE.md` - Instructions given to each Claude Code instance
+- `scripts/ralph/prd.json.example` - Example PRD format
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
 ## Flowchart
@@ -41,7 +41,7 @@ npm run dev
 
 ## Patterns
 
-- Each iteration spawns a fresh AI instance (Amp or Claude Code) with clean context
-- Memory persists via git history, `progress.txt`, and `prd.json`
+- Each session spawns a fresh AI instance (Amp or Claude Code) with clean context
+- Memory persists via git history, `scripts/ralph/progress.md`, `scripts/ralph/prd.json`, and `scripts/ralph/state.json`
 - Stories should be small enough to complete in one context window
-- Always update AGENTS.md with discovered patterns for future iterations
+- Always update Institutional Memory in scripts/ralph/CLAUDE.md with discovered patterns for future sessions

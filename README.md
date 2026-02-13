@@ -25,12 +25,17 @@ Copy the ralph files into your project:
 ```bash
 # From your project root
 mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/scripts/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/scripts/ralph/BOOTSTRAP.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/COMPACTION.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/PROGRESS-GUIDE.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/ITERATIVE.md scripts/ralph/
+cp /path/to/ralph/scripts/ralph/prd.json.example scripts/ralph/
 
 # Copy the prompt template for your AI tool of choice:
-cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
+cp /path/to/ralph/scripts/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
-cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+cp /path/to/ralph/scripts/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -135,7 +140,7 @@ Ralph will:
 
 Iterative mode is for work that is inherently batched (e.g., audit N sections, process N files), **NOT** for stories that are too large. Stories that are too large should be split into smaller stories.
 
-When a story has `iterationMode`, the agent loads `ITERATIVE.md` as a delta-only supplement to `CLAUDE.md`. See `ITERATIVE.md` for the full rules.
+When a story has `iterationMode`, the agent loads `scripts/ralph/ITERATIVE.md` as a delta-only supplement to `scripts/ralph/CLAUDE.md`. See `scripts/ralph/ITERATIVE.md` for the full rules.
 
 ## Memory Model
 
@@ -146,25 +151,25 @@ Ralph persists knowledge across sessions via four layers:
 | **Operational** | `state.json` | Current story, next action, branch, compaction status | Per-session (updated every session) |
 | **Structural** | `prd.json` | Story status, iteration counters, notes | Per-PRD |
 | **Experiential** | `progress.md` | Session logs, codebase patterns, learnings | Per-PRD, append-only (auto-compacted) |
-| **Institutional** | `CLAUDE.md` | Reusable conventions, gotchas, cross-file dependencies | Permanent — survives across PRDs |
+| **Institutional** | `scripts/ralph/CLAUDE.md` | Reusable conventions, gotchas, cross-file dependencies | Permanent — survives across PRDs |
 
-See the "Institutional Memory" section in `CLAUDE.md` for details on what goes where.
+See the "Institutional Memory" section in `scripts/ralph/CLAUDE.md` for details on what goes where.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI sessions (supports `--tool amp` or `--tool claude`) |
-| `prompt.md` | Prompt template for Amp |
-| `CLAUDE.md` | Core agent instructions for Claude Code (includes institutional memory) |
-| `BOOTSTRAP.md` | State bootstrap for first session (loaded conditionally) |
-| `COMPACTION.md` | Progress compaction rules (loaded conditionally) |
-| `PROGRESS-GUIDE.md` | Progress report format and learnings guide (reference) |
-| `ITERATIVE.md` | Supplemental rules for iterative stories (loaded conditionally) |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.md` | Append-only learnings for future sessions |
-| `state.json` | Session orientation file — tells the agent which story, branch, and action to take |
+| `scripts/ralph/ralph.sh` | The bash loop that spawns fresh AI sessions (supports `--tool amp` or `--tool claude`) |
+| `scripts/ralph/prompt.md` | Prompt template for Amp |
+| `scripts/ralph/CLAUDE.md` | Core agent instructions for Claude Code (includes institutional memory) |
+| `scripts/ralph/BOOTSTRAP.md` | State bootstrap for first session (loaded conditionally) |
+| `scripts/ralph/COMPACTION.md` | Progress compaction rules (loaded conditionally) |
+| `scripts/ralph/PROGRESS-GUIDE.md` | Progress report format and learnings guide (reference) |
+| `scripts/ralph/ITERATIVE.md` | Supplemental rules for iterative stories (loaded conditionally) |
+| `scripts/ralph/prd.json` | User stories with `passes` status (the task list) |
+| `scripts/ralph/prd.json.example` | Example PRD format for reference |
+| `scripts/ralph/progress.md` | Append-only learnings for future sessions |
+| `scripts/ralph/state.json` | Session orientation file — tells the agent which story, branch, and action to take |
 | `skills/ralph/` | Skill for generating PRD markdown + `prd.json` (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
@@ -210,7 +215,7 @@ Too big (split these):
 
 ### Institutional Memory
 
-After each session, Ralph updates the institutional memory section in `CLAUDE.md` with reusable patterns and gotchas. This is key because AI coding tools automatically read these files, so future sessions (and future human developers) benefit from discovered conventions and gotchas.
+After each session, Ralph updates the institutional memory section in `scripts/ralph/CLAUDE.md` with reusable patterns and gotchas. This is key because AI coding tools automatically read these files, so future sessions (and future human developers) benefit from discovered conventions and gotchas.
 
 Examples of what to persist:
 - Patterns discovered ("this codebase uses X for Y")
@@ -238,13 +243,13 @@ Check current state:
 
 ```bash
 # See current state
-cat state.json | jq .
+cat scripts/ralph/state.json | jq .
 
 # See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
+cat scripts/ralph/prd.json | jq '.userStories[] | {id, title, passes}'
 
 # See learnings from previous sessions
-cat progress.md
+cat scripts/ralph/progress.md
 
 # Check git history
 git log --oneline -10
@@ -252,14 +257,14 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `scripts/ralph/prompt.md` (for Amp) or `scripts/ralph/CLAUDE.md` (for Claude Code) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
 
 ## Archiving
 
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `scripts/ralph/archive/YYYY-MM-DD-feature-name/`.
 
 ## References
 

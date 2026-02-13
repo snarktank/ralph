@@ -58,6 +58,12 @@ if ! jq empty "$PRD_FILE" 2>/dev/null; then
   exit 1
 fi
 
+# Validate required PRD fields
+if ! jq -e '.project and .branchName and .userStories and (.userStories | length > 0)' "$PRD_FILE" > /dev/null 2>&1; then
+  echo "Error: $PRD_FILE is missing required fields (project, branchName, userStories)."
+  exit 1
+fi
+
 # Archive previous run if branch changed
 if [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
@@ -133,7 +139,7 @@ if [ ! -f "$STATE_FILE" ]; then
         nextAction: $action,
         progressTokens: 0,
         compactionNeeded: false,
-        compactionThreshold: 7500,
+        compactionThreshold: 10000,
         lastUpdated: $date
       }' > "$STATE_FILE"
     echo "   Created state.json: $FIRST_STORY_ID - $FIRST_STORY_TITLE"
@@ -177,6 +183,13 @@ for i in $(seq 1 $MAX_SESSIONS); do
     echo "Ralph completed all tasks!"
     echo "Completed at session $i of $MAX_SESSIONS"
     exit 0
+  fi
+
+  # Validate state.json integrity after session
+  if [ -f "$STATE_FILE" ]; then
+    if ! jq -e '.currentStory and .lastUpdated and .branch' "$STATE_FILE" > /dev/null 2>&1; then
+      echo "Warning: state.json may be malformed after session $i. Check manually."
+    fi
   fi
 
   echo "Session $i complete. Continuing..."

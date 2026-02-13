@@ -18,7 +18,7 @@
   "nextAction": "<determined above>",
   "progressTokens": 0,
   "compactionNeeded": false,
-  "compactionThreshold": 7500,
+  "compactionThreshold": 10000,
   "lastUpdated": "<today's date>"
 }
 ```

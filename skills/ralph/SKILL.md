@@ -256,14 +256,14 @@ Allow users to configure which notifications they receive and through which chan
 
 **Before writing a new `prd.json`, check if one already exists from a different feature:**
 
-1. Read the current `prd.json` if it exists
+1. Read the current `scripts/ralph/prd.json` if it exists
 2. Check if `branchName` differs from the new feature's branch name
-3. If different AND `progress.md` has content beyond the header:
-   - Create archive folder: `archive/YYYY-MM-DD-feature-name/`
-   - Copy current `prd.json`, `progress.md`, and `state.json` to the archive
-   - Reset `progress.md` with a fresh header
+3. If different AND `scripts/ralph/progress.md` has content beyond the header:
+   - Create archive folder: `scripts/ralph/archive/YYYY-MM-DD-feature-name/`
+   - Copy current `scripts/ralph/prd.json`, `scripts/ralph/progress.md`, and `scripts/ralph/state.json` to the archive
+   - Reset `scripts/ralph/progress.md` with a fresh header
 
-The `ralph.sh` script handles this automatically when run (including archiving and resetting `state.json` when the branch changes), but if you are manually creating `prd.json`, archive first to avoid data loss.
+The `scripts/ralph/ralph.sh` script handles this automatically when run (including archiving and resetting `scripts/ralph/state.json` when the branch changes), but if you are manually creating `prd.json`, archive first to avoid data loss.
 
 ---
 
