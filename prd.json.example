@@ -1,15 +1,16 @@
 {
-  "project": "MyApp",
-  "branchName": "ralph/task-priority",
-  "description": "Task Priority System - Add priority levels to tasks",
+  "project": "MyProject",
+  "branchName": "ralph/user-preferences",
+  "description": "User Preferences - Add configurable user preferences with persistence",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add priority field to database",
-      "description": "As a developer, I need to store task priority so it persists across sessions.",
+      "title": "Add preferences table to database",
+      "description": "As a developer, I need a preferences table so that user settings persist across sessions.",
       "acceptanceCriteria": [
-        "Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')",
-        "Generate and run migration successfully",
+        "Preferences table created with user_id foreign key",
+        "Default row seeded on user creation via trigger",
+        "Migration runs without errors",
         "Typecheck passes"
       ],
       "priority": 1,
@@ -18,13 +19,13 @@
     },
     {
       "id": "US-002",
-      "title": "Display priority indicator on task cards",
-      "description": "As a user, I want to see task priority at a glance.",
+      "title": "Build preferences UI panel",
+      "description": "As a user, I want a settings panel so that I can configure my preferences visually.",
       "acceptanceCriteria": [
-        "Each task card shows colored priority badge (red=high, yellow=medium, gray=low)",
-        "Priority visible without hovering or clicking",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Settings panel accessible from user menu",
+        "All preference fields rendered with correct input types",
+        "Save button persists changes to backend",
+        "Verify in browser: panel renders, fields are interactive, save works"
       ],
       "priority": 2,
       "passes": false,
@@ -32,33 +33,21 @@
     },
     {
       "id": "US-003",
-      "title": "Add priority selector to task edit",
-      "description": "As a user, I want to change a task's priority when editing it.",
+      "title": "Audit configuration files for consistency",
+      "description": "As a developer, I want all configuration files audited so that they follow project conventions.",
       "acceptanceCriteria": [
-        "Priority dropdown in task edit modal",
-        "Shows current priority as selected",
-        "Saves immediately on selection change",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Each configuration file checked against project conventions",
+        "Non-compliant files updated to match conventions",
+        "All changes documented in progress notes",
+        "Lint passes after each iteration"
       ],
       "priority": 3,
       "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-004",
-      "title": "Filter tasks by priority",
-      "description": "As a user, I want to filter the task list to see only high-priority items.",
-      "acceptanceCriteria": [
-        "Filter dropdown with options: All | High | Medium | Low",
-        "Filter persists in URL params",
-        "Empty state message when no tasks match filter",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 4,
-      "passes": false,
-      "notes": ""
+      "notes": "",
+      "iterationMode": "fixed",
+      "maxIterations": 3,
+      "currentIteration": 0,
+      "validationCommand": "npm run lint"
     }
   ]
 }

@@ -1,258 +1,292 @@
 ---
 name: ralph
-description: "Convert PRDs to prd.json format for the Ralph autonomous agent system. Use when you have an existing PRD and need to convert it to Ralph's JSON format. Triggers on: convert this prd, turn this into ralph format, create prd.json from this, ralph json."
+description: "Generate a Product Requirements Document and Ralph-compatible prd.json for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
 user-invocable: true
 ---
 
-# Ralph PRD Converter
+# PRD Generator
 
-Converts existing PRDs to the prd.json format that Ralph uses for autonomous execution.
+Produce two outputs for every feature request:
+
+1. **Human-readable PRD**: `tasks/prd-[feature-name].md`
+2. **Machine-readable PRD**: `scripts/ralph/prd.json` (consumed by Ralph agent loop)
+
+**IMPORTANT:** Do NOT start implementing. Only create the PRD and JSON.
 
 ---
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+1. Receive a feature description from the user
+2. Ask 3-5 clarifying questions (lettered options for quick answers)
+3. **Archive previous run** if `prd.json` already exists with a different `branchName` (see Archiving below)
+4. Generate the PRD markdown file
+5. Generate the `prd.json` file
+6. Save both files
 
 ---
 
-## Output Format
+## Step 1: Clarifying Questions
 
-```json
-{
-  "project": "[Project Name]",
-  "branchName": "ralph/[feature-name-kebab-case]",
-  "description": "[Feature description from PRD title/intro]",
-  "userStories": [
-    {
-      "id": "US-001",
-      "title": "[Story title]",
-      "description": "As a [user], I want [feature] so that [benefit]",
-      "acceptanceCriteria": [
-        "Criterion 1",
-        "Criterion 2",
-        "Typecheck passes"
-      ],
-      "priority": 1,
-      "passes": false,
-      "notes": ""
-    }
-  ]
-}
+Ask only where the initial prompt is ambiguous. Format with lettered options so the user can reply "1A, 2C, 3B":
+
 ```
+1. What is the primary goal?
+   A. [option]  B. [option]  C. [option]  D. Other: [specify]
+
+2. Who is the target user?
+   A. [option]  B. [option]  C. [option]
+
+3. What is the scope?
+   A. Minimal viable version  B. Full-featured  C. Backend only  D. UI only
+```
+
+Focus on: problem/goal, core functionality, scope boundaries, success criteria.
 
 ---
 
-## Story Size: The Number One Rule
+## Step 2: PRD Structure (`tasks/prd-[feature-name].md`)
 
-**Each story must be completable in ONE Ralph iteration (one context window).**
+Required sections in order:
 
-Ralph spawns a fresh Amp instance per iteration with no memory of previous work. If a story is too big, the LLM runs out of context before finishing and produces broken code.
+| # | Section | Content |
+|---|---------|---------|
+| 1 | **Title + Summary** | One-paragraph overview of the feature and problem it solves |
+| 2 | **Goals** | 3-6 bullet points, specific and measurable |
+| 3 | **User Stories** | See Story Format below |
+| 4 | **Functional Requirements** | Numbered list: "FR-1: The system must..." |
+| 5 | **Non-Goals** | What this feature will NOT include |
+| 6 | **Technical Notes** | Rule file references, gotchas, file paths, dependencies |
+| 7 | **Open Questions** | Remaining unknowns |
 
-### Right-sized stories:
-- Add a database column and migration
-- Add a UI component to an existing page
-- Update a server action with new logic
-- Add a filter dropdown to a list
+**CRITICAL: PRD must stay under 150 lines.** Be concise. Use tables over prose.
 
-### Too big (split these):
-- "Build the entire dashboard" - Split into: schema, queries, UI components, filters
-- "Add authentication" - Split into: schema, middleware, login UI, session handling
-- "Refactor the API" - Split into one story per endpoint or pattern
+### Story Format
 
-**Rule of thumb:** If you cannot describe the change in 2-3 sentences, it is too big.
-
----
-
-## Story Ordering: Dependencies First
-
-Stories execute in priority order. Earlier stories must not depend on later ones.
-
-**Correct order:**
-1. Schema/database changes (migrations)
-2. Server actions / backend logic
-3. UI components that use the backend
-4. Dashboard/summary views that aggregate data
-
-**Wrong order:**
-1. UI component (depends on schema that does not exist yet)
-2. Schema change
-
----
-
-## Acceptance Criteria: Must Be Verifiable
-
-Each criterion must be something Ralph can CHECK, not something vague.
-
-### Good criteria (verifiable):
-- "Add `status` column to tasks table with default 'pending'"
-- "Filter dropdown has options: All, Active, Completed"
-- "Clicking delete shows confirmation dialog"
-- "Typecheck passes"
-- "Tests pass"
-
-### Bad criteria (vague):
-- "Works correctly"
-- "User can do X easily"
-- "Good UX"
-- "Handles edge cases"
-
-### Always include as final criterion:
-```
-"Typecheck passes"
-```
-
-For stories with testable logic, also include:
-```
-"Tests pass"
-```
-
-### For stories that change UI, also include:
-```
-"Verify in browser using dev-browser skill"
-```
-
-Frontend stories are NOT complete until visually verified. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
-
----
-
-## Conversion Rules
-
-1. **Each user story becomes one JSON entry**
-2. **IDs**: Sequential (US-001, US-002, etc.)
-3. **Priority**: Based on dependency order, then document order
-4. **All stories**: `passes: false` and empty `notes`
-5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
-6. **Always add**: "Typecheck passes" to every story's acceptance criteria
-
----
-
-## Splitting Large PRDs
-
-If a PRD has big features, split them:
-
-**Original:**
-> "Add user notification system"
-
-**Split into:**
-1. US-001: Add notifications table to database
-2. US-002: Create notification service for sending notifications
-3. US-003: Add notification bell icon to header
-4. US-004: Create notification dropdown panel
-5. US-005: Add mark-as-read functionality
-6. US-006: Add notification preferences page
-
-Each is one focused change that can be completed and verified independently.
-
----
-
-## Example
-
-**Input PRD:**
 ```markdown
-# Task Status Feature
+### US-001: Short title (under 50 chars)
+**Description:** As a [role], I want [feature] so that [benefit].
 
-Add ability to mark tasks with different statuses.
+**Acceptance Criteria:**
+- Specific verifiable statement
+- Another verifiable statement
+- Quality gate (e.g., "Typecheck passes", "Tests pass", "Build succeeds")
 
-## Requirements
-- Toggle between pending/in-progress/done on task list
-- Filter list by status
-- Show status badge on each task
-- Persist status in database
+**Iteration (only if iterative):**
+- Mode: fixed
+- Max iterations: N
+- Current iteration: 0
+- Validation: `command` (optional)
 ```
 
-**Output prd.json:**
+### Story Rules
+
+| Rule | Detail |
+|------|--------|
+| **Scope** | ALWAYS completable in a single context window |
+| **Criteria count** | 3-6 verifiable statements per story |
+| **Quality gates** | ALWAYS include at least one project-appropriate quality gate criterion (e.g., "Typecheck passes", "Tests pass", "Build succeeds") |
+| **Browser verification** | UI stories ALWAYS include a browser verification criterion (e.g., "Verify in browser using available tools") |
+| **ID format** | `US-NNN` (zero-padded, sequential) |
+| **Title length** | Under 50 characters (must work as commit message suffix) |
+| **Splitting** | NEVER use iterations for oversized stories — split them instead |
+
+**NEVER** write vague acceptance criteria. "Works correctly" is bad. "Returns 404 when resource not found" is good.
+
+### Standard vs Iterative Stories
+
+| Type | When to Use | Iteration Fields |
+|------|-------------|-----------------|
+| **Standard** | Single-pass work (most stories) | None |
+| **Iterative** | Batch/multi-pass work with known count (audit N files, process N items) | Required (see below) |
+
+**IMPORTANT:** Iterative stories are for batch work, NOT for stories that are too big. If a story is too big, split it into multiple standard stories.
+
+For iterative story rules, see `scripts/ralph/ITERATIVE.md`.
+
+---
+
+## Step 3: Ralph JSON (`scripts/ralph/prd.json`)
+
+**CRITICAL:** This file is the machine-readable contract consumed by Ralph. Every field matters.
+
+### Schema
+
 ```json
 {
-  "project": "TaskApp",
-  "branchName": "ralph/task-status",
-  "description": "Task Status Feature - Track task progress with status indicators",
+  "project": "ProjectName",
+  "branchName": "ralph/feature-name",
+  "description": "Brief description of the feature",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add status field to tasks table",
-      "description": "As a developer, I need to store task status in the database.",
+      "title": "Short title under 50 chars",
+      "description": "As a [role], I want [feature] so that [benefit].",
       "acceptanceCriteria": [
-        "Add status column: 'pending' | 'in_progress' | 'done' (default 'pending')",
-        "Generate and run migration successfully",
-        "Typecheck passes"
+        "Verifiable statement as plain string",
+        "Another verifiable statement",
+        "Quality gate passes"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-002",
-      "title": "Display status badge on task cards",
-      "description": "As a user, I want to see task status at a glance.",
-      "acceptanceCriteria": [
-        "Each task card shows colored status badge",
-        "Badge colors: gray=pending, blue=in_progress, green=done",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 2,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-003",
-      "title": "Add status toggle to task list rows",
-      "description": "As a user, I want to change task status directly from the list.",
-      "acceptanceCriteria": [
-        "Each row has status dropdown or toggle",
-        "Changing status saves immediately",
-        "UI updates without page refresh",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 3,
-      "passes": false,
-      "notes": ""
-    },
-    {
-      "id": "US-004",
-      "title": "Filter tasks by status",
-      "description": "As a user, I want to filter the list to see only certain statuses.",
-      "acceptanceCriteria": [
-        "Filter dropdown: All | Pending | In Progress | Done",
-        "Filter persists in URL params",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 4,
       "passes": false,
       "notes": ""
     }
   ]
 }
+```
+
+### Project-Level Fields
+
+| Field | Type | Rules |
+|-------|------|-------|
+| `project` | string | Project name (from repo name, CLAUDE.md, or user input) |
+| `branchName` | string | **ALWAYS** `ralph/[feature-name]` (kebab-case) |
+| `description` | string | One-line feature summary |
+
+### Story-Level Fields (`userStories[]`)
+
+| Field | Type | Rules |
+|-------|------|-------|
+| `id` | string | `US-NNN` format, sequential |
+| `title` | string | Under 50 chars, commit-message friendly |
+| `description` | string | "As a [role], I want [feature] so that [benefit]" format |
+| `acceptanceCriteria` | string[] | Plain strings, NOT checkbox markdown |
+| `priority` | number | Execution order (1 = first). Use dependency order: if US-B depends on US-A's output, US-A must have higher priority (lower number). For independent stories, order by risk or complexity (hardest first). |
+| `passes` | boolean | **ALWAYS** starts `false` |
+| `notes` | string | **ALWAYS** starts `""` |
+
+### Additional Fields for Iterative Stories
+
+| Field | Type | Rules |
+|-------|------|-------|
+| `iterationMode` | string | **ALWAYS** `"fixed"` |
+| `maxIterations` | number | Total passes required |
+| `currentIteration` | number | **ALWAYS** starts `0` |
+| `validationCommand` | string | Optional command to verify each iteration |
+
+**CRITICAL:** `passes` becomes `true` ONLY when `currentIteration >= maxIterations`. This is enforced by Ralph, not by the PRD author.
+
+---
+
+## Subagent Usage Policy
+
+When writing PRDs that may involve subagent delegation during implementation:
+
+**Use subagents when:**
+- High-volume output (test suites, log analysis, codebase-wide exploration)
+- Self-contained, isolated tasks with clear start/end
+- Parallel independent investigations
+- Context preservation (exploration in subagent frees main context)
+
+**Do NOT use subagents when:**
+- Task requires iteration or back-and-forth
+- Shared context across steps is critical
+- Trivial or single-file scope
+- Latency-sensitive simple changes
+
+**Key trade-off:** Subagents isolate context but lose continuity. Use for isolated high-volume tasks only. Note this guidance in Technical Notes if relevant to the feature.
+
+---
+
+## Example Skeleton
+
+```markdown
+# PRD: User Notification Preferences
+
+## Summary
+Allow users to configure which notifications they receive and through which channels.
+
+## Goals
+- Users can toggle notification types on/off
+- Support email and in-app channels
+- Persist preferences across sessions
+
+## User Stories
+
+### US-001: Add preferences table to database
+**Description:** As a developer, I need to store notification preferences per user.
+**Acceptance Criteria:**
+- Preferences table created with user_id FK
+- Default preferences seeded on user creation
+- Migration runs successfully
+- Typecheck passes
+
+### US-002: Build notification settings panel
+**Description:** As a user, I want a settings panel to manage my notification preferences.
+**Acceptance Criteria:**
+- Settings panel accessible from user menu
+- Toggle switches for each notification type
+- Save persists changes to backend
+- Verify in browser using available tools
+- Typecheck passes
+
+### US-003: Audit existing notification triggers
+**Description:** As a developer, I need to verify all notification triggers respect user preferences.
+**Acceptance Criteria:**
+- Each trigger checked against preferences table
+- Non-compliant triggers updated
+- All findings documented
+- Lint passes after each iteration
+**Iteration:**
+- Mode: fixed
+- Max iterations: 3
+- Current iteration: 0
+
+## Functional Requirements
+- FR-1: Preferences table with columns per notification type
+- FR-2: API endpoint GET/PUT /api/preferences
+- FR-3: Notification dispatch checks preferences before sending
+
+## Non-Goals
+- Push notifications (future phase)
+- Notification scheduling/digest mode
+
+## Technical Notes
+- See relevant rule files for database and API conventions
+- Preferences must have RLS policies
+- Subagent recommended for US-003 (batch audit across multiple files)
+
+## Open Questions
+- Should preferences sync across devices in real-time?
 ```
 
 ---
 
 ## Archiving Previous Runs
 
-**Before writing a new prd.json, check if there is an existing one from a different feature:**
+**Before writing a new `prd.json`, check if one already exists from a different feature:**
 
 1. Read the current `prd.json` if it exists
 2. Check if `branchName` differs from the new feature's branch name
-3. If different AND `progress.txt` has content beyond the header:
+3. If different AND `progress.md` has content beyond the header:
    - Create archive folder: `archive/YYYY-MM-DD-feature-name/`
-   - Copy current `prd.json` and `progress.txt` to archive
-   - Reset `progress.txt` with fresh header
+   - Copy current `prd.json`, `progress.md`, and `state.json` to the archive
+   - Reset `progress.md` with a fresh header
 
-**The ralph.sh script handles this automatically** when you run it, but if you are manually updating prd.json between runs, archive first.
+The `ralph.sh` script handles this automatically when run (including archiving and resetting `state.json` when the branch changes), but if you are manually creating `prd.json`, archive first to avoid data loss.
 
 ---
 
-## Checklist Before Saving
+## Checklist
 
-Before writing prd.json, verify:
+Before saving, verify:
 
-- [ ] **Previous run archived** (if prd.json exists with different branchName, archive it first)
-- [ ] Each story is completable in one iteration (small enough)
-- [ ] Stories are ordered by dependency (schema to backend to UI)
-- [ ] Every story has "Typecheck passes" as criterion
-- [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
-- [ ] Acceptance criteria are verifiable (not vague)
-- [ ] No story depends on a later story
+- [ ] Previous `prd.json` archived if it exists with a different `branchName`
+- [ ] Asked clarifying questions with lettered options
+- [ ] Incorporated user's answers
+- [ ] Each story completable in one context window
+- [ ] Story IDs follow `US-NNN` pattern
+- [ ] Story titles under 50 characters
+- [ ] 3-6 verifiable acceptance criteria per story
+- [ ] Every story includes at least one project-appropriate quality gate (e.g., "Typecheck passes", "Tests pass", "Build succeeds")
+- [ ] UI stories include browser verification criterion (e.g., "Verify in browser using available tools")
+- [ ] Iterative stories used ONLY for batch/multi-pass work (not oversized stories)
+- [ ] Iterative stories have all required fields (`iterationMode`, `maxIterations`, `currentIteration: 0`)
+- [ ] Priorities reflect dependency order (dependencies first = lower number)
+- [ ] Functional requirements numbered and unambiguous
+- [ ] Non-goals section defines clear boundaries
+- [ ] `prd.json` has `project`, `branchName`, `description` fields
+- [ ] All stories in JSON have `priority`, `passes: false`, `notes: ""`
+- [ ] `acceptanceCriteria` in JSON are string arrays (no checkboxes)
+- [ ] Saved PRD to `tasks/prd-[feature-name].md`
+- [ ] Saved JSON to `scripts/ralph/prd.json`
