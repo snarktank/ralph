@@ -45,3 +45,14 @@ npm run dev
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations
+
+## Parallel Mode
+
+Ralph supports running multiple agents in parallel via Docker containers. See `parallel/README.md` for details.
+
+- Parallel scripts live in `parallel/` — orchestrator, status, stop
+- Docker image and container entrypoint live in `docker/`
+- Agents claim stories via `claimed_by` field in prd.json using git atomic push
+- Each agent writes to its own `progress-<agent-id>.txt` to avoid merge conflicts
+- Builder agents have restricted network access (Claude API + npm only)
+- Researcher agents have full internet access

@@ -11,3 +11,8 @@ progress.txt
 
 #Claude
 .claude/
+
+# Parallel mode state
+.ralph/
+agent_logs/
+progress-agent-*.txt

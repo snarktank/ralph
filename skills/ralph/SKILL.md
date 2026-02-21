@@ -33,6 +33,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
         "Criterion 2",
         "Typecheck passes"
       ],
+      "dependsOn": [],
       "priority": 1,
       "passes": false,
       "notes": ""
@@ -68,11 +69,15 @@ Ralph spawns a fresh Amp instance per iteration with no memory of previous work.
 
 Stories execute in priority order. Earlier stories must not depend on later ones.
 
+For explicit dependency control, use the `dependsOn` field — an array of story IDs that must have `passes: true` before this story can be claimed. This complements priority ordering by enforcing hard prerequisites, which is especially useful for parallel agents where multiple stories run concurrently.
+
+**If a story requires another story to be completed first, list the prerequisite IDs in `dependsOn`.** Stories without dependencies use an empty array `[]`.
+
 **Correct order:**
 1. Schema/database changes (migrations)
 2. Server actions / backend logic
-3. UI components that use the backend
-4. Dashboard/summary views that aggregate data
+3. UI components that use the backend — `dependsOn: ["US-001"]`
+4. Dashboard/summary views that aggregate data — `dependsOn: ["US-002", "US-003"]`
 
 **Wrong order:**
 1. UI component (depends on schema that does not exist yet)
@@ -121,9 +126,10 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 1. **Each user story becomes one JSON entry**
 2. **IDs**: Sequential (US-001, US-002, etc.)
 3. **Priority**: Based on dependency order, then document order
-4. **All stories**: `passes: false` and empty `notes`
-5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
-6. **Always add**: "Typecheck passes" to every story's acceptance criteria
+4. **dependsOn**: If a story requires another story first, list prerequisite IDs in `dependsOn`. Use `[]` for stories with no prerequisites.
+5. **All stories**: `passes: false` and empty `notes`
+6. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
+7. **Always add**: "Typecheck passes" to every story's acceptance criteria
 
 ---
 
@@ -177,6 +183,7 @@ Add ability to mark tasks with different statuses.
         "Generate and run migration successfully",
         "Typecheck passes"
       ],
+      "dependsOn": [],
       "priority": 1,
       "passes": false,
       "notes": ""
@@ -191,6 +198,7 @@ Add ability to mark tasks with different statuses.
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
+      "dependsOn": ["US-001"],
       "priority": 2,
       "passes": false,
       "notes": ""
@@ -206,6 +214,7 @@ Add ability to mark tasks with different statuses.
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
+      "dependsOn": ["US-001"],
       "priority": 3,
       "passes": false,
       "notes": ""
@@ -220,6 +229,7 @@ Add ability to mark tasks with different statuses.
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
+      "dependsOn": ["US-002", "US-003"],
       "priority": 4,
       "passes": false,
       "notes": ""
@@ -252,6 +262,7 @@ Before writing prd.json, verify:
 - [ ] **Previous run archived** (if prd.json exists with different branchName, archive it first)
 - [ ] Each story is completable in one iteration (small enough)
 - [ ] Stories are ordered by dependency (schema to backend to UI)
+- [ ] Stories with prerequisites have correct `dependsOn` arrays
 - [ ] Every story has "Typecheck passes" as criterion
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)

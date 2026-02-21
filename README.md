@@ -143,6 +143,8 @@ Ralph will:
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
+| `docker/` | Dockerfile and container scripts for parallel mode |
+| `parallel/` | Parallel mode orchestrator, status, and stop scripts |
 
 ## Flowchart
 
@@ -231,6 +233,58 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your pro
 ## Archiving
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+
+## Parallel Mode (Docker)
+
+Ralph includes a parallel mode that runs N containerized Claude Code agents simultaneously against the same PRD. Each agent runs in a Docker container with:
+
+- **Network restrictions** — builder agents can only reach Claude API and npm registry
+- **Resource limits** — configurable memory and CPU caps per container
+- **Story claiming** — agents claim stories via git atomic push to avoid duplicate work
+- **Automatic recovery** — stale claims are cleared, crashed containers are restarted
+
+### Prerequisites (Parallel Mode)
+
+- Docker installed and running
+- A Claude Code auth token (env var, file, or 1Password)
+- `jq` installed
+
+### Quick Start (Parallel Mode)
+
+```bash
+# Set your Claude auth token
+export RALPH_CLAUDE_TOKEN='<your-token>'
+
+# Run 3 agents in parallel
+./parallel/ralph-parallel.sh --agents 3
+
+# Check status
+./parallel/status.sh
+
+# Graceful shutdown
+./parallel/stop.sh
+```
+
+### Options
+
+```bash
+./parallel/ralph-parallel.sh \
+  --agents 3 \              # number of builder agents (default: 2)
+  --model claude-sonnet-4-5-20250929 \   # model (default: sonnet)
+  --memory 4g \             # per-container memory limit
+  --cpus 2 \                # per-container CPU limit
+  --researcher 1 \          # researcher agents with full internet access
+  [max_iterations]           # per-agent iteration cap (default: 0 = until PRD complete)
+```
+
+### Auth Token
+
+Priority order (first wins):
+1. `RALPH_CLAUDE_TOKEN` environment variable
+2. `.ralph/token` file in the project directory
+3. 1Password via `op read` (interactive, startup only)
+
+See [parallel/README.md](parallel/README.md) for full documentation.
 
 ## References
 
