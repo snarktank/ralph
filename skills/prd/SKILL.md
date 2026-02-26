@@ -71,6 +71,8 @@ Each story needs:
 - **Title:** Short descriptive name
 - **Description:** "As a [user], I want [feature] so that [benefit]"
 - **Acceptance Criteria:** Verifiable checklist of what "done" means
+- **Implementation Context** (optional): Relevant files, hints, and code pattern examples
+- **Verification Commands** (optional): Shell commands to validate the story
 
 Each story should be small enough to implement in one focused session.
 
@@ -80,15 +82,38 @@ Each story should be small enough to implement in one focused session.
 **Description:** As a [user], I want [feature] so that [benefit].
 
 **Acceptance Criteria:**
-- [ ] Specific verifiable criterion
-- [ ] Another criterion
+- [ ] Specific testable assertion (not a description)
+- [ ] Another testable assertion
 - [ ] Typecheck/lint passes
 - [ ] **[UI stories only]** Verify in browser using dev-browser skill
+
+**Verification Commands:** (optional)
+- `npx tsc --noEmit`
+- `npm test -- --grep "priority"`
+
+**Implementation Context:** (optional)
+- **Relevant files:** `src/components/TaskCard.tsx`, `src/components/ui/Badge.tsx`
+- **Hints:** Reuse existing Badge component — it already supports color variants
+- **Pattern to follow:**
+  ```tsx
+  <Badge color={statusColors[task.status]}>{task.status}</Badge>
+  ```
 ```
 
-**Important:** 
-- Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
-- **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
+**Acceptance Criteria Rules:**
+- Each criterion must be a **testable assertion**, not a description. An agent must be able to check pass/fail.
+- Good: "TaskCard renders a Badge with color prop: red for high, yellow for medium, gray for low"
+- Bad: "Priority is displayed nicely" or "Works correctly"
+- **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria.
+
+**Verification Commands:**
+- Include explicit shell commands that validate the story (e.g., `npx tsc --noEmit`, `npm test -- --grep "feature"`)
+- These give agents a concrete way to verify their work beyond manual inspection
+
+**Implementation Context:**
+- **Relevant files**: List specific files the implementor should read or modify
+- **Hints**: Brief guidance on approach — what to reuse, what pattern to follow
+- **Code examples**: Show existing patterns from the codebase that the new code should match
 
 ### 4. Functional Requirements
 Numbered list of specific functionalities:
@@ -98,24 +123,39 @@ Numbered list of specific functionalities:
 Be explicit and unambiguous.
 
 ### 5. Non-Goals (Out of Scope)
-What this feature will NOT include. Critical for managing scope.
+What this feature will NOT include. **This section is REQUIRED** — explicit scope boundaries prevent agents from gold-plating or building unrequested features.
 
-### 6. Design Considerations (Optional)
+### 6. Constraints
+Architectural decisions and technology requirements that agents MUST follow. This captures intent, not just current state.
+
+Examples:
+- "Use drizzle ORM for all database operations"
+- "Use server actions for mutations, not API routes"
+- "All new components must use shadcn/ui"
+- "Follow existing naming conventions in src/actions/"
+
+### 7. Glossary (Optional)
+Define domain-specific terms used in the PRD. Helps agents (and junior developers) understand the vocabulary without guessing.
+
+Format:
+- **term**: Definition
+
+### 8. Design Considerations (Optional)
 - UI/UX requirements
 - Link to mockups if available
 - Relevant existing components to reuse
 
-### 7. Technical Considerations (Optional)
+### 9. Technical Considerations (Optional)
 - Known constraints or dependencies
 - Integration points with existing systems
 - Performance requirements
 
-### 8. Success Metrics
+### 10. Success Metrics
 How will success be measured?
 - "Reduce time to complete X by 50%"
 - "Increase conversion rate by 10%"
 
-### 9. Open Questions
+### 11. Open Questions
 Remaining questions or areas needing clarification.
 
 ---
@@ -209,6 +249,17 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - No automatic priority assignment based on due date
 - No priority inheritance for subtasks
 
+## Constraints
+
+- Use drizzle ORM for all database operations
+- Use server actions in src/actions/ for mutations, not API routes
+- Use shadcn/ui for all new UI components
+
+## Glossary
+
+- **priority**: Task urgency level — high, medium, or low
+- **badge**: Colored label component showing task metadata
+
 ## Technical Considerations
 
 - Reuse existing badge component with color variants
@@ -229,6 +280,20 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 
 ---
 
+## Revision Mode
+
+When updating an existing feature (the user references a prior PRD or says "add X to feature Y"):
+
+1. Read the existing PRD for that feature
+2. Note which user stories are unchanged vs new/modified
+3. Generate the updated PRD as a **complete spec** (not a diff)
+4. Mark unchanged stories clearly so the `/ralph` converter can carry over their status
+5. Include a brief "Changes from v{N}" section at the top listing what's new
+
+This supports PRP versioning — the `/ralph` converter will handle archiving and version numbering.
+
+---
+
 ## Checklist
 
 Before saving the PRD:
@@ -236,6 +301,11 @@ Before saving the PRD:
 - [ ] Asked clarifying questions with lettered options
 - [ ] Incorporated user's answers
 - [ ] User stories are small and specific
+- [ ] Acceptance criteria are **testable assertions** (not descriptions)
 - [ ] Functional requirements are numbered and unambiguous
-- [ ] Non-goals section defines clear boundaries
+- [ ] Non-goals section defines clear boundaries (**required**)
+- [ ] Constraints section captures architectural decisions
+- [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
+- [ ] Verification commands included where applicable
+- [ ] Implementation context included for non-trivial stories
 - [ ] Saved to `tasks/prd-[feature-name].md`

@@ -143,6 +143,8 @@ Ralph will:
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
+| `docker/` | Dockerfile and container scripts for parallel mode |
+| `parallel/` | Parallel mode orchestrator, status, and stop scripts |
 
 ## Flowchart
 
@@ -231,6 +233,110 @@ After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your pro
 ## Archiving
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+
+## Parallel Mode (Docker)
+
+Ralph includes a parallel mode that runs N containerized Claude Code agents simultaneously against the same PRD. Each agent runs in a Docker container with:
+
+- **Network restrictions** — builder agents can only reach Claude API and npm registry
+- **Resource limits** — configurable memory and CPU caps per container
+- **Story claiming** — agents claim stories via git atomic push to avoid duplicate work
+- **Automatic recovery** — stale claims are cleared, crashed containers are restarted
+
+### Prerequisites (Parallel Mode)
+
+- Docker installed and running
+- A Claude Code auth token (env var, file, or 1Password)
+- `jq` installed
+
+### Quick Start (Parallel Mode)
+
+```bash
+# Set your Claude auth token
+export RALPH_CLAUDE_TOKEN='<your-token>'
+
+# Run 3 agents in parallel
+./parallel/ralph-parallel.sh --agents 3
+
+# Check status
+./parallel/status.sh
+
+# Graceful shutdown
+./parallel/stop.sh
+```
+
+### Options
+
+```bash
+./parallel/ralph-parallel.sh \
+  --agents 3 \              # number of builder agents (default: 2)
+  --model claude-sonnet-4-5-20250929 \   # model (default: sonnet)
+  --memory 4g \             # per-container memory limit
+  --cpus 2 \                # per-container CPU limit
+  --researcher 1 \          # researcher agents with full internet access
+  [max_iterations]           # per-agent iteration cap (default: 0 = until PRD complete)
+```
+
+### Auth Token
+
+Priority order (first wins):
+1. `RALPH_CLAUDE_TOKEN` environment variable
+2. `.ralph/token` file in the project directory
+3. 1Password via `op read` (interactive, startup only)
+
+See [parallel/README.md](parallel/README.md) for full documentation.
+
+## Multi-PRP Mode (Docker)
+
+Multi-PRP mode extends parallel mode for running **independent feature branches simultaneously**. Instead of N agents competing for stories on one PRD, each PRP file gets its own feature branch and dedicated agent. This is ideal for batching multiple independent features in a single launch.
+
+### How It Works
+
+1. You provide multiple PRP JSON files, each with its own `branchName`
+2. The orchestrator pre-creates a feature branch per PRP in the bare repo
+3. One container launches per PRP, targeted to its branch via `RALPH_BRANCH`
+4. Agents work independently — no competition, no cross-branch coordination
+5. On completion, branches are fetched back and PR creation commands are printed
+
+### Quick Start (Multi-PRP)
+
+```bash
+# Launch 6 agents, one per PRP file
+./parallel/launch-multi-prp.sh \
+  --project /path/to/my-repo \
+  --prp prps/prp-03.json \
+  --prp prps/prp-04.json \
+  --prp prps/prp-05.json \
+  --prp prps/prp-06.json \
+  --prp prps/prp-07.json \
+  --model claude-sonnet-4-5-20250929
+```
+
+### Options (Multi-PRP)
+
+```bash
+./parallel/launch-multi-prp.sh \
+  --project DIR \          # project git repo (required)
+  --prp FILE \             # PRP JSON file, relative to project (repeatable, required)
+  --model MODEL \          # Claude model (default: claude-sonnet-4-5-20250929)
+  --memory SIZE \          # per-container memory (default: 4g)
+  --cpus N \               # per-container CPUs (default: 2)
+  --max-iterations N \     # per-agent iteration cap (default: 0 = until done)
+  --allow-domain DOMAIN    # extra firewall whitelist (repeatable)
+```
+
+### Single-PRP vs Multi-PRP
+
+| | `ralph-parallel.sh` | `launch-multi-prp.sh` |
+|---|---|---|
+| Branches | One shared branch | One branch per PRP |
+| Agents | N agents compete for stories | 1 agent per PRP, no competition |
+| Use case | Parallelize within a feature | Parallelize across features |
+| Story claiming | Git atomic push (contention possible) | No contention (isolated branches) |
+| Completion | All stories done → exit | All branches done → exit |
+| Output | Stories marked `passes: true` | Branches synced + PR commands printed |
+
+See [parallel/README.md](parallel/README.md) for full documentation.
 
 ## References
 

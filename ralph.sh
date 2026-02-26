@@ -34,29 +34,36 @@ if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PRD_FILE="$SCRIPT_DIR/prd.json"
+# Prefer prp.json, fall back to prd.json
+if [ -f "$SCRIPT_DIR/prp.json" ]; then
+  SPEC_FILE="$SCRIPT_DIR/prp.json"
+elif [ -f "$SCRIPT_DIR/prd.json" ]; then
+  SPEC_FILE="$SCRIPT_DIR/prd.json"
+else
+  SPEC_FILE="$SCRIPT_DIR/prp.json"  # default for new projects
+fi
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 
 # Archive previous run if branch changed
-if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+if [ -f "$SPEC_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$SPEC_FILE" 2>/dev/null || echo "")
   LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
-  
+
   if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
-    # Archive the previous run
-    DATE=$(date +%Y-%m-%d)
+    # Archive the previous run — use versioned naming
+    SPEC_VERSION=$(jq -r '.version // 1' "$SPEC_FILE" 2>/dev/null || echo "1")
     # Strip "ralph/" prefix from branch name for folder
     FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
-    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
-    
-    echo "Archiving previous run: $LAST_BRANCH"
+    ARCHIVE_FOLDER="$ARCHIVE_DIR/$FOLDER_NAME"
+
+    echo "Archiving previous run: $LAST_BRANCH (v$SPEC_VERSION)"
     mkdir -p "$ARCHIVE_FOLDER"
-    [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
-    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-    echo "   Archived to: $ARCHIVE_FOLDER"
-    
+    [ -f "$SPEC_FILE" ] && cp "$SPEC_FILE" "$ARCHIVE_FOLDER/v${SPEC_VERSION}.prp.json"
+    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/v${SPEC_VERSION}.progress.txt"
+    echo "   Archived to: $ARCHIVE_FOLDER/v${SPEC_VERSION}.*"
+
     # Reset progress file for new run
     echo "# Ralph Progress Log" > "$PROGRESS_FILE"
     echo "Started: $(date)" >> "$PROGRESS_FILE"
@@ -65,8 +72,8 @@ if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
 fi
 
 # Track current branch
-if [ -f "$PRD_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+if [ -f "$SPEC_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$SPEC_FILE" 2>/dev/null || echo "")
   if [ -n "$CURRENT_BRANCH" ]; then
     echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
   fi

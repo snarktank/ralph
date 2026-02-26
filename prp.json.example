@@ -1,0 +1,152 @@
+{
+  "project": "MyApp",
+  "branchName": "ralph/task-priority",
+  "description": "Task Priority System - Add priority levels to tasks with visual indicators and filtering",
+  "version": 1,
+  "previousVersion": null,
+
+  "constraints": [
+    "Use drizzle ORM for all database operations",
+    "Use server actions in src/actions/ for mutations, not API routes",
+    "Use shadcn/ui for all new UI components",
+    "Follow the existing pattern in src/actions/ for new server actions"
+  ],
+
+  "nonGoals": [
+    "No priority-based notifications or reminders",
+    "No automatic priority assignment based on due date",
+    "No priority inheritance for subtasks"
+  ],
+
+  "glossary": {
+    "priority": "Task urgency level: high, medium, or low",
+    "badge": "Colored label component showing task metadata"
+  },
+
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add priority field to database",
+      "description": "As a developer, I need to store task priority so it persists across sessions.",
+      "acceptanceCriteria": [
+        "Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "verificationCommands": [
+        "npx tsc --noEmit",
+        "npx drizzle-kit push"
+      ],
+      "dependsOn": [],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "context": {
+        "relevantFiles": [
+          "src/db/schema.ts",
+          "drizzle.config.ts"
+        ],
+        "hints": [
+          "Follow existing column patterns in schema.ts",
+          "Use pgEnum for the priority type"
+        ],
+        "examples": [
+          "// Existing enum pattern in schema.ts:\nexport const statusEnum = pgEnum('status', ['pending', 'in_progress', 'done']);"
+        ]
+      }
+    },
+    {
+      "id": "US-002",
+      "title": "Display priority indicator on task cards",
+      "description": "As a user, I want to see task priority at a glance so I know what needs attention first.",
+      "acceptanceCriteria": [
+        "TaskCard component renders a Badge with color prop: red for high, yellow for medium, gray for low",
+        "Priority badge is visible without hover or click interaction",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "verificationCommands": [
+        "npx tsc --noEmit"
+      ],
+      "dependsOn": ["US-001"],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "context": {
+        "relevantFiles": [
+          "src/components/TaskCard.tsx",
+          "src/components/ui/Badge.tsx"
+        ],
+        "hints": [
+          "Reuse existing Badge component — it already supports color variants",
+          "Priority data is already included in the task query response after US-001"
+        ],
+        "examples": [
+          "// Existing Badge usage in StatusBadge.tsx:\n<Badge color={statusColors[task.status]}>{task.status}</Badge>"
+        ]
+      }
+    },
+    {
+      "id": "US-003",
+      "title": "Add priority selector to task edit",
+      "description": "As a user, I want to change a task's priority when editing it.",
+      "acceptanceCriteria": [
+        "Priority dropdown in task edit modal with options: High, Medium, Low",
+        "Shows current priority as selected value",
+        "Saves immediately on selection change via server action",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "verificationCommands": [
+        "npx tsc --noEmit"
+      ],
+      "dependsOn": ["US-001"],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "context": {
+        "relevantFiles": [
+          "src/components/TaskEditModal.tsx",
+          "src/actions/tasks.ts"
+        ],
+        "hints": [
+          "Add updatePriority server action following existing patterns in tasks.ts",
+          "Use shadcn/ui Select component for the dropdown"
+        ],
+        "examples": [
+          "// Existing server action pattern in tasks.ts:\nexport async function updateStatus(taskId: string, status: Status) {\n  return db.update(tasks).set({ status }).where(eq(tasks.id, taskId));\n}"
+        ]
+      }
+    },
+    {
+      "id": "US-004",
+      "title": "Filter tasks by priority",
+      "description": "As a user, I want to filter the task list to see only high-priority items when I'm focused.",
+      "acceptanceCriteria": [
+        "Filter dropdown with options: All | High | Medium | Low",
+        "Filter persists in URL search params",
+        "Empty state message when no tasks match filter",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "verificationCommands": [
+        "npx tsc --noEmit"
+      ],
+      "dependsOn": ["US-002", "US-003"],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "context": {
+        "relevantFiles": [
+          "src/components/TaskList.tsx",
+          "src/components/FilterBar.tsx"
+        ],
+        "hints": [
+          "Follow the existing status filter pattern in FilterBar.tsx",
+          "Use useSearchParams for URL param persistence"
+        ],
+        "examples": []
+      }
+    }
+  ]
+}

@@ -4,16 +4,36 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the PRD at `prd.json` (in the same directory as this file)
+1. Read the spec file: check for `prp.json` first, fall back to `prd.json` (in the same directory as this file)
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
-3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. Pick the **highest priority** user story where `passes: false`
-5. Implement that single user story
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-7. Update CLAUDE.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-9. Update the PRD to set `passes: true` for the completed story
-10. Append your progress to `progress.txt`
+3. Check you're on the correct branch from the spec's `branchName`. If not, check it out or create from main.
+4. If the spec has a `previousVersion` field (non-null), read the prior version for context on what's already built
+5. Pick the **highest priority** user story where `passes: false` and all `dependsOn` story IDs (if any) have `passes: true`
+6. Before implementing, read the story's `context` block if present (see PRP Context below)
+7. Implement that single user story
+8. Run quality checks — if the story has `verificationCommands`, run those; otherwise use project defaults (typecheck, lint, test)
+9. Update CLAUDE.md files if you discover reusable patterns (see below)
+10. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+11. Update the spec to set `passes: true` for the completed story
+12. Append your progress to `progress.txt`
+
+## PRP Context
+
+The spec file may contain enriched fields that help you work more effectively. Check for and use these if present:
+
+### Project-Level Fields
+- **`constraints`**: Architectural decisions you MUST follow (e.g., "Use drizzle ORM", "Use server actions for mutations"). Treat these as hard requirements — do not deviate.
+- **`nonGoals`**: Explicit scope boundaries. Before completing a story, verify your implementation doesn't accidentally build something listed as a non-goal.
+- **`glossary`**: Domain term definitions. Use these when you encounter unfamiliar terms in the spec.
+
+### Story-Level Fields
+- **`context.relevantFiles`**: Read these files before starting implementation — they contain the code you'll be modifying or the patterns you should follow.
+- **`context.hints`**: Implementation guidance — what to reuse, what approach to take.
+- **`context.examples`**: Code snippets showing patterns your new code should match.
+- **`verificationCommands`**: Specific shell commands to validate your work. Run these instead of (or in addition to) generic quality checks.
+
+### Version Context
+- **`previousVersion`**: If non-null, points to an archived prior version of this spec. Read it to understand what's already been built — stories with `passes: true` carried over from the previous version are already implemented.
 
 ## Progress Report Format
 
@@ -73,9 +93,11 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 ## Quality Requirements
 
 - ALL commits must pass your project's quality checks (typecheck, lint, test)
+- If the story has `verificationCommands`, run those as part of your quality checks
 - Do NOT commit broken code
 - Keep changes focused and minimal
 - Follow existing code patterns
+- If `constraints` exist in the spec, verify your implementation follows them
 
 ## Browser Testing (If Available)
 
