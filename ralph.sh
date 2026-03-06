@@ -7,6 +7,7 @@ set -e
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
 MAX_ITERATIONS=10
+LIMIT_WAIT=3600  # Default: wait 1 hour when rate limited
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +17,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --limit-wait)
+      LIMIT_WAIT="$2"
+      shift 2
+      ;;
+    --limit-wait=*)
+      LIMIT_WAIT="${1#*=}"
       shift
       ;;
     *)
@@ -79,7 +88,7 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Limit wait: ${LIMIT_WAIT}s"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -87,14 +96,58 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-  # Run the selected tool with the ralph prompt
-  if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  else
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
-  fi
-  
+  while true; do
+    # Run the selected tool with the ralph prompt
+    if [[ "$TOOL" == "amp" ]]; then
+      OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
+    else
+      # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
+      OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    fi
+
+    # Check for rate/usage limit signals in the output
+    if echo "$OUTPUT" | grep -qiE "rate.?limit|429|quota|too many requests|usage limit|limit exceeded|try again later|hit.*limit|you.*hit.*limit"; then
+      echo ""
+
+      # Try to parse reset time from message, e.g. "resets 8pm (Asia/Saigon)"
+      RESET_TIME_STR=$(echo "$OUTPUT" | grep -oiE "resets [0-9]+(:[0-9]+)?(am|pm)" | grep -oiE "[0-9]+(:[0-9]+)?(am|pm)" | head -1)
+      RESET_TZ_STR=$(echo "$OUTPUT" | grep -oiE "\([A-Za-z]+/[A-Za-z_]+\)" | tr -d '()' | head -1)
+
+      WAIT_SECS=$LIMIT_WAIT
+      if [[ -n "$RESET_TIME_STR" && -n "$RESET_TZ_STR" ]]; then
+        NOW=$(date +%s)
+        RESET_EPOCH=$(TZ="$RESET_TZ_STR" date -d "today $RESET_TIME_STR" +%s 2>/dev/null || true)
+        if [[ -n "$RESET_EPOCH" && $RESET_EPOCH -le $NOW ]]; then
+          RESET_EPOCH=$(TZ="$RESET_TZ_STR" date -d "tomorrow $RESET_TIME_STR" +%s 2>/dev/null || true)
+        fi
+        if [[ -n "$RESET_EPOCH" && $RESET_EPOCH -gt $NOW ]]; then
+          WAIT_SECS=$((RESET_EPOCH - NOW))
+          RESET_LOCAL=$(TZ="$RESET_TZ_STR" date -d "@$RESET_EPOCH" "+%H:%M %Z")
+          echo "*** Rate limit hit. Waiting until $RESET_LOCAL (${WAIT_SECS}s) before retrying iteration $i... ***"
+        else
+          echo "*** Rate limit hit. Could not parse reset time. Waiting ${WAIT_SECS}s before retrying iteration $i... ***"
+        fi
+      else
+        echo "*** Rate limit hit. Waiting ${WAIT_SECS}s before retrying iteration $i... ***"
+      fi
+
+      REMAINING=$WAIT_SECS
+      while [[ $REMAINING -gt 0 ]]; do
+        HOURS=$((REMAINING / 3600))
+        MINS=$(( (REMAINING % 3600) / 60 ))
+        SECS=$((REMAINING % 60))
+        printf "\r  Retrying in %02d:%02d:%02d..." "$HOURS" "$MINS" "$SECS"
+        sleep 1
+        REMAINING=$((REMAINING - 1))
+      done
+      printf "\r  Retrying now...                    \n"
+      continue
+    fi
+
+    # No rate limit — exit inner retry loop
+    break
+  done
+
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
