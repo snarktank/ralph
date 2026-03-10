@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [Cursor CLI](https://cursor.com/docs/cli/headless)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -13,6 +13,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [Cursor CLI](https://cursor.com/docs/cli/headless) (install via Cursor IDE or `curl https://cursor.com/install -fsS | bash`; use `cursor auth login` or `CURSOR_API_KEY` for headless)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -30,14 +31,14 @@ cp /path/to/ralph/ralph.sh scripts/ralph/
 # Copy the prompt template for your AI tool of choice:
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
-cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code or Cursor
 
 chmod +x scripts/ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally (Amp)
+### Option 2: Install skills globally (Amp, Claude Code, Cursor)
 
-Copy the skills to your Amp or Claude config for use across all projects:
+Copy the skills to your Amp, Claude, or Cursor config for use across all projects:
 
 For AMP
 ```bash
@@ -49,6 +50,12 @@ For Claude Code (manual)
 ```bash
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
+```
+
+For Cursor
+```bash
+cp -r skills/prd ~/.cursor/skills/
+cp -r skills/ralph ~/.cursor/skills/
 ```
 
 ### Option 3: Use as Claude Code Marketplace
@@ -115,9 +122,15 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Using Cursor CLI
+./scripts/ralph/ralph.sh --tool cursor [max_iterations]
+
+# Using Cursor CLI with a specific model (e.g. auto, claude-sonnet-4)
+./scripts/ralph/ralph.sh --tool cursor [max_iterations] --model auto
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp`, `--tool claude`, or `--tool cursor` to select your AI coding tool. With Cursor, use `--model MODEL` to pass a model name to the Cursor CLI (e.g. `--model auto`).
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -133,9 +146,9 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--tool cursor`; Cursor supports `--model MODEL`) |
 | `prompt.md` | Prompt template for Amp |
-| `CLAUDE.md` | Prompt template for Claude Code |
+| `CLAUDE.md` | Prompt template for Claude Code and Cursor |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
@@ -223,7 +236,7 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code or Cursor) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
@@ -237,3 +250,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [Cursor CLI documentation](https://cursor.com/docs/cli/headless)
