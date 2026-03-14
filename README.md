@@ -202,6 +202,23 @@ Ralph only works if there are feedback loops:
 
 Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
 
+### Per-Story Model Selection (Claude Code)
+
+When using `--tool claude`, you can specify a model per story by adding a `model` field:
+
+```json
+{
+  "id": "US-005",
+  "title": "Complex table reconstruction",
+  "model": "opus",
+  "notes": "Requires opus for complex multi-column table logic"
+}
+```
+
+Ralph reads the `model` field from the next incomplete story and passes `--model` to the Claude CLI. Valid values: `sonnet`, `opus`, `haiku`, or full model IDs like `claude-opus-4-6`. Stories without a `model` field use the default model.
+
+This lets you use a cheaper model (sonnet) for straightforward stories and reserve opus for complex ones, optimizing cost across a run.
+
 ### Stop Condition
 
 When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
