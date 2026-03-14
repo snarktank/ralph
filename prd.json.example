@@ -14,7 +14,8 @@
       ],
       "priority": 1,
       "passes": false,
-      "notes": ""
+      "notes": "",
+      "model": ""
     },
     {
       "id": "US-002",

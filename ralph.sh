@@ -87,12 +87,28 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
+  # Detect per-story model override from prd.json
+  # Reads the "model" field from the first story where passes is false
+  STORY_MODEL=""
+  STORY_ID=""
+  if [ -f "$PRD_FILE" ] && [[ "$TOOL" == "claude" ]]; then
+    STORY_MODEL=$(jq -r '[.userStories[] | select(.passes == false)] | sort_by(.priority) | first | .model // empty' "$PRD_FILE" 2>/dev/null || echo "")
+    STORY_ID=$(jq -r '[.userStories[] | select(.passes == false)] | sort_by(.priority) | first | .id // empty' "$PRD_FILE" 2>/dev/null || echo "")
+    if [ -n "$STORY_MODEL" ] && [ -n "$STORY_ID" ]; then
+      echo "  Story $STORY_ID requests model: $STORY_MODEL"
+    fi
+  fi
+
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    MODEL_FLAG=""
+    if [ -n "$STORY_MODEL" ]; then
+      MODEL_FLAG="--model $STORY_MODEL"
+    fi
+    OUTPUT=$(claude --dangerously-skip-permissions --print $MODEL_FLAG < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   fi
   
   # Check for completion signal
