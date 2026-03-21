@@ -11,3 +11,8 @@ progress.txt
 
 #Claude
 .claude/
+
+# Environment files (containing secrets - NEVER commit)
+.env
+.env.*
+! .env.example

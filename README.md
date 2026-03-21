@@ -13,6 +13,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - OR configure for direct LLM API use (see below)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -109,12 +110,27 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 ### 3. Run Ralph
 
+#### Using Amp (default)
 ```bash
-# Using Amp (default)
+# From your project root
 ./scripts/ralph/ralph.sh [max_iterations]
+```
 
-# Using Claude Code
+#### Using Claude Code
+```bash
+# From your project root
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+```
+
+#### Using Direct NVIDIA LLM API (NEW)
+```bash
+# From your project root
+./scripts/ralph/ralph.sh --llm-provider nvidia --llm-api-key YOUR_NVIDIA_API_KEY [max_iterations]
+
+# Optional parameters:
+# --llm-model MODEL_NAME (default: nvidia/nemotron-4-340b-instruct)
+# --llm-base-url URL (default: https://integrate.api.nvidia.com/v1)
+# --llm-temperature TEMPERATURE (default: 0.7)
 ```
 
 Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
@@ -133,7 +149,7 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp`, `--tool claude`, or `--llm-provider nvidia`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
@@ -162,7 +178,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (Amp, Claude Code, or direct LLM API) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -237,3 +253,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+- [NVIDIA API documentation](https://docs.nvidia.com/nim/large-language-models/latest/) (for direct LLM API usage)
