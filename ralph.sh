@@ -251,6 +251,19 @@ execute_nvidia_actions() {
     type=$(echo "$action" | jq -r '.type // empty')
     
     case "$type" in
+      "list_files")
+        log_action "start" "$action" "false"
+        local path
+        path=$(echo "$action" | jq -r '.path // empty')
+        echo "DEBUG: Attempting to list files in directory: $path"
+        if [[ -n "$path" && -d "$path" ]]; then
+          ls -la "$path"
+          log_action "end" "$action" "true"
+        else
+          echo "Error: Directory not found: $path"
+          log_action "end" "$action" "false"
+        fi
+        ;;
       "read_file")
         log_action "start" "$action" "false"
         local path
