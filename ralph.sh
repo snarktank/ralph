@@ -1,5 +1,9 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
+
+# Global timer variables
+SCRIPT_START_SECONDS=$SECONDS
+TOTAL_API_CALLS=0
 # Usage: ./ralph.sh [--tool amp|claude] [--llm-provider nvidia --llm-api-key KEY ...] [max_iterations]
 
 set -e
