@@ -300,6 +300,12 @@ execute_nvidia_actions() {
         fi
         ;;
       "finish")
+        _sid=$(jq -r '[.userStories[] | select(.passes == false)][0].id // empty' "$SCRIPT_DIR/prd.json" 2>/dev/null)
+        if [[ -n "$_sid" && "$_sid" != "null" ]]; then
+          _tmp=$(mktemp)
+          jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
+          echo "Story $_sid marked as PASSED"
+        fi
         echo "<promise>COMPLETE</promise>"
         return 0
         ;;
@@ -444,6 +450,9 @@ run_nvidia_agent_loop() {
     
     # Try to parse as JSON action - handle the case where LLM returns clean JSON
     local actions_json
+    # Strip markdown code fences (Qwen3-coder wraps JSON in ```json blocks)
+    llm_content=$(echo "$llm_content" | sed '/^```/d')
+
     actions_json=$(echo "$llm_content" | jq -e '.' 2>/dev/null) || true
     
     # If that failed, try to extract JSON from text (in case LLM wrapped it in markdown)
