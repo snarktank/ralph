@@ -216,7 +216,7 @@ llm_call_nvidia() {
     --arg model "$LLM_MODEL" \
     --argjson msgs "$messages" \
     --argjson temp "${LLM_TEMPERATURE}" \
-    --argjson max_tokens 4096 \
+    --argjson max_tokens 8192 \
     '{model: $model, messages: $msgs, temperature: $temp, max_tokens: $max_tokens, stream: false}')
   
   local _retry _api_result
@@ -245,8 +245,8 @@ execute_nvidia_actions() {
   log_action "start" "execute_nvidia_actions" "true"
   local actions_json="$1"
   
-  # Process each action
-  echo "$actions_json" | jq -c '.actions[]' | while read -r action; do
+  # Process each action (process substitution avoids subshell — return works correctly)
+  while read -r action; do
     local type
     type=$(echo "$action" | jq -r '.type // empty')
     
@@ -362,99 +362,8 @@ execute_nvidia_actions() {
         log_action "end" "$action" "false"
         ;;
     esac
+  done < <(echo "$actions_json" | jq -c '.actions[]')
   log_action "end" "execute_nvidia_actions" "true"
-      "read_file")
-        local path
-        path=$(echo "$action" | jq -r '.path // empty')
-        echo "DEBUG: Attempting to read file: $path"
-        if [[ -n "$path" && -f "$path" ]]; then
-          cat "$path"
-        else
-          echo "Error: File not found: $path"
-        fi
-        ;;
-      "edit_file")
-        local path
-        path=$(echo "$action" | jq -r '.path // empty')
-        local changes
-        changes=$(echo "$action" | jq -c '.changes // empty')
-        
-        if [[ -z "$path" || -z "$changes" ]]; then
-          echo "Error: Invalid edit_file action"
-          continue
-        fi
-        
-        # Apply each change
-        echo "$changes" | jq -c '.[]' | while read -r change; do
-          local old_str new_str
-          old_str=$(echo "$change" | jq -r '.oldString // empty')
-          new_str=$(echo "$change" | jq -r '.newString // empty')
-          
-          if [[ -n "$old_str" && -n "$new_str" && -f "$path" ]]; then
-            # Use sed with careful escaping for forward slash and ampersand
-            _EP="$path" _EO="$old_str" _EN="$new_str" python3 -c "import os;p=os.environ['_EP'];c=open(p).read().replace(os.environ['_EO'],os.environ['_EN'],1);open(p,'w').write(c)"
-            echo "Edited: $path"
-          else
-            echo "Warning: Skipping invalid change in $path"
-          fi
-        done
-        ;;
-      "create_file")
-        local path
-        path=$(echo "$action" | jq -r '.path // .filename // empty')
-        local content
-        content=$(echo "$action" | jq -r '.content // empty')
-        
-        if [[ -z "$path" ]]; then
-          echo "Error: Invalid create_file action - missing path"
-          continue
-        fi
-        
-        if [[ -z "$content" ]]; then
-          echo "Error: Invalid create_file action - missing content"
-          continue
-        fi
-        
-        # Create directory if needed
-        mkdir -p "$(dirname "$path")"
-        
-        # Write content to file
-        echo "$content" > "$path"
-        echo "Created: $path"
-        ;;
-      "run_command")
-        local command expect_success
-        command=$(echo "$action" | jq -r '.command // empty')
-        expect_success=$(echo "$action" | jq -r '.expects_success // true')
-        
-        if [[ -n "$command" ]]; then
-          echo "Running: $command"
-          local output
-          output=$(eval "$command" 2>&1)
-          local exit_code=$?
-          
-          if [[ "$expect_success" == "true" && $exit_code -ne 0 ]]; then
-            echo "Command failed (exit $exit_code): $output"
-          else
-            echo "Command succeeded: $output"
-          fi
-        fi
-        ;;
-      "finish")
-        _sid=$(jq -r '[.userStories[] | select(.passes == false)][0].id // empty' "$SCRIPT_DIR/prd.json" 2>/dev/null)
-        if [[ -n "$_sid" && "$_sid" != "null" ]]; then
-          _tmp=$(mktemp)
-          jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
-          echo "Story $_sid marked as PASSED"
-        fi
-        echo "<promise>COMPLETE</promise>"
-        return 0
-        ;;
-      *)
-        echo "Warning: Unknown action type: $type"
-        ;;
-    esac
-  done
 }
 
 # Construct prompt for NVIDIA LLM
@@ -579,16 +488,6 @@ run_nvidia_agent_loop() {
       return 1
     fi
     
-    # Debug: show what we got
-    echo "DEBUG: LLM response content length: ${#llm_content}"
-    if [[ -n "$llm_content" && "$llm_content" != "null" ]]; then
-      echo "DEBUG: LLM content (first 200 chars): ${llm_content:0:200}"
-      echo "DEBUG: LLM content (last 50 chars): ${llm_content: -50}"
-    else
-      echo "DEBUG: LLM content is empty or null"
-      echo "DEBUG: Full response: $llm_response"
-    fi
-    
     # Try to parse as JSON action - handle the case where LLM returns clean JSON
     local actions_json
     # Strip markdown code fences (Qwen3-coder wraps JSON in ```json blocks)
@@ -633,11 +532,11 @@ run_nvidia_agent_loop() {
     # Add execution result to history
     conversation_history=$(echo "$conversation_history" | jq --arg res "$execution_result" '. + [{"role": "user", "content": ("Action execution result: " + $res)}]')
     
-    # Check for completion signal via exit code from execute_nvidia_actions
-    # (grep on execution_result is unsafe - reading ralph.sh would match the string in source code)
+    # Check for completion: finish action now uses return 0 (no subshell thanks to process substitution)
     if [[ $exit_code -eq 0 ]] && echo "$execution_result" | tail -1 | grep -qF "<promise>COMPLETE</promise>"; then
       return 0
     fi
+    
     
     # Safety check: prevent infinite loops
     if (( iteration_count++ > 40 )); then
