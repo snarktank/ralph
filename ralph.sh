@@ -1,9 +1,5 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-
-# Global timer variables
-SCRIPT_START_SECONDS=$SECONDS
-TOTAL_API_CALLS=0
 # Usage: ./ralph.sh [--tool amp|claude] [--llm-provider nvidia --llm-api-key KEY ...] [max_iterations]
 
 set -e
@@ -14,15 +10,6 @@ if ! command -v jq &> /dev/null; then
   echo "On Windows with Git Binary, you can download from: https://github.com/jqlang/jq/releases"
   exit 1
 fi
-
-# Log action to ralph-debug.log
-log_action() {
-  local action_type="$1"
-  local action_details="$2"
-  local success="$3"
-  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-  echo "$timestamp - $action_type - $action_details - $success" >> "$LOG_FILE"
-}
 if ! command -v curl &> /dev/null; then
   echo "Error: curl is required but not installed. Please install curl and try again."
   exit 1
@@ -164,6 +151,21 @@ PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 
+# Global timer variables
+SCRIPT_START_SECONDS=$SECONDS
+TOTAL_API_CALLS=0
+TOTAL_API_TIME=0
+ITERATION_START_SECONDS=0
+
+# Log action to ralph-debug.log
+log_action() {
+  local action_type="$1"
+  local action_details="$2"
+  local success="$3"
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  echo "$timestamp - $action_type - $action_details - $success" >> "$LOG_FILE"
+}
+
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
@@ -249,6 +251,7 @@ llm_call_nvidia() {
 
 # Execute actions returned by the LLM
 execute_nvidia_actions() {
+  local actions_start_seconds=$SECONDS
   local actions_json="$1"
   local action_count=0
   log_action "start" "execute_nvidia_actions" "true"
@@ -257,6 +260,7 @@ execute_nvidia_actions() {
   while read -r action; do
     local type
     type=$(echo "$action" | jq -r '.type // empty')
+    (( action_count++ )) || true
     
     case "$type" in
       "list_files")
@@ -407,7 +411,8 @@ execute_nvidia_actions() {
     esac
   done < <(echo "$actions_json" | jq -c '.actions[]')
   log_action "end" "execute_nvidia_actions" "true"
-  echo "DEBUG: Executed $action_count actions" >&2
+  local actions_duration=$(( SECONDS - actions_start_seconds ))
+  echo "DEBUG: Executed $action_count actions in ${actions_duration}s" >&2
 }
 
 # Construct prompt for NVIDIA LLM
@@ -583,7 +588,13 @@ run_nvidia_agent_loop() {
       return 0
     fi
     
-    
+    # Sliding window: keep last 10 messages to prevent context overflow (jq: Argument list too long)
+    local hist_len
+    hist_len=$(echo "$conversation_history" | jq 'length')
+    if (( hist_len > 10 )); then
+      conversation_history=$(echo "$conversation_history" | jq '.[-10:]')
+      echo "DEBUG: Trimmed conversation history from $hist_len to 10 messages" >&2
+    fi
     # Safety check: prevent infinite loops
     if (( iteration_count++ > 40 )); then
       echo "Error: Exceeded maximum agent iterations"
