@@ -534,6 +534,8 @@ run_nvidia_agent_loop() {
     
     # Check for completion: finish action now uses return 0 (no subshell thanks to process substitution)
     if [[ $exit_code -eq 0 ]] && echo "$execution_result" | tail -1 | grep -qF "<promise>COMPLETE</promise>"; then
+      # Re-emit completion signal so main loop can detect it in $OUTPUT
+      echo "<promise>COMPLETE</promise>"
       return 0
     fi
     
