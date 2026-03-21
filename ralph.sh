@@ -134,11 +134,14 @@ GIT RULES:
 - After completing a story: git add -A && git commit -m feat-STORYID-title
 - Use run_command for all git operations
 
-SELF-MODIFICATION RULES:
-- You CAN read and modify ralph.sh - this is expected for self-improvement tasks
-- ALWAYS commit before modifying ralph.sh
-- After modifying ralph.sh, read it back to verify your changes are correct
-- If you break JSON parsing or bash syntax, the next iteration will fail - be careful"
+SELF-MODIFICATION RULES (SANDBOX):
+- You CAN read and modify ralph.sh - edits go to a staging copy automatically
+- On finish, staging is validated with bash -n before applying
+- If syntax is broken, changes are REJECTED and you must fix them
+- Make SMALL, incremental changes per action - one edit_file per logical change
+- Do NOT try to rewrite entire functions in one edit - split into multiple actions
+- After editing, use read_file to verify your staged changes look correct
+- ALWAYS commit before modifying ralph.sh: run_command git add -A && git commit -m checkpoint"
   
   # Trigger direct LLM path
   TOOL="llm_direct_nvidia"
@@ -242,8 +245,9 @@ llm_call_nvidia() {
 
 # Execute actions returned by the LLM
 execute_nvidia_actions() {
-  log_action "start" "execute_nvidia_actions" "true"
   local actions_json="$1"
+  local action_count=0
+  log_action "start" "execute_nvidia_actions" "true"
   
   # Process each action (process substitution avoids subshell — return works correctly)
   while read -r action; do
@@ -268,6 +272,11 @@ execute_nvidia_actions() {
         log_action "start" "$action" "false"
         local path
         path=$(echo "$action" | jq -r '.path // empty')
+        # SANDBOX: if staged version exists, read that instead
+        if [[ ("$path" == "ralph.sh" || "$path" == "./ralph.sh") && -f "$SCRIPT_DIR/.staging/ralph.sh" ]]; then
+          path="$SCRIPT_DIR/.staging/ralph.sh"
+          echo "SANDBOX: Reading staged version of ralph.sh"
+        fi
         echo "DEBUG: Attempting to read file: $path"
         if [[ -n "$path" && -f "$path" ]]; then
           cat "$path"
@@ -287,6 +296,16 @@ execute_nvidia_actions() {
           echo "Error: Invalid edit_file action"
           log_action "end" "$action" "false"
           continue
+        fi
+        # SANDBOX: redirect ralph.sh edits to staging copy
+        if [[ "$path" == "ralph.sh" || "$path" == "./ralph.sh" ]]; then
+          mkdir -p "$SCRIPT_DIR/.staging"
+          if [[ ! -f "$SCRIPT_DIR/.staging/ralph.sh" ]]; then
+            cp "$SCRIPT_DIR/ralph.sh" "$SCRIPT_DIR/.staging/ralph.sh"
+            echo "SANDBOX: Created staging copy of ralph.sh"
+          fi
+          path="$SCRIPT_DIR/.staging/ralph.sh"
+          echo "SANDBOX: Editing staging copy (not live code)"
         fi
         # Apply each change
         echo "$changes" | jq -c '.[]' | while read -r change; do
@@ -347,6 +366,26 @@ execute_nvidia_actions() {
         ;;
       "finish")
         log_action "start" "$action" "false"
+        # SANDBOX: validate staged ralph.sh before accepting
+        if [[ -f "$SCRIPT_DIR/.staging/ralph.sh" ]]; then
+          echo "SANDBOX: Validating staged ralph.sh with bash -n..."
+          local _sandbox_err
+          _sandbox_err=$(bash -n "$SCRIPT_DIR/.staging/ralph.sh" 2>&1)
+          if [[ $? -eq 0 ]]; then
+            echo "SANDBOX: ✅ Syntax OK — applying changes to live ralph.sh"
+            echo "SANDBOX: Changes diff:"
+            diff "$SCRIPT_DIR/ralph.sh" "$SCRIPT_DIR/.staging/ralph.sh" || true
+            cp "$SCRIPT_DIR/.staging/ralph.sh" "$SCRIPT_DIR/ralph.sh"
+            rm -rf "$SCRIPT_DIR/.staging"
+          else
+            echo "SANDBOX: ❌ SYNTAX ERROR — changes REJECTED"
+            echo "SANDBOX: Error: $_sandbox_err"
+            rm -rf "$SCRIPT_DIR/.staging"
+            echo "Your changes to ralph.sh had syntax errors. Please fix and retry."
+            log_action "end" "$action" "false"
+            continue
+          fi
+        fi
         _sid=$(jq -r '[.userStories[] | select(.passes == false)][0].id // empty' "$SCRIPT_DIR/prd.json" 2>/dev/null)
         if [[ -n "$_sid" && "$_sid" != "null" ]]; then
           _tmp=$(mktemp)
@@ -364,6 +403,7 @@ execute_nvidia_actions() {
     esac
   done < <(echo "$actions_json" | jq -c '.actions[]')
   log_action "end" "execute_nvidia_actions" "true"
+  echo "DEBUG: Executed $action_count actions" >&2
 }
 
 # Construct prompt for NVIDIA LLM
@@ -511,8 +551,8 @@ run_nvidia_agent_loop() {
       echo "Warning: LLM did not return valid JSON. Response:"
       echo "$llm_content"
       echo "Attempting to continue..."
-      # Simple fallback: finish if contains completion signal
-      if echo "$llm_content" | grep -q "<promise>COMPLETE</promise>"; then
+      # Fallback: check if LLM explicitly requested finish action (not just mentioned COMPLETE string)
+      if echo "$llm_content" | jq -e '.actions[] | select(.type == "finish")' >/dev/null 2>&1; then
         echo "<promise>COMPLETE</promise>"
         return 0
       fi

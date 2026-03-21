@@ -9,8 +9,14 @@ progress.txt
 # OS files
 .DS_Store
 
-#Claude
+# Claude
 .claude/
+
+# Staging sandbox (self-improvement sandbox)
+.staging/
+
+# Debug log
+ralph-debug.log
 
 # Environment files (containing secrets - NEVER commit)
 .env
