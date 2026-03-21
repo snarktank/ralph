@@ -431,7 +431,7 @@ run_nvidia_agent_loop() {
     
     # Extract content from response (handle API format)
     local llm_content
-    if ! llm_content=$(echo "$llm_response" | jq -r '.choices[0].message.content // empty' 2>/dev/null); then
+    if ! llm_content=$(echo "$llm_response" | jq -r '(.choices[0].message.content // .choices[0].message.reasoning_content // .choices[0].message.reasoning) // empty' 2>/dev/null); then
         echo "DEBUG: Failed to parse LLM response as JSON. Response was:" >&2
         echo "$llm_response" >&2
         echo "Saving response to /tmp/llm_response_debug.txt" >&2
