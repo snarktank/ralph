@@ -108,7 +108,28 @@ Each action object MUST have a 'type' field. Supported types:
 
 IMPORTANT: The PRD is located at \"prd.json\" and the progress log is located at \"progress.txt\" in the project root. Use these exact file names when referring to these files.
 
-DO NOT include any text outside the JSON object. DO NOT include explanations, markdown formatting, or additional fields. Your entire response must be parseable as JSON."
+DO NOT include any text outside the JSON object. DO NOT include explanations, markdown formatting, or additional fields. Your entire response must be parseable as JSON.
+
+WORKFLOW RULES:
+1. Read prd.json to find the highest priority story where passes is false
+2. Read progress.txt for context from previous iterations
+3. Implement the story with minimal, focused changes
+4. When modifying .sh files, ALWAYS run_command git add -A and git commit BEFORE making changes (safety net)
+5. After implementing, verify your changes work (read the file back, run tests if applicable)
+6. When story is complete, use edit_file to update prd.json and set passes to true for that story
+7. Append a summary to progress.txt describing what you did and what you learned
+8. Use finish action to signal completion
+
+GIT RULES:
+- Before modifying any .sh file: git add -A && git commit -m checkpoint-before-edit
+- After completing a story: git add -A && git commit -m feat-STORYID-title
+- Use run_command for all git operations
+
+SELF-MODIFICATION RULES:
+- You CAN read and modify ralph.sh - this is expected for self-improvement tasks
+- ALWAYS commit before modifying ralph.sh
+- After modifying ralph.sh, read it back to verify your changes are correct
+- If you break JSON parsing or bash syntax, the next iteration will fail - be careful"
   
   # Trigger direct LLM path
   TOOL="llm_direct_nvidia"
@@ -187,7 +208,7 @@ llm_call_nvidia() {
       --arg model "$LLM_MODEL" \
       --argjson msgs "$messages" \
       --argjson temp "${LLM_TEMPERATURE}" \
-      --argjson max_tokens 500 \
+      --argjson max_tokens 4096 \
       '{model: $model, messages: $msgs, temperature: $temp, max_tokens: $max_tokens, stream: false}')"
 }
 
@@ -333,6 +354,12 @@ EOF
   echo ""
   echo "Recent progress (last 5 lines):"
   tail -n 5 "$SCRIPT_DIR/progress.txt" 2>/dev/null || echo "(no progress yet)"
+  echo ""
+  echo "Project files:"
+  find "$SCRIPT_DIR" -maxdepth 2 -type f \( -name "*.sh" -o -name "*.json" -o -name "*.md" -o -name "*.txt" \) ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/archive/*" 2>/dev/null | head -30
+  echo ""
+  echo "Git status:"
+  cd "$SCRIPT_DIR" && git status --short 2>/dev/null | head -10
 }
 
 # Get highest priority story where passes: false
@@ -474,7 +501,7 @@ run_nvidia_agent_loop() {
     fi
     
     # Safety check: prevent infinite loops
-    if (( iteration_count++ > 20 )); then
+    if (( iteration_count++ > 40 )); then
       echo "Error: Exceeded maximum agent iterations"
       return 1
     fi
