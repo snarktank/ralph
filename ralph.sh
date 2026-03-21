@@ -200,16 +200,34 @@ llm_call_nvidia() {
     --arg prompt "$prompt" \
     '[{role: "system", content: $sys}] + $hist + [{role: "user", content: $prompt}]')
   
-  # Call NVIDIA API (OpenAI-compatible format)
-  curl -s -X POST "${LLM_BASE_URL}/chat/completions" \
-    -H "Authorization: Bearer $LLM_API_KEY" \
-    -H "Content-Type: application/json" \
-    -d "$(jq -n \
-      --arg model "$LLM_MODEL" \
-      --argjson msgs "$messages" \
-      --argjson temp "${LLM_TEMPERATURE}" \
-      --argjson max_tokens 4096 \
-      '{model: $model, messages: $msgs, temperature: $temp, max_tokens: $max_tokens, stream: false}')"
+  # Call NVIDIA API with retry logic (cold start can return empty)
+  local _api_body
+  _api_body=$(jq -n \
+    --arg model "$LLM_MODEL" \
+    --argjson msgs "$messages" \
+    --argjson temp "${LLM_TEMPERATURE}" \
+    --argjson max_tokens 4096 \
+    '{model: $model, messages: $msgs, temperature: $temp, max_tokens: $max_tokens, stream: false}')
+  
+  local _retry _api_result
+  for _retry in 1 2 3; do
+    _api_result=$(curl -s --max-time 120 -X POST "${LLM_BASE_URL}/chat/completions" \
+      -H "Authorization: Bearer $LLM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d "$_api_body")
+    
+    # Check if we got a valid response with content
+    if echo "$_api_result" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+      echo "$_api_result"
+      return 0
+    fi
+    
+    echo "DEBUG: API attempt $_retry failed or empty, retrying in 5s..." >&2
+    sleep 5
+  done
+  
+  # Return whatever we got after 3 tries
+  echo "$_api_result"
 }
 
 # Execute actions returned by the LLM
@@ -484,15 +502,17 @@ run_nvidia_agent_loop() {
     conversation_history=$(echo "$conversation_history" | jq --arg content "$llm_content" '. + [{"role": "assistant", "content": $content}]')
     
     # Execute actions
-    local execution_result=$(execute_nvidia_actions "$actions_json")
+    local execution_result
+    execution_result=$(execute_nvidia_actions "$actions_json")
 
     local exit_code=$?
     
     # Add execution result to history
     conversation_history=$(echo "$conversation_history" | jq --arg res "$execution_result" '. + [{"role": "user", "content": ("Action execution result: " + $res)}]')
     
-    # Check for completion signal
-    if echo "$execution_result" | grep -q "<promise>COMPLETE</promise>"; then
+    # Check for completion signal via exit code from execute_nvidia_actions
+    # (grep on execution_result is unsafe - reading ralph.sh would match the string in source code)
+    if [[ $exit_code -eq 0 ]] && echo "$execution_result" | tail -1 | grep -qF "<promise>COMPLETE</promise>"; then
       return 0
     fi
     
