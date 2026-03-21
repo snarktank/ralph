@@ -100,7 +100,7 @@ if [[ -n "$LLM_PROVIDER" ]]; then
 2. 'actions': an array of action objects to execute
 
 Each action object MUST have a 'type' field. Supported types:
-- read_file: { \"type\": \"read_file\", \"path\": \"relative/path/file.ext\" }
+- read_file: { \"type\": \"read_file\", \"path\": \"relative/path/file.ext\", \"line_start\": 1, \"line_end\": 50 } // line_start/end are optional for chunking
 - edit_file: { \"type\": \"edit_file\", \"path\": \"relative/path/file.ext\", \"changes\": [ {\"oldString\": \"exact text to find\", \"newString\": \"replacement text\"} ] }
   (Alternative format also accepted: { \"type\": \"create_file\", \"path\": \"relative/path/file.ext\", \"content\": \"file content\" } )
 - run_command: { \"type\": \"run_command\", \"command\": \"shell command to execute\", \"expects_success\": true/false }
@@ -280,6 +280,9 @@ execute_nvidia_actions() {
         log_action "start" "$action" "false"
         local path
         path=$(echo "$action" | jq -r '.path // empty')
+        local line_start line_end
+        line_start=$(echo "$action" | jq -r '.line_start // empty')
+        line_end=$(echo "$action" | jq -r '.line_end // empty')
         # SANDBOX: if staged version exists, read that instead
         if [[ ("$path" == "ralph.sh" || "$path" == "./ralph.sh") && -f "$SCRIPT_DIR/.staging/ralph.sh" ]]; then
           path="$SCRIPT_DIR/.staging/ralph.sh"
@@ -287,7 +290,25 @@ execute_nvidia_actions() {
         fi
         echo "DEBUG: Attempting to read file: $path"
         if [[ -n "$path" && -f "$path" ]]; then
-          cat "$path"
+          local total_lines
+          total_lines=$(wc -l < "$path")
+          if [[ -n "$line_start" && -n "$line_end" ]]; then
+            # Specific line range requested
+            sed -n "${line_start},${line_end}p" "$path"
+            echo "[Read lines $line_start-$line_end of $total_lines total]"
+          elif (( total_lines > 200 )); then
+            # Auto-chunk: first 50 + last 50
+            head -n 50 "$path"
+            local omitted=$(( total_lines - 100 ))
+            echo ""
+            echo "[... $omitted lines omitted (lines 51-$(( total_lines - 50 ))) ...]"
+            echo "[Use read_file with line_start and line_end to read specific sections]"
+            echo ""
+            tail -n 50 "$path"
+            echo "[File chunked: $total_lines lines total, showing first 50 + last 50]"
+          else
+            cat "$path"
+          fi
           log_action "end" "$action" "true"
         else
           echo "Error: File not found: $path"
@@ -394,12 +415,67 @@ execute_nvidia_actions() {
             continue
           fi
         fi
+        
+        # Get current failing story
         _sid=$(jq -r '[.userStories[] | select(.passes == false)][0].id // empty' "$SCRIPT_DIR/prd.json" 2>/dev/null)
+        
+        # Check if story has verificationCommand
         if [[ -n "$_sid" && "$_sid" != "null" ]]; then
-          _tmp=$(mktemp)
-          jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
-          echo "Story $_sid marked as PASSED"
+          _verification_cmd=$(jq -r --arg id "$_sid" '.userStories[] | select(.id == $id) | .verificationCommand // empty' "$SCRIPT_DIR/prd.json" 2>/dev/null)
+          
+          if [[ -n "$_verification_cmd" && "$_verification_cmd" != "null" ]]; then
+            echo "VERIFICATION: Running verification command for story $_sid:"
+            echo "VERIFICATION: $_verification_cmd"
+            
+            # Initialize rejection counter if not exists
+            if [[ ! -f "$SCRIPT_DIR/.rejection_count" ]]; then
+              echo 0 > "$SCRIPT_DIR/.rejection_count"
+            fi
+            
+            _current_rejections=$(cat "$SCRIPT_DIR/.rejection_count")
+            
+            # Run verification command
+            if eval "$_verification_cmd"; then
+              # Verification passed
+              echo "VERIFICATION: ✅ PASSED - Story $_sid verified successfully"
+              
+              # Reset rejection counter on success
+              echo 0 > "$SCRIPT_DIR/.rejection_count"
+              
+              # Mark story as passed
+              _tmp=$(mktemp)
+              jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
+              echo "Story $_sid marked as PASSED"
+            else
+              # Verification failed
+              _exit_code=$?
+              echo "VERIFICATION: ❌ FAILED - Story $_sid verification failed (exit $_exit_code)"
+              
+              # Increment rejection counter
+              _new_rejections=$((_current_rejections + 1))
+              echo $_new_rejections > "$SCRIPT_DIR/.rejection_count"
+              
+              if [[ $_new_rejections -ge 5 ]]; then
+                echo "VERIFICATION: 🚨 CRITICAL HINT - 5 consecutive verification failures"
+                echo "VERIFICATION: Consider re-examining your approach or breaking down the problem further"
+              fi
+              
+              log_action "end" "$action" "false"
+              continue
+            fi
+          else
+            # No verification command - proceed as before
+            echo "VERIFICATION: No verificationCommand found for story $_sid - proceeding with completion"
+            
+            # Mark story as passed
+            _tmp=$(mktemp)
+            jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
+            echo "Story $_sid marked as PASSED"
+          fi
+        else
+          echo "VERIFICATION: No failing stories found - proceeding with completion"
         fi
+        
         echo "<promise>COMPLETE</promise>"
         log_action "end" "$action" "true"
         return 0
