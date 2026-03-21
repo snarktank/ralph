@@ -477,19 +477,6 @@ run_nvidia_agent_loop() {
     # Execute actions
     local execution_result=$(execute_nvidia_actions "$actions_json")
 
-    # Check if agent signaled completion
-    if echo "$execution_result" | grep -q "<promise>COMPLETE</promise>"; then
-      local current_id
-      current_id=$(get_story_context | jq -r '.id // empty')
-      if [[ -n "$current_id" && "$current_id" != "null" ]]; then
-        local tmp_prd
-        tmp_prd=$(mktemp)
-        jq --arg id "$current_id" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$tmp_prd" && mv "$tmp_prd" "$SCRIPT_DIR/prd.json"
-        echo "Story $current_id marked as PASSED"
-      fi
-      echo "<promise>COMPLETE</promise>"
-      return 0
-    fi
     local exit_code=$?
     
     # Add execution result to history
