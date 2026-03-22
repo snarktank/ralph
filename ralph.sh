@@ -157,6 +157,50 @@ TOTAL_API_CALLS=0
 TOTAL_API_TIME=0
 ITERATION_START_SECONDS=0
 
+# Context monitoring (Faza 1)
+MAX_CONTEXT_TOKENS=${MAX_CONTEXT_TOKENS:-32768}
+CONTEXT_WARN_THRESHOLD=70  # warn at 70%
+CONTEXT_SHRINK_THRESHOLD=80  # shrink history at 80%
+CONSECUTIVE_API_ERRORS=0
+
+# Fallback model list (Faza 2) — tried in order when primary fails
+LLM_FALLBACK_MODELS=(
+  "abacusai/dracarys-llama-3.1-70b-instruct"
+  "microsoft/phi-3-medium-128k-instruct"
+  "microsoft/phi-3-mini-128k-instruct"
+)
+LLM_ORIGINAL_MODEL="$LLM_MODEL"
+
+# Estimate token count (~4 chars/token, rough heuristic)
+estimate_tokens() {
+  local text="$1"
+  local char_count=${#text}
+  echo $(( char_count / 4 ))
+}
+
+# Check context usage and warn/shrink
+check_context_usage() {
+  local history_json="$1"
+  local history_text
+  history_text=$(echo "$history_json" | jq -r '.[].content' 2>/dev/null)
+  local sys_tokens
+  sys_tokens=$(estimate_tokens "$LLM_SYSTEM_PROMPT")
+  local hist_tokens
+  hist_tokens=$(estimate_tokens "$history_text")
+  local total_tokens=$(( sys_tokens + hist_tokens ))
+  local usage_pct=$(( total_tokens * 100 / MAX_CONTEXT_TOKENS ))
+
+  if (( usage_pct >= CONTEXT_SHRINK_THRESHOLD )); then
+    echo "CONTEXT: ⚠️  ${usage_pct}% used (~${total_tokens}/${MAX_CONTEXT_TOKENS} tokens) — shrinking history" >&2
+    echo "shrink"
+  elif (( usage_pct >= CONTEXT_WARN_THRESHOLD )); then
+    echo "CONTEXT: ⚡ ${usage_pct}% used (~${total_tokens}/${MAX_CONTEXT_TOKENS} tokens)" >&2
+    echo "warn"
+  else
+    echo "ok"
+  fi
+}
+
 # Log action to ralph-debug.log
 log_action() {
   local action_type="$1"
@@ -219,7 +263,7 @@ llm_call_nvidia() {
     --arg prompt "$prompt" \
     '[{role: "system", content: $sys}] + $hist + [{role: "user", content: $prompt}]')
   
-  # Call NVIDIA API with retry logic (cold start can return empty)
+  # Call NVIDIA API with exponential backoff retry (Faza 2)
   local _api_body
   _api_body=$(jq -n \
     --arg model "$LLM_MODEL" \
@@ -228,21 +272,54 @@ llm_call_nvidia() {
     --argjson max_tokens 8192 \
     '{model: $model, messages: $msgs, temperature: $temp, max_tokens: $max_tokens, stream: false}')
   
-  local _retry _api_result
+  local _retry _api_result _backoff_delay=5
   for _retry in 1 2 3; do
+    local _call_start=$SECONDS
     _api_result=$(curl -s --max-time 120 -X POST "${LLM_BASE_URL}/chat/completions" \
       -H "Authorization: Bearer $LLM_API_KEY" \
       -H "Content-Type: application/json" \
       -d "$_api_body")
+    local _call_duration=$(( SECONDS - _call_start ))
+    (( TOTAL_API_CALLS++ )) || true
+    (( TOTAL_API_TIME += _call_duration )) || true
+    
+    # Check for API error field (Faza 2 — walidacja odpowiedzi)
+    local _api_error
+    _api_error=$(echo "$_api_result" | jq -r '.error.message // empty' 2>/dev/null)
+    if [[ -n "$_api_error" ]]; then
+      echo "DEBUG: API error: $_api_error" >&2
+      (( CONSECUTIVE_API_ERRORS++ )) || true
+      
+      # Fallback model logic (Faza 2)
+      if (( CONSECUTIVE_API_ERRORS >= 3 )); then
+        for _fb_model in "${LLM_FALLBACK_MODELS[@]}"; do
+          if [[ "$_fb_model" != "$LLM_MODEL" ]]; then
+            echo "FALLBACK: Switching model from $LLM_MODEL to $_fb_model after $CONSECUTIVE_API_ERRORS consecutive errors" >&2
+            LLM_MODEL="$_fb_model"
+            CONSECUTIVE_API_ERRORS=0
+            # Rebuild body with new model
+            _api_body=$(jq -n \
+              --arg model "$LLM_MODEL" \
+              --argjson msgs "$messages" \
+              --argjson temp "${LLM_TEMPERATURE}" \
+              --argjson max_tokens 8192 \
+              '{model: $model, messages: $msgs, temperature: $temp, max_tokens: $max_tokens, stream: false}')
+            break
+          fi
+        done
+      fi
+    fi
     
     # Check if we got a valid response with content
     if echo "$_api_result" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+      CONSECUTIVE_API_ERRORS=0
       echo "$_api_result"
       return 0
     fi
     
-    echo "DEBUG: API attempt $_retry failed or empty, retrying in 5s..." >&2
-    sleep 5
+    echo "DEBUG: API attempt $_retry failed or empty, retrying in ${_backoff_delay}s... (exponential backoff)" >&2
+    sleep "$_backoff_delay"
+    _backoff_delay=$(( _backoff_delay * 3 ))  # 5s → 15s → 45s
   done
   
   # Return whatever we got after 3 tries
@@ -664,10 +741,20 @@ run_nvidia_agent_loop() {
       return 0
     fi
     
-    # Sliding window: keep last 10 messages to prevent context overflow (jq: Argument list too long)
+    # Adaptive sliding window with context monitoring (Faza 1)
+    local _ctx_status
+    _ctx_status=$(check_context_usage "$conversation_history")
     local hist_len
     hist_len=$(echo "$conversation_history" | jq 'length')
-    if (( hist_len > 10 )); then
+    
+    if [[ "$_ctx_status" == "shrink" ]]; then
+      # Aggressive trim — keep only 6 messages when context is critically high
+      if (( hist_len > 6 )); then
+        conversation_history=$(echo "$conversation_history" | jq '.[-6:]')
+        echo "DEBUG: Context high — trimmed history from $hist_len to 6 messages" >&2
+      fi
+    elif (( hist_len > 10 )); then
+      # Normal trim — keep last 10
       conversation_history=$(echo "$conversation_history" | jq '.[-10:]')
       echo "DEBUG: Trimmed conversation history from $hist_len to 10 messages" >&2
     fi
@@ -702,6 +789,22 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
+    
+    # Auto-cleanup: archive runtime files after successful completion
+    if [ -f "$PRD_FILE" ]; then
+      CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "completed")
+      FOLDER_NAME=$(echo "$CURRENT_BRANCH" | sed 's|^ralph/||')
+      CLEANUP_DIR="$ARCHIVE_DIR/$(date +%Y-%m-%d)-$FOLDER_NAME"
+      
+      echo "Archiving runtime files to: $CLEANUP_DIR"
+      mkdir -p "$CLEANUP_DIR"
+      [ -f "$PRD_FILE" ] && mv "$PRD_FILE" "$CLEANUP_DIR/"
+      [ -f "$PROGRESS_FILE" ] && mv "$PROGRESS_FILE" "$CLEANUP_DIR/"
+      [ -f "$LAST_BRANCH_FILE" ] && rm -f "$LAST_BRANCH_FILE"
+      [ -f "$SCRIPT_DIR/.rejection_count" ] && rm -f "$SCRIPT_DIR/.rejection_count"
+      echo "Runtime files archived and cleaned up."
+    fi
+    
     exit 0
   fi
   
