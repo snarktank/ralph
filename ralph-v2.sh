@@ -193,9 +193,10 @@ SELF-MODIFICATION (ralph.sh):
 - Make SMALL incremental changes — one edit_file per logical change
 - After editing, read_file to verify your staged changes
 
-GIT RULES:
-- Before .sh edits: git add -A && git commit -m "checkpoint-before-edit"
-- After completing story: git add -A && git commit -m "feat-STORYID-title"
+GIT RULES (MANDATORY):
+- Before .sh edits: run_command "git add -A && git commit -m checkpoint-before-edit"
+- BEFORE calling finish: you MUST run_command "git add -A && git commit -m feat-STORYID-description"
+- NEVER call finish without committing first. The commit proves your work is saved.
 - Use run_command for all git operations
 SYSPROMPT
   )
@@ -1249,7 +1250,19 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
   elif [[ "$TOOL" == "claude" ]]; then
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   elif [[ "$TOOL" == "llm_direct_nvidia" ]]; then
-    OUTPUT=$(run_nvidia_agent_loop) || true
+    # Fix: use temp files to preserve subshell counters + show live output
+    _COUNTER_FILE=$(mktemp)
+    _OUTPUT_FILE=$(mktemp)
+    echo "0 0" > "$_COUNTER_FILE"
+
+    (
+      run_nvidia_agent_loop
+      echo "$TOTAL_API_CALLS $TOTAL_API_TIME" > "$_COUNTER_FILE"
+    ) 2>&1 | tee "$_OUTPUT_FILE"
+
+    OUTPUT=$(cat "$_OUTPUT_FILE")
+    read TOTAL_API_CALLS TOTAL_API_TIME < "$_COUNTER_FILE"
+    rm -f "$_COUNTER_FILE" "$_OUTPUT_FILE"
     debug_log "Agent loop output: ${OUTPUT:0:200}"
   fi
 
