@@ -26,3 +26,11 @@ ralph-debug.log
 .env
 .env.*
 ! .env.example
+.env
+.api_stats
+.chat_history.json
+.staging/
+*.log
+.checkpoint_iter
+.rejection_count
+.last-branch
