@@ -311,7 +311,8 @@ status_line() {
   if [[ -n "$CURRENT_ITERATION" && -n "$MAX_ITERATIONS" ]]; then
     iter_prefix="[iter $CURRENT_ITERATION/$MAX_ITERATIONS] "
   fi
-  echo "${iter_prefix}${icon} ${action}: ${detail} ... ${result}"
+  # Output to stderr so it's visible even inside $() captures
+  echo "${iter_prefix}${icon} ${action}: ${detail} ... ${result}" >&2
 }
 
 # Print end-of-run summary
@@ -320,21 +321,25 @@ print_summary() {
   local minutes=$(( total_seconds / 60 ))
   local seconds=$(( total_seconds % 60 ))
   local stories_total=0 stories_passed=0
+
   if [ -f "$PRD_FILE" ]; then
     stories_total=$(jq '.userStories | length' "$PRD_FILE" 2>/dev/null || echo 0)
     stories_passed=$(jq '[.userStories[] | select(.passes == true)] | length' "$PRD_FILE" 2>/dev/null || echo 0)
   fi
-  local avg_api="0"
-  if (( TOTAL_API_CALLS > 0 )); then
-    avg_api=$(( TOTAL_API_TIME / TOTAL_API_CALLS ))
+
+  # Bulletproof: count LLM calls from debug log (file I/O always works)
+  local api_calls=0
+  if [ -f "$LOG_FILE"]; then
+    api_calls=$(grep -c "execute_nvidia_actions - true" "$LOG_FILE" 2>/dev/null || echo 0)
   fi
+
   echo ""
   echo "═══════════════════════════════════════"
   echo "  Ralph v2.0 Summary"
   echo "───────────────────────────────────────"
   echo "  Stories:    ${stories_passed}/${stories_total} completed"
   echo "  Iterations: ${CURRENT_ITERATION:-?}/${MAX_ITERATIONS} used"
-  echo "  API calls:  ${TOTAL_API_CALLS} (avg ${avg_api}s)"
+  echo "  LLM rounds: ${api_calls}"
   echo "  Total time: ${minutes}m ${seconds}s"
   echo "  Model:      ${LLM_MODEL:-N/A}"
   echo "═══════════════════════════════════════"
@@ -484,7 +489,10 @@ fi
 
 init_memory_files
 
-if [ ! -f "$PROGRESS_FILE" ]; then
+# Reset API stats for this run
+  # rm -f "$SCRIPT_DIR/.api_stats"  # disabled: using debug log for stats
+
+  if [ ! -f "$PROGRESS_FILE" ]; then
   echo "# Ralph Progress Log" > "$PROGRESS_FILE"
   echo "Started: $(date)" >> "$PROGRESS_FILE"
   echo "---" >> "$PROGRESS_FILE"
@@ -529,8 +537,9 @@ llm_call_nvidia() {
       -H "Content-Type: application/json" \
       -d "$_api_body")
     local _call_duration=$(( SECONDS - _call_start ))
-    (( TOTAL_API_CALLS++ )) || true
-    (( TOTAL_API_TIME += _call_duration )) || true
+    # echo "1 $_call_duration" >> "$SCRIPT_DIR/.api_stats"  # disabled: using debug log for stats
+    # (( TOTAL_API_CALLS++ )) || true
+    # (( TOTAL_API_TIME += _call_duration )) || true
 
     # Check for API-level error
     local _api_error
@@ -1250,20 +1259,9 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
   elif [[ "$TOOL" == "claude" ]]; then
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   elif [[ "$TOOL" == "llm_direct_nvidia" ]]; then
-    # Fix: use temp files to preserve subshell counters + show live output
-    _COUNTER_FILE=$(mktemp)
     _OUTPUT_FILE=$(mktemp)
-    echo "0 0" > "$_COUNTER_FILE"
-
-    (
-      run_nvidia_agent_loop
-      echo "$TOTAL_API_CALLS $TOTAL_API_TIME" > "$_COUNTER_FILE"
-    ) 2>&1 | tee "$_OUTPUT_FILE"
-
+    run_nvidia_agent_loop 2>&1 | tee "$_OUTPUT_FILE"
     OUTPUT=$(cat "$_OUTPUT_FILE")
-    read TOTAL_API_CALLS TOTAL_API_TIME < "$_COUNTER_FILE"
-    rm -f "$_COUNTER_FILE" "$_OUTPUT_FILE"
-    debug_log "Agent loop output: ${OUTPUT:0:200}"
   fi
 
   # Check for completion
@@ -1283,6 +1281,7 @@ for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
       [ -f "$LAST_BRANCH_FILE" ] && mv "$LAST_BRANCH_FILE" "$CLEANUP_DIR/last-branch.txt"
       [ -f "$SCRIPT_DIR/.rejection_count" ] && mv "$SCRIPT_DIR/.rejection_count" "$CLEANUP_DIR/"
       [ -f "$CHECKPOINT_FILE" ] && mv "$CHECKPOINT_FILE" "$CLEANUP_DIR/"
+      # [ -f "$SCRIPT_DIR/.api_stats" ] && mv "$SCRIPT_DIR/.api_stats" "$CLEANUP_DIR/"
       # NOTE: learnings.md and AGENTS.md are NOT archived — they persist across runs
       echo "Runtime files archived. learnings.md and AGENTS.md preserved."
     fi

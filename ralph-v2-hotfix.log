@@ -44,3 +44,23 @@ DEBUG: Agent loop iteration 4
 DEBUG: LLM content length: 394
 DEBUG: Action #1: run_command
 DEBUG: Running: git add -A && git commit -m "feat-V2-002-create-word-counter-script"
+DEBUG: Action #2: finish
+<promise>COMPLETE</promise>
+DEBUG: Agent loop output: DEBUG: Starting agent loop
+DEBUG: Agent loop iteration 0
+📌 Working on: [V2-001] Create greeting script (inner iteration 0)
+DEBUG: LLM content length: 1141
+DEBUG: Action #1: plan
+DEBUG: Action #2: list
+
+═══════════════════════════════════════
+  Ralph v2.0 Summary
+───────────────────────────────────────
+  Stories:    2/2 completed
+  Iterations: 1/6 used
+  API calls:  0 (avg 0s)
+  Total time: 0m 27s
+  Model:      moonshotai/kimi-k2-instruct
+═══════════════════════════════════════
+Archiving runtime files to: /mnt/g/ralph/archive/2026-03-22-v2-test
+Runtime files archived. learnings.md and AGENTS.md preserved.
