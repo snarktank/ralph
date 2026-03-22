@@ -38,7 +38,7 @@ const allSteps: { id: string; label: string; description: string; phase: Phase }
   // Setup phase (vertical)
   { id: '1', label: 'You write a PRD', description: 'Define what you want to build', phase: 'setup' },
   { id: '2', label: 'Convert to prd.json', description: 'Break into small user stories', phase: 'setup' },
-  { id: '3', label: 'Run ralph.sh', description: 'Starts the autonomous loop', phase: 'setup' },
+  { id: '3', label: 'Run ralph.sh', description: 'Starts the autonomous loop with Amp, Claude, or Codex', phase: 'setup' },
   // Loop phase
   { id: '4', label: 'AI picks a story', description: 'Finds next passes: false', phase: 'loop' },
   { id: '5', label: 'Implements it', description: 'Writes code, runs tests', phase: 'loop' },
