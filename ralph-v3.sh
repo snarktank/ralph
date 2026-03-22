@@ -191,6 +191,7 @@ SKIP_THRESHOLD=7
 LLM_FALLBACK_MODELS=(
   "abacusai/dracarys-llama-3.1-70b-instruct"
   "microsoft/phi-3-medium-128k-instruct"
+  "microsoft/phi-3-mini-128k-instruct"
 )
 
 # ═══════════════════════════════════════════════════════════════
@@ -249,6 +250,9 @@ check_protected_file() {
     .env|.env.*|.git|.git/*)
       echo "🛡️ BLOCKED: Cannot $action protected file: $filepath"
       return 1 ;;
+    prd.json|./prd.json)
+      echo "⚠️ WARNING: Direct edit of prd.json. Use 'finish' to mark stories." >&2
+      return 0 ;;
   esac
   return 0
 }
@@ -649,7 +653,7 @@ execute_nvidia_actions() {
             verify_exit=$?
 
             if [[ $verify_exit -eq 0 ]]; then
-              echo "VERIFY: ✅ PASSED — Story $sid"
+              echo "VERIFY: ✅ PASSED — Story $sid" | tee /dev/stderr
               echo "$verify_output"
               echo 0 > "$SCRIPT_DIR/.rejection_count"
               story_verified=true
@@ -657,7 +661,7 @@ execute_nvidia_actions() {
             else
               local new_rej=$(( rejections + 1 ))
               echo "$new_rej" > "$SCRIPT_DIR/.rejection_count"
-              echo "VERIFY: ❌ FAILED (exit $verify_exit, rejection $new_rej)"
+              echo "VERIFY: ❌ FAILED (exit $verify_exit, rejection $new_rej)" | tee /dev/stderr
               echo "VERIFY OUTPUT:"
               echo "$verify_output"
 
@@ -681,7 +685,7 @@ execute_nvidia_actions() {
             jq --arg id "$sid" \
               '(.userStories[] | select(.id == $id)).passes = true' \
               "$SCRIPT_DIR/prd.json" > "$tmp" && mv "$tmp" "$SCRIPT_DIR/prd.json"
-            echo "✅ Story $sid marked as PASSED"
+            echo "✅ Story $sid marked as PASSED" | tee /dev/stderr
             echo 0 > "$SCRIPT_DIR/.rejection_count" 2>/dev/null || true
           fi
         else
@@ -794,7 +798,7 @@ get_story_context() {
   if [[ -z "$story" || "$story" == "null" ]]; then
     echo "{}"
   else
-    echo "$story" | jq -c '{id, title, description, acceptanceCriteria, verificationCommand}'
+    echo "$story" | jq -c '{id, title, description, acceptanceCriteria, verificationCommand, branchName}'
   fi
 }
 

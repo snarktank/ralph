@@ -69,3 +69,18 @@ DEBUG: Running: echo 'hello world test' > /tmp/test_wc.txt && bash count_words.s
 [iter 1/6] 🏃 run_command: echo 'hello world test' > /tmp/test_wc.txt && bash count_words.sh /tmp/test_wc.txt | grep -qF '/tmp/test_wc.txt: 3 words' ... OK (0s)
 DEBUG: Action #2: run_command
 DEBUG: Running: git add -A && git commit -m feat-V2-002-create-word-counter-script
+[iter 1/6] 🏃 run_command: git add -A && git commit -m feat-V2-002-create-word-counter-script ... OK (0s)
+DEBUG: Action #3: finish
+<promise>COMPLETE</promise>
+
+═══════════════════════════════════════
+  Ralph v2.0 Summary
+───────────────────────────────────────
+  Stories:    2/2 completed
+  Iterations: 1/6 used
+  LLM calls:  10
+  Total time: 0m 36s
+  Model:      moonshotai/kimi-k2-instruct
+═══════════════════════════════════════
+Archiving to: /mnt/g/ralph/archive/2026-03-22-v2-test
+Archived. learnings.md and AGENTS.md preserved.
