@@ -1,3 +1,0 @@
-[2026-03-22T15:13:09.093Z] Plugin initialized: 0 commands []
-[2026-03-22T16:03:00.150Z] tool.before: callID=call_function_ik0e99jn57mc_1, cmd=undefined, desc="Compare Ralph v2 vs v3", mainCmd=undefined
-[2026-03-22T16:04:28.954Z] tool.after: callID=call_function_ik0e99jn57mc_1, cmd=undefined, wasTracked=false
