@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude|codex] [max_iterations]
 
 set -e
 
@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate tool choice
-if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
-  echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
+if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "codex" ]]; then
+  echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'codex'."
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -89,11 +89,15 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   # Run the selected tool with the ralph prompt
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
-  else
+    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1) || true
+  elif [[ "$TOOL" == "claude" ]]; then
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1) || true
+  else
+    # Codex CLI: use non-interactive exec mode with workspace-write sandbox
+    OUTPUT=$(codex exec --full-auto --sandbox workspace-write -C "$SCRIPT_DIR" - < "$SCRIPT_DIR/CODEX.md" 2>&1) || true
   fi
+  printf '%s\n' "$OUTPUT"
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
