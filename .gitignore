@@ -18,6 +18,10 @@ progress.txt
 # Debug log
 ralph-debug.log
 
+# Runtime files (generated during agent runs)
+.rejection_count
+.chat_history.json
+
 # Environment files (containing secrets - NEVER commit)
 .env
 .env.*

@@ -19,6 +19,17 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Setup
 
+### Environment Variables
+
+Copy `.env.example` to `.env` and fill in your API key:
+
+```bash
+cp .env.example .env
+# Edit .env and set NVIDIA_API_KEY=your-real-key
+```
+
+> **Note:** `.env` is gitignored and must never be committed.
+
 ### Option 1: Copy to your project
 
 Copy the ralph files into your project:
@@ -128,7 +139,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ./scripts/ralph/ralph.sh --llm-provider nvidia --llm-api-key YOUR_NVIDIA_API_KEY [max_iterations]
 
 # Optional parameters:
-# --llm-model MODEL_NAME (default: nvidia/nemotron-4-340b-instruct)
+# --llm-model MODEL_NAME (default: abacusai/dracarys-llama-3.1-70b-instruct)
 # --llm-base-url URL (default: https://integrate.api.nvidia.com/v1)
 # --llm-temperature TEMPERATURE (default: 0.7)
 ```
@@ -154,10 +165,12 @@ Ralph will:
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
+| `.env.example` | Template for environment variables (API keys, model config) |
 | `progress.txt` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
+| `docs/` | Guides: verification feature, test instructions |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
 ## Flowchart
@@ -217,6 +230,20 @@ Ralph only works if there are feedback loops:
 ### Browser Verification for UI Stories
 
 Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
+
+### Verification / TDD Mode
+
+Stories can include a `verificationCommand` field in `prd.json`. When present, Ralph will run the command after the agent calls `finish`:
+
+- **Pass** (exit 0): story is marked as `passes: true`
+- **Fail** (non-zero): rejection counter increments, agent retries
+- **5+ consecutive failures**: critical hint is shown to the agent
+
+See [`docs/VERIFICATION_GUIDE.md`](docs/VERIFICATION_GUIDE.md) for full details.
+
+### Self-Modification Sandbox
+
+When the NVIDIA LLM agent edits `ralph.sh`, changes go to a staging copy (`.staging/ralph.sh`). On `finish`, the staging copy is validated with `bash -n` before being applied. If syntax is broken, changes are rejected.
 
 ### Stop Condition
 
