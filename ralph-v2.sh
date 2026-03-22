@@ -329,7 +329,7 @@ print_summary() {
 
   # Bulletproof: count LLM calls from debug log (file I/O always works)
   local api_calls=0
-  if [ -f "$LOG_FILE"]; then
+  if [ -f "$LOG_FILE" ]; then
     api_calls=$(grep -c "execute_nvidia_actions - true" "$LOG_FILE" 2>/dev/null || echo 0)
   fi
 
