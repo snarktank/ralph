@@ -271,7 +271,7 @@ print_summary() {
   # Bulletproof: count from debug log (immune to subshell issues)
   local llm_rounds=0
   if [ -f "$LOG_FILE" ]; then
-    llm_rounds=$(grep -c "| llm_call |" "$LOG_FILE" 2>/dev/null || echo 0)
+    llm_rounds=$(grep -c "| llm_call |.*| ok" "$LOG_FILE" 2>/dev/null || echo 0)
   fi
 
   echo ""
