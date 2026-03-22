@@ -210,6 +210,47 @@ log_action() {
   echo "$timestamp - $action_type - $action_details - $success" >> "$LOG_FILE"
 }
 
+# Debug log — only prints when RALPH_DEBUG=1 (v1.4)
+debug_log() {
+  [[ "${RALPH_DEBUG:-0}" == "1" ]] && echo "DEBUG: $*" >&2
+}
+
+# Clean status line with emoji (v1.4)
+status_line() {
+  local icon="$1" action="$2" detail="$3" result="$4"
+  local iter_prefix=""
+  if [[ -n "$CURRENT_ITERATION" && -n "$MAX_ITERATIONS" ]]; then
+    iter_prefix="[iter $CURRENT_ITERATION/$MAX_ITERATIONS] "
+  fi
+  echo "${iter_prefix}${icon} ${action}: ${detail} ... ${result}"
+}
+
+# Print end-of-run summary (v1.4)
+print_summary() {
+  local total_seconds=$(( SECONDS - SCRIPT_START_SECONDS ))
+  local minutes=$(( total_seconds / 60 ))
+  local seconds=$(( total_seconds % 60 ))
+  local stories_total=0 stories_passed=0
+  if [ -f "$PRD_FILE" ]; then
+    stories_total=$(jq '.userStories | length' "$PRD_FILE" 2>/dev/null || echo 0)
+    stories_passed=$(jq '[.userStories[] | select(.passes == true)] | length' "$PRD_FILE" 2>/dev/null || echo 0)
+  fi
+  local avg_api="0"
+  if (( TOTAL_API_CALLS > 0 )); then
+    avg_api=$(( TOTAL_API_TIME / TOTAL_API_CALLS ))
+  fi
+  echo ""
+  echo "═══════════════════════════════════════"
+  echo "  Ralph Summary"
+  echo "───────────────────────────────────────"
+  echo "  Stories:    ${stories_passed}/${stories_total} completed"
+  echo "  Iterations: ${CURRENT_ITERATION:-?}/${MAX_ITERATIONS} used"
+  echo "  API calls:  ${TOTAL_API_CALLS} (avg ${avg_api}s)"
+  echo "  Total time: ${minutes}m ${seconds}s"
+  echo "  Model:      ${LLM_MODEL:-N/A}"
+  echo "═══════════════════════════════════════"
+}
+
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
@@ -250,7 +291,16 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo ""
+echo "═══════════════════════════════════════"
+echo "  Ralph v1.4 — Tool: $TOOL"
+echo "  Max iterations: $MAX_ITERATIONS"
+[[ "$TOOL" == "llm_direct_nvidia" ]] && echo "  Model: $LLM_MODEL"
+echo "═══════════════════════════════════════"
+echo ""
+
+# Global iteration tracker (for status_line)
+CURRENT_ITERATION=0
 
 # Helper function for NVIDIA API calls
 llm_call_nvidia() {
@@ -287,14 +337,14 @@ llm_call_nvidia() {
     local _api_error
     _api_error=$(echo "$_api_result" | jq -r '.error.message // empty' 2>/dev/null)
     if [[ -n "$_api_error" ]]; then
-      echo "DEBUG: API error: $_api_error" >&2
+      debug_log "API error: $_api_error"
       (( CONSECUTIVE_API_ERRORS++ )) || true
       
       # Fallback model logic (Faza 2)
       if (( CONSECUTIVE_API_ERRORS >= 3 )); then
         for _fb_model in "${LLM_FALLBACK_MODELS[@]}"; do
           if [[ "$_fb_model" != "$LLM_MODEL" ]]; then
-            echo "FALLBACK: Switching model from $LLM_MODEL to $_fb_model after $CONSECUTIVE_API_ERRORS consecutive errors" >&2
+            status_line "🔄" "fallback" "$LLM_MODEL → $_fb_model" "after $CONSECUTIVE_API_ERRORS errors"
             LLM_MODEL="$_fb_model"
             CONSECUTIVE_API_ERRORS=0
             # Rebuild body with new model
@@ -317,7 +367,7 @@ llm_call_nvidia() {
       return 0
     fi
     
-    echo "DEBUG: API attempt $_retry failed or empty, retrying in ${_backoff_delay}s... (exponential backoff)" >&2
+    debug_log "API attempt $_retry failed or empty, retrying in ${_backoff_delay}s (exponential backoff)"
     sleep "$_backoff_delay"
     _backoff_delay=$(( _backoff_delay * 3 ))  # 5s → 15s → 45s
   done
@@ -338,18 +388,20 @@ execute_nvidia_actions() {
     local type
     type=$(echo "$action" | jq -r '.type // empty')
     (( action_count++ )) || true
+    debug_log "Action #$action_count: $type"
     
     case "$type" in
       "list_files")
         log_action "start" "$action" "false"
         local path
         path=$(echo "$action" | jq -r '.path // empty')
-        echo "DEBUG: Attempting to list files in directory: $path"
+        debug_log "Listing files in: $path"
         if [[ -n "$path" && -d "$path" ]]; then
           ls -la "$path"
+          status_line "📂" "list_files" "$path" "OK"
           log_action "end" "$action" "true"
         else
-          echo "Error: Directory not found: $path"
+          status_line "📂" "list_files" "$path" "FAIL (not found)"
           log_action "end" "$action" "false"
         fi
         ;;
@@ -365,7 +417,7 @@ execute_nvidia_actions() {
           path="$SCRIPT_DIR/.staging/ralph.sh"
           echo "SANDBOX: Reading staged version of ralph.sh"
         fi
-        echo "DEBUG: Attempting to read file: $path"
+        debug_log "Reading file: $path"
         if [[ -n "$path" && -f "$path" ]]; then
           local total_lines
           total_lines=$(wc -l < "$path")
@@ -386,9 +438,12 @@ execute_nvidia_actions() {
           else
             cat "$path"
           fi
+          local _fsize
+          _fsize=$(wc -l < "$path" 2>/dev/null || echo "?")
+          status_line "📖" "read_file" "$path (${_fsize} lines)" "OK"
           log_action "end" "$action" "true"
         else
-          echo "Error: File not found: $path"
+          status_line "📖" "read_file" "$path" "FAIL (not found)"
           log_action "end" "$action" "false"
         fi
         ;;
@@ -420,7 +475,7 @@ execute_nvidia_actions() {
           new_str=$(echo "$change" | jq -r '.newString // empty')
           if [[ -n "$old_str" && -n "$new_str" && -f "$path" ]]; then
             _EP="$path" _EO="$old_str" _EN="$new_str" python3 -c "import os;p=os.environ['_EP'];c=open(p).read().replace(os.environ['_EO'],os.environ['_EN'],1);open(p,'w').write(c)"
-            echo "Edited: $path"
+            status_line "✏️" "edit_file" "$path" "OK"
             log_action "end" "$action" "true"
           else
             echo "Warning: Skipping invalid change in $path"
@@ -446,9 +501,8 @@ execute_nvidia_actions() {
         fi
         # Create directory if needed
         mkdir -p "$(dirname "$path")"
-        # Write content to file
         echo "$content" > "$path"
-        echo "Created: $path"
+        status_line "📝" "create_file" "$path" "OK"
         log_action "end" "$action" "true"
         ;;
       "run_command")
@@ -457,15 +511,19 @@ execute_nvidia_actions() {
         command=$(echo "$action" | jq -r '.command // empty')
         expect_success=$(echo "$action" | jq -r '.expects_success // true')
         if [[ -n "$command" ]]; then
-          echo "Running: $command"
+          debug_log "Running: $command"
+          local _cmd_start=$SECONDS
           local output
           output=$(eval "$command" 2>&1)
           local exit_code=$?
+          local _cmd_dur=$(( SECONDS - _cmd_start ))
           if [[ "$expect_success" == "true" && $exit_code -ne 0 ]]; then
-            echo "Command failed (exit $exit_code): $output"
+            status_line "🏃" "run_command" "$command" "FAIL (exit $exit_code, ${_cmd_dur}s)"
+            echo "$output"
             log_action "end" "$action" "false"
           else
-            echo "Command succeeded: $output"
+            status_line "🏃" "run_command" "$command" "OK (${_cmd_dur}s)"
+            debug_log "Output: $output"
             log_action "end" "$action" "true"
           fi
         fi
@@ -541,19 +599,26 @@ execute_nvidia_actions() {
               continue
             fi
           else
-            # No verification command - proceed as before
             echo "VERIFICATION: No verificationCommand found for story $_sid - proceeding with completion"
-            
-            # Mark story as passed
-            _tmp=$(mktemp)
-            jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
-            echo "Story $_sid marked as PASSED"
           fi
+          
+          # Oznacz bieżące story jako ukończone
+          _tmp=$(mktemp)
+          jq --arg id "$_sid" '(.userStories[] | select(.id == $id)).passes = true' "$SCRIPT_DIR/prd.json" > "$_tmp" && mv "$_tmp" "$SCRIPT_DIR/prd.json"
+          echo "Story $_sid marked as PASSED"
         else
           echo "VERIFICATION: No failing stories found - proceeding with completion"
         fi
         
-        echo "<promise>COMPLETE</promise>"
+        # Sprawdzamy pozostałe story
+        _remaining=$(jq '[.userStories[] | select(.passes == false)] | length' "$SCRIPT_DIR/prd.json" 2>/dev/null || echo 0)
+        
+        if (( _remaining == 0 )); then
+          echo "<promise>COMPLETE</promise>"
+        else
+          echo "STORY_COMPLETED: $_sid ($_remaining stories left)"
+          echo "<promise>STORY_COMPLETED</promise>"
+        fi
         log_action "end" "$action" "true"
         return 0
         ;;
@@ -565,7 +630,7 @@ execute_nvidia_actions() {
   done < <(echo "$actions_json" | jq -c '.actions[]')
   log_action "end" "execute_nvidia_actions" "true"
   local actions_duration=$(( SECONDS - actions_start_seconds ))
-  echo "DEBUG: Executed $action_count actions in ${actions_duration}s" >&2
+  debug_log "Executed $action_count actions in ${actions_duration}s"
 }
 
 # Construct prompt for NVIDIA LLM
@@ -648,12 +713,13 @@ get_story_context() {
 run_nvidia_agent_loop() {
   local conversation_history='[]'  # JSON array of message objects
   local iteration_count=0
+  local consecutive_json_fails=0
   
-  echo "DEBUG: Starting agent loop"
+  debug_log "Starting agent loop"
   
   # Main agent loop
   while true; do
-    echo "DEBUG: Entering agent loop iteration $iteration_count"
+    debug_log "Entering agent loop iteration $iteration_count"
     # Get current story context
     local context=$(get_story_context)
     
@@ -674,13 +740,12 @@ run_nvidia_agent_loop() {
     fi
     
     # Debug: show what we got
-    echo "DEBUG: LLM response content length: ${#llm_content}"
+    debug_log "LLM response content length: ${#llm_content}"
     if [[ -n "$llm_content" && "$llm_content" != "null" ]]; then
-      echo "DEBUG: LLM content (first 200 chars): ${llm_content:0:200}"
-      echo "DEBUG: LLM content (last 50 chars): ${llm_content: -50}"
+      debug_log "LLM content (first 200 chars): ${llm_content:0:200}"
     else
-      echo "DEBUG: LLM content is empty or null"
-      echo "DEBUG: Full response: $llm_response"
+      debug_log "LLM content is empty or null"
+      debug_log "Full response: $llm_response"
     fi
     
     # If we got empty content, show error and break
@@ -710,16 +775,23 @@ run_nvidia_agent_loop() {
     
     # If still not valid JSON, treat as plain text (for debugging)
     if [[ -z "$actions_json" || "$actions_json" == "null" ]]; then
+      (( consecutive_json_fails++ )) || true
       echo "Warning: LLM did not return valid JSON. Response:"
       echo "$llm_content"
-      echo "Attempting to continue..."
-      # Fallback: check if LLM explicitly requested finish action (not just mentioned COMPLETE string)
-      if echo "$llm_content" | jq -e '.actions[] | select(.type == "finish")' >/dev/null 2>&1; then
-        echo "<promise>COMPLETE</promise>"
-        return 0
+      
+      if (( consecutive_json_fails >= 3 )); then
+        echo "Error: LLM repeatedly failed to generate valid JSON ($consecutive_json_fails times). Aborting this LLM run."
+        return 1
       fi
-      # Otherwise, ask for clarification in next turn
-      actions_json='{"thoughts": "Invalid JSON response from LLM. Please respond with valid JSON matching the required format.", "actions": []}'
+      
+      echo "Attempting to auto-recover..."
+      # Create strong error feedback for LLM
+      local recovery_msg="ERROR: Your previous response was NOT valid JSON. You MUST respond with ONLY a valid JSON object matching the requested schema. Do not include markdown blocks wrapping the JSON if they are malformed."
+      conversation_history=$(echo "$conversation_history" | jq --arg content "$llm_content" '. + [{"role": "assistant", "content": $content}]')
+      conversation_history=$(echo "$conversation_history" | jq --arg msg "$recovery_msg" '. + [{"role": "user", "content": $msg}]')
+      continue
+    else
+      consecutive_json_fails=0
     fi
     
     # Add LLM response to conversation history
@@ -734,11 +806,18 @@ run_nvidia_agent_loop() {
     # Add execution result to history
     conversation_history=$(echo "$conversation_history" | jq --arg res "$execution_result" '. + [{"role": "user", "content": ("Action execution result: " + $res)}]')
     
-    # Check for completion: finish action now uses return 0 (no subshell thanks to process substitution)
-    if [[ $exit_code -eq 0 ]] && echo "$execution_result" | tail -1 | grep -qF "<promise>COMPLETE</promise>"; then
-      # Re-emit completion signal so main loop can detect it in $OUTPUT
-      echo "<promise>COMPLETE</promise>"
-      return 0
+    # Check for completions
+    if [[ $exit_code -eq 0 ]]; then
+      if echo "$execution_result" | tail -n 5 | grep -qF "<promise>COMPLETE</promise>"; then
+        # Re-emit completion signal so main loop can detect it in $OUTPUT
+        echo "<promise>COMPLETE</promise>"
+        return 0
+      elif echo "$execution_result" | tail -n 5 | grep -qF "<promise>STORY_COMPLETED</promise>"; then
+        # Story finished, but more remain. We can clear context or notify LLM.
+        echo "Moving to next story..."
+        conversation_history='[]' # Clear history for fresh start on next story
+        continue
+      fi
     fi
     
     # Adaptive sliding window with context monitoring (Faza 1)
@@ -766,14 +845,27 @@ run_nvidia_agent_loop() {
   done
 }
 
-for i in $(seq 1 $MAX_ITERATIONS); do
+CHECKPOINT_FILE="$SCRIPT_DIR/.checkpoint_iter"
+START_ITERATION=1
+
+# Resume from checkpoint if present
+if [ -f "$CHECKPOINT_FILE" ]; then
+  START_ITERATION=$(cat "$CHECKPOINT_FILE")
+  echo "v1.6: Resuming from checkpoint: iteration $START_ITERATION"
+fi
+
+for i in $(seq "$START_ITERATION" "$MAX_ITERATIONS"); do
+  # Update checkpoint
+  echo "$i" > "$CHECKPOINT_FILE"
+  
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
   
   # Run the selected tool with the ralph prompt
-  echo "DEBUG: TOOL is '$TOOL'" >&2
+  CURRENT_ITERATION=$i
+  debug_log "TOOL is '$TOOL'"
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   elif [[ "$TOOL" == "claude" ]]; then
@@ -781,14 +873,12 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   elif [[ "$TOOL" == "llm_direct_nvidia" ]]; then
     OUTPUT=$(run_nvidia_agent_loop) || true
-    echo "DEBUG: OUTPUT from agent loop: $OUTPUT" >&2
+    debug_log "OUTPUT from agent loop: $OUTPUT"
   fi
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
-    echo ""
-    echo "Ralph completed all tasks!"
-    echo "Completed at iteration $i of $MAX_ITERATIONS"
+    print_summary
     
     # Auto-cleanup: archive runtime files after successful completion
     if [ -f "$PRD_FILE" ]; then
@@ -800,8 +890,9 @@ for i in $(seq 1 $MAX_ITERATIONS); do
       mkdir -p "$CLEANUP_DIR"
       [ -f "$PRD_FILE" ] && mv "$PRD_FILE" "$CLEANUP_DIR/"
       [ -f "$PROGRESS_FILE" ] && mv "$PROGRESS_FILE" "$CLEANUP_DIR/"
-      [ -f "$LAST_BRANCH_FILE" ] && rm -f "$LAST_BRANCH_FILE"
-      [ -f "$SCRIPT_DIR/.rejection_count" ] && rm -f "$SCRIPT_DIR/.rejection_count"
+      [ -f "$LAST_BRANCH_FILE" ] && mv "$LAST_BRANCH_FILE" "$CLEANUP_DIR/last-branch.txt"
+      [ -f "$SCRIPT_DIR/.rejection_count" ] && mv "$SCRIPT_DIR/.rejection_count" "$CLEANUP_DIR/rejection_count.txt"
+      [ -f "$CHECKPOINT_FILE" ] && mv "$CHECKPOINT_FILE" "$CLEANUP_DIR/"
       echo "Runtime files archived and cleaned up."
     fi
     
