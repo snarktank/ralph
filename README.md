@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([opencode](https://opencode.ai) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -11,7 +11,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 ## Prerequisites
 
 - One of the following AI coding tools installed and authenticated:
-  - [Amp CLI](https://ampcode.com) (default)
+  - [opencode](https://opencode.ai) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
@@ -28,24 +28,17 @@ mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
 
 # Copy the prompt template for your AI tool of choice:
-cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
+cp /path/to/ralph/AGENTS.md scripts/ralph/AGENTS.md    # For opencode
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
 
 chmod +x scripts/ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally (Amp)
+### Option 2: Install skills globally
 
-Copy the skills to your Amp or Claude config for use across all projects:
+Copy the skills to your Claude config for use across all projects:
 
-For AMP
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph ~/.config/amp/skills/
-```
-
-For Claude Code (manual)
 ```bash
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
@@ -73,18 +66,6 @@ Skills are automatically invoked when you ask Claude to:
 - "create a prd", "write prd for", "plan this feature"
 - "convert this prd", "turn into ralph format", "create prd.json"
 
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
-
-```json
-{
-  "amp.experimental.autoHandoff": { "context": 90 }
-}
-```
-
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
-
 ## Workflow
 
 ### 1. Create a PRD
@@ -110,14 +91,14 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default)
+# Using opencode (default)
 ./scripts/ralph/ralph.sh [max_iterations]
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool opencode` or `--tool claude` to select your AI coding tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -133,14 +114,14 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
-| `prompt.md` | Prompt template for Amp |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode` or `--tool claude`) |
+| `AGENTS.md` | Prompt template for opencode |
 | `CLAUDE.md` | Prompt template for Claude Code |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
-| `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+| `skills/prd/` | Skill for generating PRDs (works with Claude Code) |
+| `skills/ralph/` | Skill for converting PRDs to JSON (works with Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
 
@@ -162,7 +143,7 @@ npm run dev
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (opencode or Claude Code) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.txt` (learnings and context)
 - `prd.json` (which stories are done)
@@ -223,7 +204,7 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` (for Amp) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
+After copying `AGENTS.md` (for opencode) or `CLAUDE.md` (for Claude Code) to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
@@ -235,5 +216,5 @@ Ralph automatically archives previous runs when you start a new feature (differe
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Amp documentation](https://ampcode.com/manual)
+- [opencode documentation](https://opencode.ai)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)

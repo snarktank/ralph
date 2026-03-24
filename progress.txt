@@ -1,0 +1,47 @@
+# Ralph Progress Log
+Started: Tue Mar 24 14:15:31 CET 2026
+---
+
+## 2026-03-24 - US-001
+- Replaced AGENTS.md contents with the full Ralph agent prompt (adapted from CLAUDE.md)
+- All references to "CLAUDE.md" in the prompt changed to "AGENTS.md" (step 7, section header, examples)
+- No Amp thread URL line present (CLAUDE.md never had it, so none added)
+- All sections present: Task, Progress Report Format, Consolidate Patterns, Update AGENTS.md Files, Quality Requirements, Browser Testing, Stop Condition, Important
+- Files changed: AGENTS.md
+- **Learnings for future iterations:**
+  - CLAUDE.md is the canonical source of the agent prompt; AGENTS.md should mirror it with AGENTS.md substitutions
+  - Typecheck runs in `flowchart/` via `./node_modules/.bin/tsc --noEmit` (need `npm install` first if node_modules missing)
+  - This is a documentation-only change; typecheck still passes since no TS files were modified
+---
+
+## 2026-03-24 - US-002
+- Added `--tool opencode` as a valid option in ralph.sh
+- Changed default TOOL from `amp` to `opencode`
+- Updated validation to accept `claude` or `opencode` (error message updated accordingly)
+- Added opencode execution branch: `OPENCODE_PERMISSION='{"*":"allow"}' opencode run "Read AGENTS.md and prd.json and complete the next user story"`
+- Iteration log uses `$TOOL` variable so it automatically shows the correct tool name
+- Files changed: ralph.sh
+- **Learnings for future iterations:**
+  - opencode uses `OPENCODE_PERMISSION='{"*":"allow"}'` env var for autonomous/non-interactive operation (equivalent to claude's `--dangerously-skip-permissions`)
+  - opencode uses `opencode run "<prompt>"` CLI pattern (not stdin like claude uses)
+  - The amp execution branch still exists in ralph.sh after this story; US-003 removes it along with prompt.md
+---
+
+## 2026-03-24 - US-004
+- Updated README.md: replaced Amp prerequisites with opencode, updated Setup section to use AGENTS.md instead of prompt.md, removed 'Configure Amp auto-handoff' section, updated Workflow commands to --tool opencode and --tool claude, updated Key Files table (replaced prompt.md with AGENTS.md), updated References to use opencode docs link
+- Added Commands section to AGENTS.md showing correct ralph.sh usage (opencode default, --tool claude option)
+- Updated prd.json to mark US-004 as passes: true
+- Files changed: README.md, AGENTS.md, prd.json
+- **Learnings for future iterations:**
+  - README.md and AGENTS.md are the main user-facing docs; keep them in sync with ralph.sh supported tools
+  - AGENTS.md Commands section is useful for opencode users to know how to invoke ralph.sh
+---
+
+## 2026-03-24 - US-003
+- Deleted prompt.md (the old Amp-specific agent prompt template)
+- All other Amp deprecation work (default tool, valid tool list, amp branch removal) was already completed in US-002
+- Files changed: prompt.md (deleted), prd.json
+- **Learnings for future iterations:**
+  - US-002 proactively completed most of US-003's acceptance criteria; always check prior progress before implementing
+  - prompt.md was the legacy Amp prompt; AGENTS.md is its replacement for opencode users
+---

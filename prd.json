@@ -1,0 +1,71 @@
+{
+  "project": "Ralph",
+  "branchName": "ralph/opencode-support",
+  "description": "Add opencode as a supported AI coding tool, deprecate Amp, and update all documentation to reflect the new tool landscape (Claude Code + opencode).",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Update AGENTS.md with full Ralph agent prompt",
+      "description": "As an opencode user, I want AGENTS.md to contain the full Ralph agent instructions so opencode picks them up automatically when running in my project.",
+      "acceptanceCriteria": [
+        "AGENTS.md contains the complete Ralph agent prompt (same content/structure as CLAUDE.md but adapted for opencode)",
+        "Progress report format does NOT include the Amp thread URL line (Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID)",
+        "The file references AGENTS.md instead of CLAUDE.md where appropriate (e.g. 'Update AGENTS.md files if you discover reusable patterns')",
+        "Stop condition, quality requirements, and all other sections are present and complete",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add opencode support to ralph.sh",
+      "description": "As a user, I want to run ./ralph.sh --tool opencode so Ralph can drive opencode the same way it drives Claude Code.",
+      "acceptanceCriteria": [
+        "--tool opencode is a valid option in ralph.sh",
+        "When --tool opencode is selected, ralph.sh invokes opencode with: OPENCODE_PERMISSION='{\"*\":\"allow\"}' opencode run \"<prompt>\" for non-interactive autonomous operation",
+        "The prompt passed to opencode instructs it to read AGENTS.md and prd.json (e.g. 'Read AGENTS.md and prd.json and complete the next user story')",
+        "Error message updated to: \"Must be 'claude' or 'opencode'.\"",
+        "Iteration log line shows the correct tool name",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Deprecate Amp in ralph.sh",
+      "description": "As a maintainer, I want to remove Amp as a supported tool so the codebase reflects the current supported tools (Claude Code and opencode).",
+      "acceptanceCriteria": [
+        "Default tool in ralph.sh changed from 'amp' to 'opencode'",
+        "'amp' removed from the valid tool list in ralph.sh",
+        "The if [[ \"$TOOL\" == \"amp\" ]] branch removed from ralph.sh",
+        "prompt.md is deleted",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Update README.md and AGENTS.md for opencode support",
+      "description": "As a new user, I want the README to accurately describe all supported tools so I can choose the right one for my setup.",
+      "acceptanceCriteria": [
+        "Prerequisites section: replace Amp CLI with opencode, keep Claude Code",
+        "Setup section: replace Amp-specific copy instructions with opencode equivalents (copy AGENTS.md instead of prompt.md)",
+        "'Configure Amp auto-handoff' section removed",
+        "Workflow section: command examples show --tool opencode and --tool claude (no --tool amp)",
+        "Key Files table: replace prompt.md row with AGENTS.md as 'Prompt template for opencode'",
+        "References section: replace Amp docs link with opencode docs link (https://opencode.ai)",
+        "AGENTS.md Commands section updated to remove Amp references and show correct ralph.sh usage",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

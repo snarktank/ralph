@@ -96,6 +96,18 @@ If ALL stories are complete and passing, reply with:
 
 If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
 
+## Commands
+
+Run Ralph from the project root:
+
+```bash
+# Using opencode (default)
+./ralph.sh [max_iterations]
+
+# Using Claude Code
+./ralph.sh --tool claude [max_iterations]
+```
+
 ## Important
 
 - Work on ONE story per iteration
