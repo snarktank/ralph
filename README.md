@@ -52,6 +52,7 @@ The generated `./prd.json` should contain small, dependency-ordered stories with
 ### 5. Check progress
 
 ```bash
+./ralph.sh --status
 cat ./prd.json | jq '.userStories[] | {id, title, passes}'
 cat ./progress.txt
 git log --oneline -10

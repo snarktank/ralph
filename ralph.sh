@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--help] [--doctor] [--tool claude|codex] [max_iterations]
+# Usage: ./ralph.sh [--help] [--doctor] [--status] [--tool claude|codex] [max_iterations]
 
 set -e
 
@@ -8,17 +8,19 @@ SCRIPT_NAME="$(basename "$0")"
 DEFAULT_TOOL="codex"
 DEFAULT_MAX_ITERATIONS=10
 DOCTOR_MODE=0
+STATUS_MODE=0
 
 print_help() {
   cat <<EOF
 Usage:
-  ./$SCRIPT_NAME [--help] [--doctor] [--tool codex|claude] [max_iterations]
+  ./$SCRIPT_NAME [--help] [--doctor] [--status] [--tool codex|claude] [max_iterations]
 
 Runs Ralph's one-story-per-iteration loop for the current repository.
 
 Options:
   --help, -h             Print this help and exit
   --doctor               Run non-destructive preflight checks and exit
+  --status               Summarize Ralph progress and exit
   --tool TOOL            Agent runtime to use: codex (default) or claude
   --tool=TOOL            Same as above
   max_iterations         Positive integer iteration cap (default: $DEFAULT_MAX_ITERATIONS)
@@ -41,6 +43,7 @@ Ralph state files in this repo:
 
 Examples:
   ./$SCRIPT_NAME --doctor
+  ./$SCRIPT_NAME --status
   ./$SCRIPT_NAME
   ./$SCRIPT_NAME 20
   ./$SCRIPT_NAME --tool claude 5
@@ -66,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --doctor)
       DOCTOR_MODE=1
+      shift
+      ;;
+    --status)
+      STATUS_MODE=1
       shift
       ;;
     --tool)
@@ -146,6 +153,109 @@ If you copied Ralph into another repository, also copy:
 - .agents/skills/prd/
 - .agents/skills/ralph/
 EOF
+}
+
+print_status_header() {
+  echo "Ralph status"
+  echo "Project root: $PROJECT_ROOT"
+  echo "Ralph directory: $SCRIPT_DIR"
+  echo "PRD file: $PRD_FILE"
+  echo "Progress log: $PROGRESS_FILE"
+  echo "Archive directory: $ARCHIVE_DIR"
+  echo ""
+}
+
+status_unavailable() {
+  local reason="$1"
+  local next_action="$2"
+
+  print_status_header
+  echo "Status: unavailable"
+  echo "Reason: $reason"
+  echo "Next: $next_action"
+  return 1
+}
+
+run_status() {
+  local summary=""
+  local branch_name=""
+  local total_stories=""
+  local passed_stories=""
+  local pending_stories=""
+  local next_story_id=""
+  local next_story_title=""
+
+  if ! command -v jq >/dev/null 2>&1; then
+    status_unavailable "'jq' is required to read $PRD_FILE." "Install jq, then rerun ./$SCRIPT_NAME --status."
+    return 1
+  fi
+
+  if [ ! -f "$PRD_FILE" ]; then
+    status_unavailable "Missing Ralph state file: $PRD_FILE" "In Codex, run /skills, then \$prd to draft a PRD, then \$ralph to create $PRD_FILE, then rerun ./$SCRIPT_NAME --status."
+    return 1
+  fi
+
+  if ! jq -e '.' "$PRD_FILE" >/dev/null 2>&1; then
+    status_unavailable "$PRD_FILE is not valid JSON." "Fix the JSON in $PRD_FILE or rerun \$ralph to regenerate it from your PRD markdown, then rerun ./$SCRIPT_NAME --status."
+    return 1
+  fi
+
+  if ! jq -e '.branchName | type == "string" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
+    status_unavailable "$PRD_FILE is missing a non-empty 'branchName' field." "Edit $PRD_FILE so 'branchName' is a non-empty string, or rerun \$ralph to regenerate it, then rerun ./$SCRIPT_NAME --status."
+    return 1
+  fi
+
+  if ! jq -e '.userStories | type == "array" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
+    status_unavailable "$PRD_FILE must contain a non-empty 'userStories' array." "Update $PRD_FILE with at least one story, or rerun \$ralph to regenerate it, then rerun ./$SCRIPT_NAME --status."
+    return 1
+  fi
+
+  summary="$(
+    jq -r '
+      {
+        branchName: .branchName,
+        total: (.userStories | length),
+        passed: ([.userStories[] | select(.passes == true)] | length),
+        pending: ([.userStories[] | select(.passes != true)] | length),
+        next: (
+          [
+            .userStories[]
+            | select(.passes != true)
+            | {
+                id: ((.id // "unknown") | tostring),
+                title: ((.title // "Untitled") | tostring),
+                priority: (.priority // 999999)
+              }
+          ]
+          | sort_by(.priority, .id)
+          | .[0] // {}
+        )
+      }
+      | [
+          .branchName,
+          (.total | tostring),
+          (.passed | tostring),
+          (.pending | tostring),
+          (.next.id // ""),
+          (.next.title // "")
+        ]
+      | @tsv
+    ' "$PRD_FILE"
+  )"
+
+  IFS=$'\t' read -r branch_name total_stories passed_stories pending_stories next_story_id next_story_title <<< "$summary"
+
+  print_status_header
+  echo "Branch name: $branch_name"
+  echo "Stories total: $total_stories"
+  echo "Stories passed: $passed_stories"
+  echo "Stories pending: $pending_stories"
+
+  if [ "$pending_stories" -eq 0 ]; then
+    echo "Next pending story: none - all stories pass"
+  else
+    echo "Next pending story: $next_story_id - $next_story_title"
+  fi
 }
 
 DOCTOR_FAILURES=0
@@ -321,6 +431,11 @@ EOF
 
 if [ "$DOCTOR_MODE" -eq 1 ]; then
   run_doctor
+  exit $?
+fi
+
+if [ "$STATUS_MODE" -eq 1 ]; then
+  run_status
   exit $?
 fi
 

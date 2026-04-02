@@ -1,0 +1,144 @@
+{
+  "project": "Ralph",
+  "branchName": "ralph/easier-to-use",
+  "description": "Make Ralph very easy to start, invoke, inspect, and recover with non-destructive diagnostics, optional global invocation, clearer onboarding, a worked example, and a self-guided flowchart.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Add CLI doctor mode",
+      "description": "As a first-time Ralph user, I want a preflight command so that I can verify my environment and state before starting a run.",
+      "acceptanceCriteria": [
+        "./ralph.sh --doctor checks required binaries, prompt files, repo-local skills, and Ralph state files",
+        "Doctor output labels each check as pass or fail and includes one concrete next action for each failure",
+        "Doctor exits with status 0 only when all required checks pass",
+        "Doctor is non-destructive and does not mutate Ralph state",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add CLI status mode",
+      "description": "As an active Ralph user, I want a status command so that I can see progress and the next pending story without reading raw JSON.",
+      "acceptanceCriteria": [
+        "./ralph.sh --status reports current branchName, total story count, passed story count, pending story count, and the next pending story ID and title",
+        "Status output includes the exact paths to prd.json, progress.txt, and archive/",
+        "If prd.json is missing or invalid, status explains the exact next command or file the user should use",
+        "Status is non-destructive and does not start an iteration",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Tighten CLI error recovery guidance",
+      "description": "As a new Ralph user, I want every common failure to tell me the next step so that I do not need to inspect source code to recover.",
+      "acceptanceCriteria": [
+        "Invalid flags explicitly point to ./ralph.sh --help",
+        "Missing tool binaries explain which binary is missing and which command path the user should take next",
+        "Missing or invalid prd.json explains the Codex-first sequence $prd -> $ralph -> ./ralph.sh",
+        "Errors caused by missing prompt or skill files explain which repo files must exist and where they should live",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Add a global Ralph command",
+      "description": "As a developer using Ralph across projects, I want a simple one-time install path so that I can run ralph without remembering the repo-local ./ralph.sh path every time.",
+      "acceptanceCriteria": [
+        "The repo provides a documented install path that exposes ralph on PATH after one-time setup",
+        "The installed ralph command runs the same loop as ./ralph.sh with Codex as the default runtime",
+        "The global command supports the same flags as ./ralph.sh, or any intentional differences are explicitly documented",
+        "Documentation explains when to use ralph versus ./ralph.sh and how to undo the install",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Add a copy-paste quickstart",
+      "description": "As a developer trying Ralph for the first time, I want a short copy-paste quickstart so that I can reach a first run with minimal interpretation.",
+      "acceptanceCriteria": [
+        "README.md contains a short quickstart section with the smallest successful Codex-first flow",
+        "The quickstart includes $prd, $ralph, ./ralph.sh, and at least one progress inspection command that does not require jq knowledge",
+        "The quickstart links to or references --help, --doctor, and --status",
+        "Claude guidance remains present but clearly secondary to the Codex path",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Ship a worked example",
+      "description": "As a new Ralph user, I want one realistic example I can copy so that I can follow a known-good workflow instead of inventing my own.",
+      "acceptanceCriteria": [
+        "The repo includes one small worked example that starts with a feature idea and ends with a valid prd.json",
+        "The example uses current repo conventions and file paths",
+        "The example is small enough that its stories are credible one-iteration Ralph tasks",
+        "The example is referenced from README.md",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Add troubleshooting and recovery docs",
+      "description": "As a Ralph user, I want explicit recovery instructions so that I can resume, restart, or debug a broken run without guessing.",
+      "acceptanceCriteria": [
+        "Documentation explains how to handle missing prd.json, invalid prd.json, empty progress.txt, branch changes, and archived runs",
+        "Documentation distinguishes continuing the current run from starting a new run",
+        "Each recovery path includes exact commands or file locations, not just conceptual guidance",
+        "Recovery guidance is reachable from the main README",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Align the flowchart with the real workflow",
+      "description": "As a user learning Ralph visually, I want the flowchart content to match the repo so that the diagram reinforces the actual process.",
+      "acceptanceCriteria": [
+        "The flowchart uses the current Codex-first sequence $prd -> $ralph -> ./ralph.sh",
+        "The flowchart names the real state files prd.json, progress.txt, and archive/",
+        "The flowchart reflects the one-story-per-iteration behavior described in CODEX.md",
+        "cd flowchart && npm run build passes",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Make the flowchart self-guided",
+      "description": "As a first-time visitor, I want the flowchart to explain where to start and what to click next so that I can learn Ralph without a presenter.",
+      "acceptanceCriteria": [
+        "The flowchart has a clear entry state for first-time viewers",
+        "The flowchart gives visible progression cues as steps are revealed",
+        "The main interaction remains usable on desktop and mobile widths",
+        "cd flowchart && npm run build passes",
+        "Verify in browser using dev-browser skill",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
