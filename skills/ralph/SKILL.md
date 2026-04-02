@@ -8,11 +8,13 @@ user-invocable: true
 
 Converts existing PRDs to the prd.json format that Ralph uses for autonomous execution.
 
+In Codex, this workflow should be exposed through the repo-local skill named `$ralph`.
+
 ---
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+Take a PRD (markdown file or text) and convert it to `./prd.json` by default, or next to `ralph.sh` if the script lives elsewhere.
 
 ---
 
@@ -47,7 +49,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
 
 **Each story must be completable in ONE Ralph iteration (one context window).**
 
-Ralph spawns a fresh Amp instance per iteration with no memory of previous work. If a story is too big, the LLM runs out of context before finishing and produces broken code.
+Ralph spawns a fresh agent instance per iteration with no memory of previous work. If a story is too big, the LLM runs out of context before finishing and produces broken code.
 
 ### Right-sized stories:
 - Add a database column and migration
