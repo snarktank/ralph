@@ -1,0 +1,58 @@
+# Ralph Progress Log
+## Codebase Patterns
+- Non-destructive CLI modes in `ralph.sh` should parse and exit before validating tool binaries, prompt files, or Ralph state so help and future recovery commands work even on broken setup.
+- Doctor-style diagnostics should validate `prd.json` directly, but treat `progress.txt` and `archive/` as lazily created state paths and check readiness instead of requiring them to exist.
+- Inspection modes should print the absolute Ralph state paths before summary or recovery guidance so users can act without opening `ralph.sh`.
+- Fatal CLI errors should identify the exact missing binary or file and finish with the repo-local recovery command path, such as `./ralph.sh --help`, `./ralph.sh --doctor`, or `$prd -> $ralph -> ./ralph.sh`.
+- Global installs should symlink `bin/ralph` onto `PATH`; the wrapper should search upward from the current directory for repo-local `ralph.sh` and forward arguments unchanged.
+
+Started: Fri Apr  3 01:16:58 KST 2026
+---
+## 2026-04-03 01:49:08 KST - US-001
+- Implemented `./ralph.sh --help` with usage, supported flags, defaults, examples, and the Codex-first happy path.
+- Tightened argument parsing so help exits before tool, prompt, `jq`, or `prd.json` validation, and invalid flags point back to help.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`
+- Branch checkout and commit could not be completed in this environment because sandbox permissions deny writes under `.git`.
+- **Learnings for future iterations:**
+  - `ralph.sh` should keep non-destructive utility modes ahead of all environment and state validation.
+  - Shell-entrypoint changes should be verified with `bash -n` plus direct CLI invocations, including a temp-copy check when the command must work without local Ralph state.
+  - `flowchart` quality checks depend on local npm dependencies being installed before `npm run build` or `npm run lint` will succeed.
+---
+## 2026-04-03 02:08:32 KST - US-001
+- Implemented `./ralph.sh --doctor` as a non-destructive preflight mode that checks the selected runtime binary, `jq`, both prompt files, both repo-local skills, `prd.json`, and the readiness of `progress.txt` plus `archive/`.
+- Verified doctor output on the real repo and on a temp copy without `prd.json`; failing checks now include a concrete next action and doctor exits non-zero when preflight is incomplete.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`
+- Recorded commit `518df44` with message `feat: US-001 - Add CLI doctor mode` on `main`, but `ralph/easier-to-use` still could not be created locally because Git cannot create new nested refs under `.git/refs/heads/` in this sandbox.
+- `flowchart` checks are still blocked by incomplete local npm dependencies: `npm run build` fails with missing `vite/client` and `node` type definitions, `npm run lint` fails because `eslint` is unavailable, and `npm install` did not complete in this restricted environment.
+- **Learnings for future iterations:**
+  - Doctor output is most useful when it validates repo assets directly but treats lazily created state like `progress.txt` and `archive/` as readiness checks instead of hard prerequisites.
+  - A temp-directory copy of `ralph.sh` is a fast way to verify failure guidance for missing-state scenarios without mutating the real Ralph state.
+  - This sandbox can update existing Git refs for commits, but it may still block creating new nested branch refs like `refs/heads/ralph/easier-to-use`.
+---
+## 2026-04-03 02:17:35 KST - US-002
+- Implemented `./ralph.sh --status` as a non-destructive inspection mode that prints the Ralph state paths, summarizes `branchName` plus story counts, and surfaces the highest-priority pending story without starting an iteration.
+- Added actionable status recovery output for missing or invalid `prd.json`, updated `--help`, and documented the new inspection command in the repo docs.
+- Files changed: `ralph.sh`, `README.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Non-destructive inspection commands should exit before prompt or runtime validation so they still work from a temp copy of `ralph.sh`.
+  - For CLI recovery output, printing the exact Ralph state paths before the error makes the next manual fix much clearer.
+  - A temp-directory copy with a missing or malformed `prd.json` is a fast regression check for new Ralph inspection modes.
+---
+## 2026-04-03 02:33:55 KST - US-003
+- Tightened Ralph startup and validation failures so invalid `--tool` values point to `./ralph.sh --help`, missing runtime binaries name the missing executable and alternative command path, and invalid or missing `prd.json` now print the full Codex-first recovery sequence.
+- Added repo-asset recovery guidance for missing prompt files and clarified doctor failures for missing prompt and skill files with the exact paths Ralph expects under the repo root.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Fatal CLI errors are most actionable when they identify the missing binary or file first and then end with the exact recovery command the user should run next.
+  - Temp-directory copies of `ralph.sh` are still the fastest regression checks for missing `prd.json`, malformed `prd.json`, and missing repo asset scenarios.
+  - `./ralph.sh --doctor` is the best verification surface for missing repo-local skill files because the main loop only requires the selected prompt file to run.
+---
+## 2026-04-03 02:39:13 KST - US-004
+- Added `bin/ralph` as a thin global wrapper that walks up from the current working directory, finds the nearest repo-local `ralph.sh`, and forwards all arguments unchanged.
+- Documented the one-time PATH install, uninstall step, wrapper behavior, and `ralph` versus `./ralph.sh` usage in `README.md`, plus linked the global-command path from `./ralph.sh --help` and `AGENTS.md`.
+- Files changed: `bin/ralph`, `ralph.sh`, `README.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep the global command as a wrapper that discovers repo-local `ralph.sh`; do not duplicate loop logic or flags in a second script.
+  - A temp-directory smoke test is the fastest way to verify both wrapper discovery from nested paths and the expected failure guidance outside a Ralph-enabled repo.
+  - For shell-only Ralph changes, `bash -n` plus direct CLI smoke tests are the effective quality checks when no stronger automated suite exists.
+---

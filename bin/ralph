@@ -1,0 +1,34 @@
+#!/bin/bash
+
+set -e
+
+find_repo_entrypoint() {
+  local dir="${PWD:-$(pwd)}"
+
+  while [ -n "$dir" ]; do
+    if [ -f "$dir/ralph.sh" ]; then
+      printf '%s\n' "$dir/ralph.sh"
+      return 0
+    fi
+
+    if [ "$dir" = "/" ]; then
+      break
+    fi
+
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+if REPO_ENTRYPOINT="$(find_repo_entrypoint)"; then
+  exec bash "$REPO_ENTRYPOINT" "$@"
+fi
+
+cat >&2 <<EOF
+Error: Could not find a repo-local ralph.sh from $PWD.
+Next: Run 'ralph' from a repository that contains ralph.sh, or invoke that repo's ./ralph.sh directly.
+If you are setting Ralph up in a new repository, copy ralph.sh, CODEX.md, CLAUDE.md, and .agents/skills/ into that repo first.
+EOF
+
+exit 1

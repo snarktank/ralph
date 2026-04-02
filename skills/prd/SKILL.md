@@ -8,6 +8,8 @@ user-invocable: true
 
 Create detailed Product Requirements Documents that are clear, actionable, and suitable for implementation.
 
+In Codex, this workflow should be exposed through the repo-local skill named `$prd`.
+
 ---
 
 ## The Job

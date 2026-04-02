@@ -2,7 +2,9 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Ralph is a Codex-first autonomous agent loop. Each iteration starts a fresh agent, completes at most one story, and writes memory back to files next to `ralph.sh`.
+
+In Codex, the native entry points for this repo are `$prd`, `$ralph`, and `./ralph.sh`.
 
 ## Commands
 
@@ -13,8 +15,17 @@ cd flowchart && npm run dev
 # Build the flowchart
 cd flowchart && npm run build
 
-# Run Ralph with Amp (default)
+# Run Ralph with Codex (default)
 ./ralph.sh [max_iterations]
+
+# Optional global wrapper after a one-time PATH install
+ralph [max_iterations]
+
+# Run non-destructive preflight checks
+./ralph.sh --doctor
+
+# Inspect current Ralph progress without starting a run
+./ralph.sh --status
 
 # Run Ralph with Claude Code
 ./ralph.sh --tool claude [max_iterations]
@@ -22,9 +33,13 @@ cd flowchart && npm run build
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
-- `prompt.md` - Instructions given to each AMP instance
--  `CLAUDE.md` - Instructions given to each Claude Code instance
+- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool claude` or `--tool codex`)
+- `bin/ralph` - Thin global wrapper that discovers the nearest repo-local `ralph.sh` and forwards all arguments unchanged
+- `README.md` - Main usage guide; keep it Codex-first and focused on in-project usage
+- `CLAUDE.md` - Instructions given to each Claude Code instance
+- `CODEX.md` - Instructions given to each Codex instance
+- `.agents/skills/prd/SKILL.md` - Codex-native PRD skill
+- `.agents/skills/ralph/SKILL.md` - Codex-native PRD-to-`prd.json` skill
 - `prd.json.example` - Example PRD format
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
@@ -41,7 +56,21 @@ npm run dev
 
 ## Patterns
 
-- Each iteration spawns a fresh AI instance (Amp or Claude Code) with clean context
+- Codex is the default runtime. Keep docs and examples Codex-first; treat Claude as an optional compatibility path.
+- Codex-native workflow in this repo is: `$prd` -> `$ralph` -> `./ralph.sh`.
+- Repo-local Codex skills live in `.agents/skills/`. Keep those paths as the primary Codex integration surface.
+- Ralph state lives next to `ralph.sh`. In this repo that means `./prd.json`, `./progress.txt`, and `./archive/`.
+- Non-destructive CLI modes in `ralph.sh` should parse and exit before validating tool binaries, prompt files, or Ralph state. That keeps setup and recovery commands usable on broken local state.
+- Diagnostic modes should validate `prd.json` directly, but treat `progress.txt` and `archive/` as lazily created state paths and check readiness instead of requiring them to exist up front.
+- Inspection modes should print the absolute Ralph state paths before summary or recovery guidance so users can act without opening the script.
+- Fatal CLI errors should name the exact missing binary or file and end with the repo-local recovery command path, such as `./ralph.sh --help`, `./ralph.sh --doctor`, or the Codex-first `$prd -> $ralph -> ./ralph.sh` sequence.
+- Loop completion should be verified from `prd.json` pending-story state; the agent's `<promise>COMPLETE</promise>` marker is advisory, not authoritative.
+- `ralph.sh` injects absolute Ralph state paths into the agent prompt, so prompt files should reference runtime context rather than assume the current working directory.
+- Ease-of-use work should prioritize copy-paste happy paths, non-destructive diagnostics, and explicit recovery steps over architectural changes.
+- When regenerating `prd.json` from a revised PRD, reflect the repo's current baseline and keep only the remaining executable work instead of replaying already-landed stories.
+- If Ralph gets a global `ralph` command, keep it as a thin wrapper around repo-local `ralph.sh` so flags, defaults, and docs stay in sync.
+- The global `bin/ralph` wrapper should search upward from the current working directory for `ralph.sh` and forward arguments unchanged; install the wrapper on PATH instead of symlinking directly to `ralph.sh`.
+- Each iteration spawns a fresh AI instance with clean context
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations
