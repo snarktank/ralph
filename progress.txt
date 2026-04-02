@@ -4,6 +4,7 @@
 - Doctor-style diagnostics should validate `prd.json` directly, but treat `progress.txt` and `archive/` as lazily created state paths and check readiness instead of requiring them to exist.
 - Inspection modes should print the absolute Ralph state paths before summary or recovery guidance so users can act without opening `ralph.sh`.
 - Fatal CLI errors should identify the exact missing binary or file and finish with the repo-local recovery command path, such as `./ralph.sh --help`, `./ralph.sh --doctor`, or `$prd -> $ralph -> ./ralph.sh`.
+- Global installs should symlink `bin/ralph` onto `PATH`; the wrapper should search upward from the current directory for repo-local `ralph.sh` and forward arguments unchanged.
 
 Started: Fri Apr  3 01:16:58 KST 2026
 ---
@@ -45,4 +46,13 @@ Started: Fri Apr  3 01:16:58 KST 2026
   - Fatal CLI errors are most actionable when they identify the missing binary or file first and then end with the exact recovery command the user should run next.
   - Temp-directory copies of `ralph.sh` are still the fastest regression checks for missing `prd.json`, malformed `prd.json`, and missing repo asset scenarios.
   - `./ralph.sh --doctor` is the best verification surface for missing repo-local skill files because the main loop only requires the selected prompt file to run.
+---
+## 2026-04-03 02:39:13 KST - US-004
+- Added `bin/ralph` as a thin global wrapper that walks up from the current working directory, finds the nearest repo-local `ralph.sh`, and forwards all arguments unchanged.
+- Documented the one-time PATH install, uninstall step, wrapper behavior, and `ralph` versus `./ralph.sh` usage in `README.md`, plus linked the global-command path from `./ralph.sh --help` and `AGENTS.md`.
+- Files changed: `bin/ralph`, `ralph.sh`, `README.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep the global command as a wrapper that discovers repo-local `ralph.sh`; do not duplicate loop logic or flags in a second script.
+  - A temp-directory smoke test is the fastest way to verify both wrapper discovery from nested paths and the expected failure guidance outside a Ralph-enabled repo.
+  - For shell-only Ralph changes, `bash -n` plus direct CLI smoke tests are the effective quality checks when no stronger automated suite exists.
 ---

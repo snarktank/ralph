@@ -8,6 +8,30 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
 
+## Install A Global `ralph` Command
+
+From the Ralph repo root, install the thin wrapper once, then use `ralph` from any repository that contains a repo-local `ralph.sh`:
+
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -sf "$(pwd)/bin/ralph" "$HOME/.local/bin/ralph"
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+If `~/.local/bin` is not already on your shell `PATH`, add that export line to `~/.zshrc`, `~/.bashrc`, or the startup file for your shell, then open a new shell.
+
+The installed `ralph` command is only a wrapper. It walks up from your current working directory until it finds `ralph.sh`, then forwards every argument unchanged to that repo-local script. That keeps the global command aligned with `./ralph.sh` instead of creating a second source of truth.
+
+Use `ralph` after the one-time PATH setup when you are already inside a Ralph-enabled repository and want the shortest command. Use `./ralph.sh` when you have not installed the wrapper yet, when you want to be explicit in docs or automation, or when you are debugging the wrapper itself.
+
+Undo the install with:
+
+```bash
+rm -f "$HOME/.local/bin/ralph"
+```
+
+If you added a dedicated PATH export just for Ralph, remove that line from your shell startup file too.
+
 ## Codex Workflow In This Repo
 
 Open this repo in Codex. The repo-local skills live under `.agents/skills`, so Codex can discover them natively.
@@ -47,6 +71,8 @@ The generated `./prd.json` should contain small, dependency-ordered stories with
 ```bash
 ./ralph.sh
 ./ralph.sh 20
+ralph
+ralph --status
 ```
 
 ### 5. Check progress
@@ -74,11 +100,24 @@ That iteration should:
 
 When every story has `passes: true`, the agent emits `<promise>COMPLETE</promise>` and the loop exits.
 
+## Global Wrapper Behavior
+
+After the one-time install above, `ralph` supports the same flags and positional arguments as `./ralph.sh` because it forwards everything to the repo-local script unchanged:
+
+```bash
+ralph --doctor
+ralph --status
+ralph --tool claude 5
+```
+
+If you run `ralph` outside a repository that contains `ralph.sh`, the wrapper stops immediately and tells you to either change into a Ralph-enabled repo or invoke that repo's `./ralph.sh` directly.
+
 ## File Layout
 
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | Loop runner. Defaults to Codex, optional `--tool claude` |
+| `bin/ralph` | Thin global wrapper that discovers the nearest repo-local `ralph.sh` and forwards all args |
 | `CODEX.md` | Codex instructions for one Ralph iteration |
 | `.agents/skills/prd/` | Codex-native PRD skill, invoked as `$prd` |
 | `.agents/skills/ralph/` | Codex-native PRD-to-`prd.json` skill, invoked as `$ralph` |

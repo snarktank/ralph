@@ -48,6 +48,12 @@ Examples:
   ./$SCRIPT_NAME
   ./$SCRIPT_NAME 20
   ./$SCRIPT_NAME --tool claude 5
+
+Global command:
+  Install bin/ralph onto your PATH once, then run:
+  ralph --status
+  ralph --tool claude 5
+  See README.md for the install and uninstall steps.
 EOF
 }
 

@@ -18,6 +18,9 @@ cd flowchart && npm run build
 # Run Ralph with Codex (default)
 ./ralph.sh [max_iterations]
 
+# Optional global wrapper after a one-time PATH install
+ralph [max_iterations]
+
 # Run non-destructive preflight checks
 ./ralph.sh --doctor
 
@@ -31,6 +34,7 @@ cd flowchart && npm run build
 ## Key Files
 
 - `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool claude` or `--tool codex`)
+- `bin/ralph` - Thin global wrapper that discovers the nearest repo-local `ralph.sh` and forwards all arguments unchanged
 - `README.md` - Main usage guide; keep it Codex-first and focused on in-project usage
 - `CLAUDE.md` - Instructions given to each Claude Code instance
 - `CODEX.md` - Instructions given to each Codex instance
@@ -65,6 +69,7 @@ npm run dev
 - Ease-of-use work should prioritize copy-paste happy paths, non-destructive diagnostics, and explicit recovery steps over architectural changes.
 - When regenerating `prd.json` from a revised PRD, reflect the repo's current baseline and keep only the remaining executable work instead of replaying already-landed stories.
 - If Ralph gets a global `ralph` command, keep it as a thin wrapper around repo-local `ralph.sh` so flags, defaults, and docs stay in sync.
+- The global `bin/ralph` wrapper should search upward from the current working directory for `ralph.sh` and forward arguments unchanged; install the wrapper on PATH instead of symlinking directly to `ralph.sh`.
 - Each iteration spawns a fresh AI instance with clean context
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window
