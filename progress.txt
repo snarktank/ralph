@@ -3,6 +3,7 @@
 - Non-destructive CLI modes in `ralph.sh` should parse and exit before validating tool binaries, prompt files, or Ralph state so help and future recovery commands work even on broken setup.
 - Doctor-style diagnostics should validate `prd.json` directly, but treat `progress.txt` and `archive/` as lazily created state paths and check readiness instead of requiring them to exist.
 - Inspection modes should print the absolute Ralph state paths before summary or recovery guidance so users can act without opening `ralph.sh`.
+- Fatal CLI errors should identify the exact missing binary or file and finish with the repo-local recovery command path, such as `./ralph.sh --help`, `./ralph.sh --doctor`, or `$prd -> $ralph -> ./ralph.sh`.
 
 Started: Fri Apr  3 01:16:58 KST 2026
 ---
@@ -35,4 +36,13 @@ Started: Fri Apr  3 01:16:58 KST 2026
   - Non-destructive inspection commands should exit before prompt or runtime validation so they still work from a temp copy of `ralph.sh`.
   - For CLI recovery output, printing the exact Ralph state paths before the error makes the next manual fix much clearer.
   - A temp-directory copy with a missing or malformed `prd.json` is a fast regression check for new Ralph inspection modes.
+---
+## 2026-04-03 02:33:55 KST - US-003
+- Tightened Ralph startup and validation failures so invalid `--tool` values point to `./ralph.sh --help`, missing runtime binaries name the missing executable and alternative command path, and invalid or missing `prd.json` now print the full Codex-first recovery sequence.
+- Added repo-asset recovery guidance for missing prompt files and clarified doctor failures for missing prompt and skill files with the exact paths Ralph expects under the repo root.
+- Files changed: `ralph.sh`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Fatal CLI errors are most actionable when they identify the missing binary or file first and then end with the exact recovery command the user should run next.
+  - Temp-directory copies of `ralph.sh` are still the fastest regression checks for missing `prd.json`, malformed `prd.json`, and missing repo asset scenarios.
+  - `./ralph.sh --doctor` is the best verification surface for missing repo-local skill files because the main loop only requires the selected prompt file to run.
 ---

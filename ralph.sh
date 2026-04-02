@@ -9,6 +9,7 @@ DEFAULT_TOOL="codex"
 DEFAULT_MAX_ITERATIONS=10
 DOCTOR_MODE=0
 STATUS_MODE=0
+REPO_ENTRYPOINT="./ralph.sh"
 
 print_help() {
   cat <<EOF
@@ -52,7 +53,7 @@ EOF
 
 print_usage_error() {
   echo "Error: $1" >&2
-  echo "Run ./$SCRIPT_NAME --help for usage." >&2
+  echo "Run $REPO_ENTRYPOINT --help for usage." >&2
   exit 1
 }
 
@@ -132,26 +133,79 @@ case "$TOOL" in
     TOOL_CMD=(codex exec --full-auto --color never)
     ;;
   *)
-    echo "Error: Invalid tool '$TOOL'. Must be 'claude' or 'codex'."
-    exit 1
+    print_usage_error "Invalid tool '$TOOL'. Use 'codex' or 'claude'."
     ;;
 esac
+
+print_repo_asset_expectations() {
+  cat <<EOF
+Ralph expects these repo files under $SCRIPT_DIR:
+- $CODEX_PROMPT_FILE
+- $CLAUDE_PROMPT_FILE
+- $PRD_SKILL_FILE
+- $RALPH_SKILL_FILE
+EOF
+}
+
+print_codex_first_recovery_path() {
+  cat <<EOF
+Codex-first recovery path:
+1. Optionally run \`/skills\` to confirm the repo-local skills are available.
+2. Use \`\$prd\` to draft a PRD into \`tasks/prd-<feature>.md\`.
+3. Use \`\$ralph\` to convert that PRD into \`$PRD_FILE\`.
+4. Run \`$REPO_ENTRYPOINT\`.
+EOF
+}
+
+print_missing_runtime_binary_help() {
+  echo "Error: Required runtime binary '$TOOL_BIN' is not installed or not on PATH."
+
+  if [ "$TOOL" = "codex" ]; then
+    echo "Next: Install 'codex', then rerun $REPO_ENTRYPOINT or $REPO_ENTRYPOINT --doctor."
+    echo "Alternative: If you want Claude Code instead, install 'claude' and run $REPO_ENTRYPOINT --tool claude."
+    return
+  fi
+
+  echo "Next: Install 'claude', then rerun $REPO_ENTRYPOINT --tool claude or $REPO_ENTRYPOINT --doctor --tool claude."
+  echo "Alternative: If you want Codex instead, install 'codex' and run $REPO_ENTRYPOINT."
+}
+
+print_missing_jq_help() {
+  echo "Error: Required binary 'jq' is not installed or not on PATH."
+  echo "Next: Install 'jq', then rerun $REPO_ENTRYPOINT --doctor so Ralph can validate $PRD_FILE."
+}
+
+print_missing_repo_asset_help() {
+  local asset_label="$1"
+  local asset_path="$2"
+  local next_command="$3"
+
+  echo "Error: Missing $asset_label: $asset_path"
+  echo ""
+  print_repo_asset_expectations
+  echo ""
+  echo "Next: Restore $asset_path, then rerun:"
+  echo "  $next_command"
+}
+
+print_invalid_prd_help() {
+  local reason="$1"
+  local next_action="$2"
+
+  echo "Error: $reason"
+  echo "Next: $next_action"
+  echo ""
+  print_codex_first_recovery_path
+}
 
 print_missing_prd_help() {
   cat <<EOF
 Error: Missing Ralph state file: $PRD_FILE
 
-Create it in Codex before running Ralph:
-1. Optionally run \`/skills\` to confirm the repo-local skills are available.
-2. Use \`\$prd\` to draft a PRD into \`tasks/prd-<feature>.md\`.
-3. Use \`\$ralph\` to convert that PRD into \`$PRD_FILE\`.
+$(print_codex_first_recovery_path)
 
-Then rerun:
-  ./ralph.sh
-
-If you copied Ralph into another repository, also copy:
-- .agents/skills/prd/
-- .agents/skills/ralph/
+If you copied Ralph into another repository, also restore these repo assets:
+$(print_repo_asset_expectations)
 EOF
 }
 
@@ -186,27 +240,27 @@ run_status() {
   local next_story_title=""
 
   if ! command -v jq >/dev/null 2>&1; then
-    status_unavailable "'jq' is required to read $PRD_FILE." "Install jq, then rerun ./$SCRIPT_NAME --status."
+    status_unavailable "'jq' is required to read $PRD_FILE." "Install jq, then rerun $REPO_ENTRYPOINT --status."
     return 1
   fi
 
   if [ ! -f "$PRD_FILE" ]; then
-    status_unavailable "Missing Ralph state file: $PRD_FILE" "In Codex, run /skills, then \$prd to draft a PRD, then \$ralph to create $PRD_FILE, then rerun ./$SCRIPT_NAME --status."
+    status_unavailable "Missing Ralph state file: $PRD_FILE" "In Codex, run /skills, then \$prd to draft a PRD, then \$ralph to create $PRD_FILE, then rerun $REPO_ENTRYPOINT --status."
     return 1
   fi
 
   if ! jq -e '.' "$PRD_FILE" >/dev/null 2>&1; then
-    status_unavailable "$PRD_FILE is not valid JSON." "Fix the JSON in $PRD_FILE or rerun \$ralph to regenerate it from your PRD markdown, then rerun ./$SCRIPT_NAME --status."
+    status_unavailable "$PRD_FILE is not valid JSON." "Fix the JSON in $PRD_FILE or rerun \$ralph to regenerate it from your PRD markdown, then rerun $REPO_ENTRYPOINT --status."
     return 1
   fi
 
   if ! jq -e '.branchName | type == "string" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
-    status_unavailable "$PRD_FILE is missing a non-empty 'branchName' field." "Edit $PRD_FILE so 'branchName' is a non-empty string, or rerun \$ralph to regenerate it, then rerun ./$SCRIPT_NAME --status."
+    status_unavailable "$PRD_FILE is missing a non-empty 'branchName' field." "Edit $PRD_FILE so 'branchName' is a non-empty string, or rerun \$ralph to regenerate it, then rerun $REPO_ENTRYPOINT --status."
     return 1
   fi
 
   if ! jq -e '.userStories | type == "array" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
-    status_unavailable "$PRD_FILE must contain a non-empty 'userStories' array." "Update $PRD_FILE with at least one story, or rerun \$ralph to regenerate it, then rerun ./$SCRIPT_NAME --status."
+    status_unavailable "$PRD_FILE must contain a non-empty 'userStories' array." "Update $PRD_FILE with at least one story, or rerun \$ralph to regenerate it, then rerun $REPO_ENTRYPOINT --status."
     return 1
   fi
 
@@ -302,14 +356,14 @@ run_doctor_progress_check() {
       return
     fi
 
-    doctor_fail "State: progress.txt" "$PROGRESS_FILE exists but is not writable." "Restore write access to $PROGRESS_FILE before running ./$SCRIPT_NAME."
+    doctor_fail "State: progress.txt" "$PROGRESS_FILE exists but is not writable." "Restore write access to $PROGRESS_FILE before running $REPO_ENTRYPOINT."
     return
   fi
 
   if [ -w "$SCRIPT_DIR" ]; then
     doctor_pass "State: progress.txt" "$PROGRESS_FILE will be created on the first Ralph run."
   else
-    doctor_fail "State: progress.txt" "missing $PROGRESS_FILE and $SCRIPT_DIR is not writable." "Create $PROGRESS_FILE manually or restore write access to $SCRIPT_DIR before running ./$SCRIPT_NAME."
+    doctor_fail "State: progress.txt" "missing $PROGRESS_FILE and $SCRIPT_DIR is not writable." "Create $PROGRESS_FILE manually or restore write access to $SCRIPT_DIR before running $REPO_ENTRYPOINT."
   fi
 }
 
@@ -320,45 +374,45 @@ run_doctor_archive_check() {
       return
     fi
 
-    doctor_fail "State: archive/" "$ARCHIVE_DIR exists but is not writable." "Restore write access to $ARCHIVE_DIR before running ./$SCRIPT_NAME."
+    doctor_fail "State: archive/" "$ARCHIVE_DIR exists but is not writable." "Restore write access to $ARCHIVE_DIR before running $REPO_ENTRYPOINT."
     return
   fi
 
   if [ -w "$SCRIPT_DIR" ]; then
     doctor_pass "State: archive/" "$ARCHIVE_DIR will be created automatically when Ralph archives a previous run."
   else
-    doctor_fail "State: archive/" "missing $ARCHIVE_DIR and $SCRIPT_DIR is not writable." "Create $ARCHIVE_DIR manually or restore write access to $SCRIPT_DIR before running ./$SCRIPT_NAME."
+    doctor_fail "State: archive/" "missing $ARCHIVE_DIR and $SCRIPT_DIR is not writable." "Create $ARCHIVE_DIR manually or restore write access to $SCRIPT_DIR before running $REPO_ENTRYPOINT."
   fi
 }
 
 run_doctor_prd_check() {
   if [ ! -f "$PRD_FILE" ]; then
-    doctor_fail "State: prd.json" "missing $PRD_FILE" "Run /skills, then \$prd, then \$ralph to create $PRD_FILE before running ./$SCRIPT_NAME."
+    doctor_fail "State: prd.json" "missing $PRD_FILE" "Run /skills, then \$prd, then \$ralph to create $PRD_FILE before running $REPO_ENTRYPOINT."
     return
   fi
 
   if ! command -v jq >/dev/null 2>&1; then
-    doctor_fail "State: prd.json" "found $PRD_FILE, but Ralph cannot validate it without 'jq'." "Install jq, then rerun ./$SCRIPT_NAME --doctor so Ralph can validate $PRD_FILE."
+    doctor_fail "State: prd.json" "found $PRD_FILE, but Ralph cannot validate it without 'jq'." "Install jq, then rerun $REPO_ENTRYPOINT --doctor so Ralph can validate $PRD_FILE."
     return
   fi
 
   if ! jq -e '.' "$PRD_FILE" >/dev/null 2>&1; then
-    doctor_fail "State: prd.json" "$PRD_FILE is not valid JSON." "Fix the JSON in $PRD_FILE or rerun \$ralph to regenerate it from your PRD markdown."
+    doctor_fail "State: prd.json" "$PRD_FILE is not valid JSON." "Fix the JSON in $PRD_FILE or rerun \$ralph to regenerate it from your PRD markdown, then rerun $REPO_ENTRYPOINT --doctor."
     return
   fi
 
   if ! jq -e '.branchName | type == "string" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
-    doctor_fail "State: prd.json" "$PRD_FILE is missing a non-empty 'branchName' field." "Update $PRD_FILE so 'branchName' is a non-empty string, then rerun ./$SCRIPT_NAME --doctor."
+    doctor_fail "State: prd.json" "$PRD_FILE is missing a non-empty 'branchName' field." "Update $PRD_FILE so 'branchName' is a non-empty string, then rerun $REPO_ENTRYPOINT --doctor."
     return
   fi
 
   if ! jq -e '.userStories | type == "array" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
-    doctor_fail "State: prd.json" "$PRD_FILE must contain a non-empty 'userStories' array." "Update $PRD_FILE with at least one story, or rerun \$ralph to regenerate it from your PRD markdown."
+    doctor_fail "State: prd.json" "$PRD_FILE must contain a non-empty 'userStories' array." "Update $PRD_FILE with at least one story, or rerun \$ralph to regenerate it from your PRD markdown, then rerun $REPO_ENTRYPOINT --doctor."
     return
   fi
 
   if [ ! -w "$PRD_FILE" ]; then
-    doctor_fail "State: prd.json" "$PRD_FILE is valid, but it is not writable." "Restore write access to $PRD_FILE before running ./$SCRIPT_NAME so Ralph can update story status."
+    doctor_fail "State: prd.json" "$PRD_FILE is valid, but it is not writable." "Restore write access to $PRD_FILE before running $REPO_ENTRYPOINT so Ralph can update story status."
     return
   fi
 
@@ -372,12 +426,12 @@ run_doctor() {
   echo "Selected tool: $TOOL_NAME ($TOOL)"
   echo ""
 
-  run_doctor_binary_check "Binary: jq" "jq" "Install jq and rerun ./$SCRIPT_NAME --doctor."
-  run_doctor_binary_check "Binary: $TOOL_BIN" "$TOOL_BIN" "Install '$TOOL_BIN', or rerun ./$SCRIPT_NAME --doctor with --tool codex or --tool claude for the runtime you intend to use."
-  run_doctor_file_check "Prompt: CODEX.md" "$CODEX_PROMPT_FILE" "Restore $CODEX_PROMPT_FILE so Codex runs have a prompt file."
-  run_doctor_file_check "Prompt: CLAUDE.md" "$CLAUDE_PROMPT_FILE" "Restore $CLAUDE_PROMPT_FILE so Claude Code runs have a prompt file."
-  run_doctor_file_check "Skill: .agents/skills/prd/SKILL.md" "$PRD_SKILL_FILE" "Restore $PRD_SKILL_FILE so the \$prd workflow is available in this repo."
-  run_doctor_file_check "Skill: .agents/skills/ralph/SKILL.md" "$RALPH_SKILL_FILE" "Restore $RALPH_SKILL_FILE so the \$ralph workflow is available in this repo."
+  run_doctor_binary_check "Binary: jq" "jq" "Install jq and rerun $REPO_ENTRYPOINT --doctor."
+  run_doctor_binary_check "Binary: $TOOL_BIN" "$TOOL_BIN" "Install '$TOOL_BIN', or rerun $REPO_ENTRYPOINT --doctor with --tool codex or --tool claude for the runtime you intend to use."
+  run_doctor_file_check "Prompt: CODEX.md" "$CODEX_PROMPT_FILE" "Restore $CODEX_PROMPT_FILE under $SCRIPT_DIR so Codex runs have their prompt file."
+  run_doctor_file_check "Prompt: CLAUDE.md" "$CLAUDE_PROMPT_FILE" "Restore $CLAUDE_PROMPT_FILE under $SCRIPT_DIR so Claude Code runs have their prompt file."
+  run_doctor_file_check "Skill: .agents/skills/prd/SKILL.md" "$PRD_SKILL_FILE" "Restore $PRD_SKILL_FILE under $SCRIPT_DIR so the \$prd workflow is available in this repo."
+  run_doctor_file_check "Skill: .agents/skills/ralph/SKILL.md" "$RALPH_SKILL_FILE" "Restore $RALPH_SKILL_FILE under $SCRIPT_DIR so the \$ralph workflow is available in this repo."
   run_doctor_prd_check
   run_doctor_progress_check
   run_doctor_archive_check
@@ -400,19 +454,29 @@ validate_prd_file() {
   fi
 
   if ! jq -e '.' "$PRD_FILE" >/dev/null 2>&1; then
-    echo "Error: Invalid JSON in $PRD_FILE"
+    print_invalid_prd_help "Invalid JSON in $PRD_FILE." "Fix the JSON in $PRD_FILE or rerun \$ralph to regenerate it from your PRD markdown."
     exit 1
   fi
 
   if ! jq -e '.branchName | type == "string" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
-    echo "Error: $PRD_FILE must contain a non-empty string field 'branchName'."
+    print_invalid_prd_help "$PRD_FILE must contain a non-empty string field 'branchName'." "Edit $PRD_FILE so 'branchName' is a non-empty string, or rerun \$ralph to regenerate it."
     exit 1
   fi
 
   if ! jq -e '.userStories | type == "array" and length > 0' "$PRD_FILE" >/dev/null 2>&1; then
-    echo "Error: $PRD_FILE must contain a non-empty 'userStories' array."
+    print_invalid_prd_help "$PRD_FILE must contain a non-empty 'userStories' array." "Update $PRD_FILE with at least one story, or rerun \$ralph to regenerate it from your PRD markdown."
     exit 1
   fi
+}
+
+get_pending_story_count() {
+  jq -r '
+    if (.userStories | type) != "array" then
+      error("userStories must be an array")
+    else
+      [.userStories[] | select(.passes != true)] | length
+    end
+  ' "$PRD_FILE"
 }
 
 build_runtime_context() {
@@ -440,17 +504,17 @@ if [ "$STATUS_MODE" -eq 1 ]; then
 fi
 
 if ! command -v "$TOOL_BIN" >/dev/null 2>&1; then
-  echo "Error: '$TOOL_BIN' is not installed or not on PATH."
+  print_missing_runtime_binary_help
   exit 1
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "Error: 'jq' is required but not installed or not on PATH."
+  print_missing_jq_help
   exit 1
 fi
 
 if [ ! -f "$PROMPT_FILE" ]; then
-  echo "Error: Prompt file not found: $PROMPT_FILE"
+  print_missing_repo_asset_help "prompt file" "$PROMPT_FILE" "$REPO_ENTRYPOINT --doctor"
   exit 1
 fi
 
@@ -514,13 +578,23 @@ for i in $(seq 1 $MAX_ITERATIONS); do
       cat "$PROMPT_FILE"
     } | "${TOOL_CMD[@]}" 2>&1 | tee /dev/stderr
   ) || true
-  
-  # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+
+  PENDING_STORIES="$(get_pending_story_count 2>/dev/null)" || {
+    echo "Error: Could not determine remaining story count from $PRD_FILE after iteration $i."
+    echo "Check $PRD_FILE for invalid JSON or a malformed userStories array."
+    exit 1
+  }
+
+  if [ "$PENDING_STORIES" -eq 0 ]; then
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
+  fi
+
+  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+    echo "Warning: Agent reported completion, but $PENDING_STORIES stories are still pending in $PRD_FILE."
+    echo "Continuing because Ralph state is not fully complete yet."
   fi
   
   echo "Iteration $i complete. Continuing..."

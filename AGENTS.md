@@ -59,6 +59,8 @@ npm run dev
 - Non-destructive CLI modes in `ralph.sh` should parse and exit before validating tool binaries, prompt files, or Ralph state. That keeps setup and recovery commands usable on broken local state.
 - Diagnostic modes should validate `prd.json` directly, but treat `progress.txt` and `archive/` as lazily created state paths and check readiness instead of requiring them to exist up front.
 - Inspection modes should print the absolute Ralph state paths before summary or recovery guidance so users can act without opening the script.
+- Fatal CLI errors should name the exact missing binary or file and end with the repo-local recovery command path, such as `./ralph.sh --help`, `./ralph.sh --doctor`, or the Codex-first `$prd -> $ralph -> ./ralph.sh` sequence.
+- Loop completion should be verified from `prd.json` pending-story state; the agent's `<promise>COMPLETE</promise>` marker is advisory, not authoritative.
 - `ralph.sh` injects absolute Ralph state paths into the agent prompt, so prompt files should reference runtime context rather than assume the current working directory.
 - Ease-of-use work should prioritize copy-paste happy paths, non-destructive diagnostics, and explicit recovery steps over architectural changes.
 - When regenerating `prd.json` from a revised PRD, reflect the repo's current baseline and keep only the remaining executable work instead of replaying already-landed stories.
