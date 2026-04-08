@@ -1,47 +1,92 @@
-# Ralph Agent Instructions
+# Ralph Codex Workbench
 
-## Overview
+This repo is the upstream Ralph source plus a local Codex adaptation workbench.
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Use it for two things:
 
-## Commands
+- understanding the original Ralph behavior from `CLAUDE.md`, `ralph.sh`,
+  `skills/prd/SKILL.md`, and `skills/ralph/SKILL.md`
+- building and validating the Codex-native adaptation without losing fidelity to the
+  original one-story loop
 
-```bash
-# Run the flowchart dev server
-cd flowchart && npm run dev
+## Read order
 
-# Build the flowchart
-cd flowchart && npm run build
+1. Read `README.md`.
+2. Read:
+   - `CLAUDE.md`
+   - `skills/prd/SKILL.md`
+   - `skills/ralph/SKILL.md`
+   - `ralph.sh`
+   - `prd.json.example`
+3. Read:
+   - `docs/product/README.md`
+   - `docs/product/01_prd.md`
+   - `docs/product/02_hld.md`
+   - `docs/product/03_lld.md`
+4. For current adaptation state and handoff context, read:
+   - `docs/issues/0000-discovery-journal.md`
+   - `docs/issues/0001-upstream-behavior-audit.md`
 
-# Run Ralph with Amp (default)
-./ralph.sh [max_iterations]
+## Local Codex skills
 
-# Run Ralph with Claude Code
-./ralph.sh --tool claude [max_iterations]
-```
+Use the installed local Codex skills instead of re-deriving the workflow from scratch
+every time:
 
-## Key Files
+- `ralph-prd`
+- `ralph-loop`
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
-- `prompt.md` - Instructions given to each AMP instance
--  `CLAUDE.md` - Instructions given to each Claude Code instance
-- `prd.json.example` - Example PRD format
-- `flowchart/` - Interactive React Flow diagram explaining how Ralph works
+These are the Codex-native equivalents of:
 
-## Flowchart
+- upstream `skills/prd/SKILL.md`
+- upstream `CLAUDE.md` plus `skills/ralph/SKILL.md`
 
-The `flowchart/` directory contains an interactive visualization built with React Flow. It's designed for presentations - click through to reveal each step with animations.
+## Core behavior to preserve
 
-To run locally:
-```bash
-cd flowchart
-npm install
-npm run dev
-```
+- one story per iteration
+- `prd.json` is the task ledger
+- `progress.txt` is append-only memory
+- reusable patterns belong at the top of `progress.txt`
+- nearby `AGENTS.md` files should capture genuinely reusable local knowledge
+- commit only after checks pass
+- output `COMPLETE` only when all stories pass
 
-## Patterns
+## Doc routing
 
-- Each iteration spawns a fresh AI instance (Amp or Claude Code) with clean context
-- Memory persists via git history, `progress.txt`, and `prd.json`
-- Stories should be small enough to complete in one context window
-- Always update AGENTS.md with discovered patterns for future iterations
+- `docs/product/`
+  - Codex adaptation specs
+- `docs/issues/`
+  - behavior mismatches, discoveries, and the UTC handoff journal
+- `docs/tests/`
+  - validation procedures and adaptation checks
+- `docs/tasks/`
+  - bounded adaptation work items
+- `docs/tasks/done/`
+  - completed work records
+- `docs/gaps/`
+  - unresolved runtime or product gaps, especially the future standalone Codex runner
+
+## Handoff discipline
+
+After each meaningful work loop, append a UTC entry to:
+
+- `docs/issues/0000-discovery-journal.md`
+
+Minimum fields:
+
+- `utc_timestamp`
+- `focus`
+- `what_was_done`
+- `files_or_areas_touched`
+- `what_changed_in_understanding`
+- `next_step`
+
+## Important constraints
+
+- Keep the upstream file contract unchanged in the first pass:
+  - `prd.json`
+  - `progress.txt`
+  - `tasks/prd-<feature>.md`
+- The Codex adaptation should stay faithful to Ralph, not become a generic autonomous
+  agent framework.
+- There is no confirmed local `codex` CLI/runtime contract here yet, so the standalone
+  loop runner remains a documented future gap rather than an implemented shell loop.
