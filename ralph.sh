@@ -100,6 +100,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
+    echo ""
+    echo "Tip: clean up Ralph's intermediary files when you're ready:"
+    echo "  Via your AI coding tool : /flick"
+    echo "  Via script (from project): path/to/ralph/flick.sh"
     exit 0
   fi
   
