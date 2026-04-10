@@ -13,6 +13,7 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 - One of the following AI coding tools installed and authenticated:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+  - [Gemini CLI](https://gemini.google.com) (`npm install -g @google/gemini-cli`)
 - `jq` installed (`brew install jq` on macOS)
 - A git repository for your project
 
@@ -31,6 +32,8 @@ cp /path/to/ralph/ralph.sh scripts/ralph/
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
 # OR
 cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
+# OR
+cp /path/to/ralph/GEMINI.md scripts/ralph/GEMINI.md    # For Gemini CLI
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -117,7 +120,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp`, `--tool claude` or `--tool gemini` to select your AI coding tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -237,3 +240,4 @@ Ralph automatically archives previous runs when you start a new feature (differe
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
+(https://docs.anthropic.com/en/docs/claude-code)
