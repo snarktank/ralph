@@ -1,0 +1,25 @@
+{
+  "name": "ralph-marketplace",
+  "owner": "snarktank",
+  "version": "1.0.0",
+  "description": "Marketplace package providing PRD generation and conversion skills for the Ralph autonomous agent system.",
+
+  "plugins": [
+    {
+      "id": "ralph-skills",
+      "name": "Ralph PRD Skills",
+      "version": "1.0.0",
+      "category": "productivity",
+      "description": "Generate Product Requirement Documents (PRDs) and convert them into prd.json for autonomous agent execution.",
+      "keywords": [
+        "ralph",
+        "autonomous-agents",
+        "prd",
+        "planning",
+        "automation"
+      ],
+      "entry": "./",
+      "skills_path": "./skills"
+    }
+  ]
+}
