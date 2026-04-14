@@ -18,9 +18,13 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Setup
 
-### Option 1: Copy to your project
+### Step 1: Install the Ralph runner into your project (required)
 
-Copy the ralph files into your project:
+Copy the Ralph runner into your project. Ralph stores `prd.json` and
+`progress.txt` next to `ralph.sh`, so keep these files together in the same
+directory.
+
+Example:
 
 ```bash
 # From your project root
@@ -35,7 +39,15 @@ cp /path/to/ralph/CLAUDE.md scripts/ralph/CLAUDE.md    # For Claude Code
 chmod +x scripts/ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally (Amp)
+This step is required whether you use the skills manually, install them
+globally, or install them from the Claude Code marketplace.
+
+### Step 2: Install the converter skills (optional)
+
+The converter skills help you generate a markdown PRD and convert it into
+`prd.json`, but they do not install the Ralph runner into your project.
+
+#### Option 2A: Install skills globally (Amp)
 
 Copy the skills to your Amp or Claude config for use across all projects:
 
@@ -51,7 +63,7 @@ cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph ~/.claude/skills/
 ```
 
-### Option 3: Use as Claude Code Marketplace
+#### Option 2B: Use the Claude Code Marketplace
 
 Add the Ralph marketplace to Claude Code:
 
@@ -68,6 +80,10 @@ Then install the skills:
 Available skills after installation:
 - `/prd` - Generate Product Requirements Documents
 - `/ralph` - Convert PRDs to prd.json format
+
+Marketplace installation only provides the `/prd` and `/ralph` skills. You
+still need Step 1 so `ralph.sh`, `prompt.md` or `CLAUDE.md`, `prd.json`, and
+`progress.txt` live inside your project instead of a plugin cache directory.
 
 Skills are automatically invoked when you ask Claude to:
 - "create a prd", "write prd for", "plan this feature"
@@ -95,17 +111,21 @@ Use the PRD skill to generate a detailed requirements document:
 Load the prd skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+Answer the clarifying questions. By default the skill writes the markdown PRD to
+`tasks/prd-[feature-name].md`, but you can save that markdown wherever your
+project keeps planning docs.
 
 ### 2. Convert PRD to Ralph format
 
 Use the Ralph skill to convert the markdown PRD to JSON:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+Load the ralph skill and convert your markdown PRD to `scripts/ralph/prd.json`
+or the matching path where you installed `ralph.sh`.
 ```
 
 This creates `prd.json` with user stories structured for autonomous execution.
+Keep it in the same directory as `ralph.sh` so the runner can find it.
 
 ### 3. Run Ralph
 
@@ -136,9 +156,9 @@ Ralph will:
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
-| `prd.json` | User stories with `passes` status (the task list) |
+| `prd.json` | User stories with `passes` status; saved next to `ralph.sh` |
 | `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
+| `progress.txt` | Append-only learnings for future iterations; saved next to `ralph.sh` |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |

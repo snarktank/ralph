@@ -12,7 +12,8 @@ Converts existing PRDs to the prd.json format that Ralph uses for autonomous exe
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+Take a PRD (markdown file or text) and convert it to `prd.json` in the same
+directory as `ralph.sh`.
 
 ---
 
@@ -249,6 +250,7 @@ Add ability to mark tasks with different statuses.
 
 Before writing prd.json, verify:
 
+- [ ] `prd.json` will be saved alongside `ralph.sh`
 - [ ] **Previous run archived** (if prd.json exists with different branchName, archive it first)
 - [ ] Each story is completable in one iteration (small enough)
 - [ ] Stories are ordered by dependency (schema to backend to UI)
@@ -256,3 +258,7 @@ Before writing prd.json, verify:
 - [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
+
+If the project uses `scripts/ralph/ralph.sh`, save to
+`scripts/ralph/prd.json`. Do not write `prd.json` to the repo root or another
+directory unless that is where `ralph.sh` lives.
