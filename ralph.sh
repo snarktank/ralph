@@ -1,11 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool amp|claude] [--model <model>] [--effort <level>] [max_iterations]
 
 set -e
 
 # Parse arguments
 TOOL="amp"  # Default to amp for backwards compatibility
+MODEL=""    # Empty = use claude CLI default
+EFFORT=""   # Empty = use claude CLI default (low|medium|high|xhigh|max)
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do
@@ -16,6 +18,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --model=*)
+      MODEL="${1#*=}"
+      shift
+      ;;
+    --effort)
+      EFFORT="$2"
+      shift 2
+      ;;
+    --effort=*)
+      EFFORT="${1#*=}"
       shift
       ;;
     *)
@@ -31,6 +49,12 @@ done
 # Validate tool choice
 if [[ "$TOOL" != "amp" && "$TOOL" != "claude" ]]; then
   echo "Error: Invalid tool '$TOOL'. Must be 'amp' or 'claude'."
+  exit 1
+fi
+
+# Validate effort choice
+if [[ -n "$EFFORT" && ! "$EFFORT" =~ ^(low|medium|high|xhigh|max)$ ]]; then
+  echo "Error: Invalid effort '$EFFORT'. Must be one of: low, medium, high, xhigh, max."
   exit 1
 fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,12 +103,12 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+echo "Starting Ralph - Tool: $TOOL - Model: ${MODEL:-default} - Effort: ${EFFORT:-default} - Max iterations: $MAX_ITERATIONS"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "==============================================================="
-  echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
+  echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL${MODEL:+, model=$MODEL}${EFFORT:+, effort=$EFFORT})"
   echo "==============================================================="
 
   # Run the selected tool with the ralph prompt
@@ -92,7 +116,10 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    CLAUDE_ARGS=(--dangerously-skip-permissions --print)
+    [[ -n "$MODEL" ]] && CLAUDE_ARGS+=(--model "$MODEL")
+    [[ -n "$EFFORT" ]] && CLAUDE_ARGS+=(--effort "$EFFORT")
+    OUTPUT=$(claude "${CLAUDE_ARGS[@]}" < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
   fi
   
   # Check for completion signal
