@@ -229,7 +229,7 @@ function App() {
   const [visibleCount, setVisibleCount] = useState(1);
   const nodePositions = useRef<{ [key: string]: { x: number; y: number } }>({ ...positions });
 
-  const getNodes = (count: number) => {
+  const getNodes = useCallback((count: number) => {
     const stepNodes = allSteps.map((step, index) =>
       createNode(step, index < count, nodePositions.current[step.id])
     );
@@ -238,7 +238,7 @@ function App() {
       return createNoteNode(note, noteVisible, nodePositions.current[note.id]);
     });
     return [...stepNodes, ...noteNodes];
-  };
+  }, []);
 
   const initialNodes = getNodes(1);
   const initialEdges = edgeConnections.map((conn, index) =>
@@ -281,11 +281,11 @@ function App() {
     [setEdges]
   );
 
-  const getEdgeVisibility = (conn: typeof edgeConnections[0], visibleStepCount: number) => {
+  const getEdgeVisibility = useCallback((conn: typeof edgeConnections[0], visibleStepCount: number) => {
     const sourceIndex = allSteps.findIndex(s => s.id === conn.source);
     const targetIndex = allSteps.findIndex(s => s.id === conn.target);
     return sourceIndex < visibleStepCount && targetIndex < visibleStepCount;
-  };
+  }, []);
 
   const handleNext = useCallback(() => {
     if (visibleCount < allSteps.length) {
@@ -299,7 +299,7 @@ function App() {
         )
       );
     }
-  }, [visibleCount, setNodes, setEdges]);
+  }, [visibleCount, setNodes, setEdges, getNodes, getEdgeVisibility]);
 
   const handlePrev = useCallback(() => {
     if (visibleCount > 1) {
@@ -313,14 +313,14 @@ function App() {
         )
       );
     }
-  }, [visibleCount, setNodes, setEdges]);
+  }, [visibleCount, setNodes, setEdges, getNodes, getEdgeVisibility]);
 
   const handleReset = useCallback(() => {
     setVisibleCount(1);
     nodePositions.current = { ...positions };
     setNodes(getNodes(1));
     setEdges(edgeConnections.map((conn, index) => createEdge(conn, index < 0)));
-  }, [setNodes, setEdges]);
+  }, [setNodes, setEdges, getNodes]);
 
   return (
     <div className="app-container">
