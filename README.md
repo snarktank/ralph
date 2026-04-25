@@ -24,8 +24,9 @@ Copy the ralph files into your project:
 
 ```bash
 # From your project root
-mkdir -p scripts/ralph
+mkdir -p scripts/ralph/lib
 cp /path/to/ralph/ralph.sh scripts/ralph/
+cp /path/to/ralph/lib/rate-limit.sh scripts/ralph/lib/
 
 # Copy the prompt template for your AI tool of choice:
 cp /path/to/ralph/prompt.md scripts/ralph/prompt.md    # For Amp
@@ -119,6 +120,8 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
 
+When running with `--tool claude`, Ralph automatically detects Claude Code quota/rate-limit messages, waits until the reported reset time when possible, and retries the same iteration instead of burning through the remaining loop count.
+
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
 2. Pick the highest priority story where `passes: false`
@@ -128,6 +131,19 @@ Ralph will:
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
+
+## Smoke Test
+
+You can run a local smoke test for the loop and rate-limit handling without installing Amp or Claude Code:
+
+```bash
+./test-rate-limit.sh
+```
+
+This script mocks the CLI tools and verifies:
+- Claude quota messages with parseable reset times retry the same iteration
+- Claude quota messages without reset details fall back to a 5-hour wait
+- The default Amp path still completes normally
 
 ## Key Files
 
