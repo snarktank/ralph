@@ -47,7 +47,7 @@ Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph di
 
 **Each story must be completable in ONE Ralph iteration (one context window).**
 
-Ralph spawns a fresh Amp instance per iteration with no memory of previous work. If a story is too big, the LLM runs out of context before finishing and produces broken code.
+Ralph spawns a fresh Codex CLI instance per iteration with no memory of previous work. If a story is too big, the agent runs out of useful context before finishing and produces broken code.
 
 ### Right-sized stories:
 - Add a database column and migration
@@ -109,10 +109,10 @@ For stories with testable logic, also include:
 
 ### For stories that change UI, also include:
 ```
-"Verify in browser using dev-browser skill"
+"Verify in browser using available Codex browser tools"
 ```
 
-Frontend stories are NOT complete until visually verified. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
+Frontend stories are NOT complete until visually verified. Ralph should use available Codex browser tools to navigate to the page, interact with the UI, and confirm changes work. If browser tools are unavailable, the progress report must say manual browser verification is still needed.
 
 ---
 
@@ -189,7 +189,7 @@ Add ability to mark tasks with different statuses.
         "Each task card shows colored status badge",
         "Badge colors: gray=pending, blue=in_progress, green=done",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using available Codex browser tools"
       ],
       "priority": 2,
       "passes": false,
@@ -204,7 +204,7 @@ Add ability to mark tasks with different statuses.
         "Changing status saves immediately",
         "UI updates without page refresh",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using available Codex browser tools"
       ],
       "priority": 3,
       "passes": false,
@@ -218,7 +218,7 @@ Add ability to mark tasks with different statuses.
         "Filter dropdown: All | Pending | In Progress | Done",
         "Filter persists in URL params",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using available Codex browser tools"
       ],
       "priority": 4,
       "passes": false,
@@ -253,6 +253,6 @@ Before writing prd.json, verify:
 - [ ] Each story is completable in one iteration (small enough)
 - [ ] Stories are ordered by dependency (schema to backend to UI)
 - [ ] Every story has "Typecheck passes" as criterion
-- [ ] UI stories have "Verify in browser using dev-browser skill" as criterion
+- [ ] UI stories have "Verify in browser using available Codex browser tools" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story

@@ -24,7 +24,7 @@
         "Each task card shows colored priority badge (red=high, yellow=medium, gray=low)",
         "Priority visible without hovering or clicking",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using available Codex browser tools"
       ],
       "priority": 2,
       "passes": false,
@@ -39,7 +39,7 @@
         "Shows current priority as selected",
         "Saves immediately on selection change",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using available Codex browser tools"
       ],
       "priority": 3,
       "passes": false,
@@ -54,7 +54,7 @@
         "Filter persists in URL params",
         "Empty state message when no tasks match filter",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser using available Codex browser tools"
       ],
       "priority": 4,
       "passes": false,

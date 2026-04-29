@@ -2,6 +2,10 @@
 prd.json
 progress.txt
 .last-branch
+.last-prd.json
+.ralph.lock
+.ralph-state.json
+runs/
 
 # Archive is optional to commit
 # archive/
@@ -9,5 +13,6 @@ progress.txt
 # OS files
 .DS_Store
 
-#Claude
+# Tool state
 .claude/
+.codex/

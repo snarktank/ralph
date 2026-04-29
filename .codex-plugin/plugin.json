@@ -1,0 +1,42 @@
+{
+  "name": "ralph-skills",
+  "version": "1.0.0",
+  "description": "Skills and prompts for the Ralph autonomous Codex CLI task loop.",
+  "author": {
+    "name": "snarktank"
+  },
+  "homepage": "https://github.com/wkc0421/codex-ralph",
+  "repository": "https://github.com/wkc0421/codex-ralph",
+  "license": "MIT",
+  "keywords": [
+    "ralph",
+    "codex",
+    "prd",
+    "automation",
+    "agent",
+    "planning",
+    "requirements"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Ralph",
+    "shortDescription": "Run PRD stories through a long-running Codex CLI loop",
+    "longDescription": "Ralph converts PRDs into small JSON stories and runs fresh Codex CLI iterations until every story is complete, preserving memory through git history, progress.txt, and prd.json.",
+    "developerName": "snarktank",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/wkc0421/codex-ralph",
+    "privacyPolicyURL": "https://github.com/wkc0421/codex-ralph",
+    "termsOfServiceURL": "https://github.com/wkc0421/codex-ralph",
+    "defaultPrompt": [
+      "Create a PRD for this feature",
+      "Convert this PRD to Ralph prd.json",
+      "Run Ralph with Codex CLI"
+    ],
+    "brandColor": "#111827",
+    "screenshots": []
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Ralph is an autonomous AI agent loop that runs Codex CLI repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Amp and Claude Code remain supported as legacy tool options.
 
 ## Commands
 
@@ -13,8 +13,11 @@ cd flowchart && npm run dev
 # Build the flowchart
 cd flowchart && npm run build
 
-# Run Ralph with Amp (default)
+# Run Ralph with Codex CLI (default)
 ./ralph.sh [max_iterations]
+
+# Run Ralph with Amp
+./ralph.sh --tool amp [max_iterations]
 
 # Run Ralph with Claude Code
 ./ralph.sh --tool claude [max_iterations]
@@ -22,10 +25,12 @@ cd flowchart && npm run build
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
-- `prompt.md` - Instructions given to each AMP instance
--  `CLAUDE.md` - Instructions given to each Claude Code instance
+- `ralph.sh` - The bash loop that spawns fresh AI instances (defaults to Codex CLI; supports `--tool amp` or `--tool claude`)
+- `CODEX.md` - Instructions given to each Codex CLI instance
+- `prompt.md` - Legacy instructions given to each Amp instance
+- `CLAUDE.md` - Legacy instructions given to each Claude Code instance
 - `prd.json.example` - Example PRD format
+- `runs/` - Generated structured logs for long-running Ralph executions
 - `flowchart/` - Interactive React Flow diagram explaining how Ralph works
 
 ## Flowchart
@@ -41,7 +46,7 @@ npm run dev
 
 ## Patterns
 
-- Each iteration spawns a fresh AI instance (Amp or Claude Code) with clean context
-- Memory persists via git history, `progress.txt`, and `prd.json`
+- Each iteration spawns a fresh AI instance (Codex CLI by default) with clean context
+- Memory persists via git history, `progress.txt`, `prd.json`, and `runs/`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations
