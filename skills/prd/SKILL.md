@@ -10,6 +10,27 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 
 ---
 
+## MVP Scoping Discipline (enforce at authoring time)
+
+Simplicity is enforced **here**, when the work is defined — not later. Before
+writing any user story:
+
+- **Collapse to the 2–3 highest-impact stories** that deliver the core value.
+  Everything else is a candidate for Non-Goals, not a story.
+- **Strip non-essential complexity.** Reject speculative generality, "while
+  we're here" additions, configurability nobody asked for, and gold-plating.
+  If a requirement is not needed to make the core scenario work, cut it or move
+  it to Open Questions.
+- **Right-size every story to one focused session** (one context window). If you
+  can't describe the change in 2–3 sentences, it is too big — split it.
+- **Prefer the boring, existing pattern** over a new abstraction.
+
+When in doubt, ship less. A tight PRD that the loop can actually finish beats a
+comprehensive one it stalls on. This discipline is inherited by `/add-feature`
+for mid-project additions.
+
+---
+
 ## The Job
 
 1. Receive a feature description from the user

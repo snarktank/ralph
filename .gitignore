@@ -3,11 +3,27 @@ prd.json
 progress.txt
 .last-branch
 
+# Control-layer runtime artifacts (generated during runs)
+cost.jsonl
+rundown/
+
 # Archive is optional to commit
 # archive/
 
 # OS files
 .DS_Store
 
-#Claude
-.claude/
+# Claude — ship project hook config (.claude/settings.json) but keep
+# personal/local settings and any session state out of git.
+.claude/settings.local.json
+.claude/*.local.json
+.claude/projects/
+.claude/todos/
+.claude/shell-snapshots/
+.claude/statsig/
+.claude/history.jsonl
+.claude/__pycache__/
+
+# Python
+__pycache__/
+*.pyc

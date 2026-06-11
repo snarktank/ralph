@@ -1,0 +1,15 @@
+{
+  "$comment": "Ralph control layer — cost capture hook (Block G). SessionEnd fires once per agent session; cost_hook.py appends one line to cost.jsonl. Config only; ralph.sh is never modified. Per PRD 11.1, confirm the SessionEnd binding/field names against the current Claude Code hooks reference.",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/cost_hook.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

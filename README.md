@@ -4,6 +4,8 @@
 
 Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
 
+This fork adds a **[control layer](#control-layer)** beside the loop (`ralph.sh` unchanged): skip-then-block escalation, an audit that doubles as a morning rundown, attributable cost tracking with forecasts, `/add-feature`, and one-command scheduling.
+
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
@@ -129,6 +131,29 @@ Ralph will:
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
 
+## Control Layer
+
+A trust-and-control wrapper beside the loop. `ralph.sh` is never modified. Run from the repo root (stdlib-Python, no deps).
+
+```bash
+./ralph run --tool claude 10   # run the loop (tagged run id + dated rundown)
+./ralph audit                  # the morning rundown — read this after a run
+```
+
+| Command | Does |
+|---------|------|
+| `./ralph run --tool claude 10` | Run the loop; on finish writes `rundown/YYYY-MM-DD.txt` |
+| `./ralph audit` | % done · active to-do · blocked-with-reasons · cost line |
+| `./ralph cost [--all]` | Spend · burn rate · cost-per-green · loop/cost forecasts |
+| `./ralph schedule "0 2 * * *"` | Cron the loop · `--off` removes · no-arg prints current |
+| `/add-feature <desc>` | Append items to `prd.json` mid-run (Claude Code skill) |
+
+- **Skip-then-block** — an item that fails `meta.maxAttempts` (K=3) times is marked `blocked` with a one-line reason and skipped, so one hard task never stalls the run. Blocked items surface in `./ralph audit`.
+- **Cost tracking** — a SessionEnd hook (`.claude/settings.json` → `cost_hook.py`) logs each session's `total_cost_usd` to `cost.jsonl`. Loop runs are tagged via `RALPH_RUN_ID`; ad-hoc sessions stay separable. Forecasts are labelled cold-prior vs warm-empirical.
+- **Aliases (optional):** `alias ralph='$(pwd)/ralph'` then `ralph audit`, `ralph cost`.
+
+Tests: `python3 -m unittest discover -s tests`
+
 ## Key Files
 
 | File | Purpose |
@@ -136,13 +161,22 @@ Ralph will:
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
 | `prompt.md` | Prompt template for Amp |
 | `CLAUDE.md` | Prompt template for Claude Code |
-| `prd.json` | User stories with `passes` status (the task list) |
+| `prd.json` | Items (`{meta, items}`) with `passes`/`blocked` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.txt` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 | `.claude-plugin/` | Plugin manifest for Claude Code marketplace discovery |
 | `flowchart/` | Interactive visualization of how Ralph works |
+| **Control layer** | |
+| `ralph` | Dispatcher: `audit` · `cost` · `schedule` · `run` |
+| `project_audit.py` | The `audit` rundown |
+| `ralph_cost.py` | `ralph cost` — spend analysis + forecasts |
+| `ralph_schedule.py` | `ralph schedule` — cron management |
+| `cost_hook.py` | SessionEnd hook that logs each session to `cost.jsonl` |
+| `ralph-run.sh` | Launch wrapper: tags `RALPH_RUN_ID`, dumps dated rundown |
+| `skills/add-feature/` | Skill to append work mid-run |
+| `ralph_prd.py` | Shared `prd.json` loader (field defaults, selection logic) |
 
 ## Flowchart
 
@@ -211,8 +245,8 @@ When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>
 Check current state:
 
 ```bash
-# See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
+# See item status (done / blocked) — or just run ./ralph audit
+jq '.items[] | {id, passes, blocked, blockReason}' prd.json
 
 # See learnings from previous iterations
 cat progress.txt

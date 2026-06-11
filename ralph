@@ -1,0 +1,37 @@
+#!/bin/bash
+# ralph — control-plane dispatcher for the Ralph control layer.
+#
+# Thin router over the standalone scripts so the documented `ralph cost` /
+# `ralph schedule` invocations work from one entrypoint. Does NOT touch or
+# replace ralph.sh (the inherited loop) — `ralph run` wraps it via ralph-run.sh.
+#
+#   ralph audit [...]        morning rundown        -> project_audit.py
+#   ralph cost  [...]        spend analysis         -> ralph_cost.py
+#   ralph schedule [...]     cron scheduling        -> ralph_schedule.py
+#   ralph run   [...]        launch the loop (tagged run id + rundown)
+#   ralph add-feature ...    append a feature (see /add-feature skill)
+#
+# Suggested aliases (add to your shell rc):
+#   alias ralph='/path/to/ralph'
+#   alias audit='/path/to/ralph audit'
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cmd="$1"; shift 2>/dev/null || true
+
+case "$cmd" in
+  audit)       exec python3 "$SCRIPT_DIR/project_audit.py" "$@" ;;
+  cost)        exec python3 "$SCRIPT_DIR/ralph_cost.py" "$@" ;;
+  schedule)    exec python3 "$SCRIPT_DIR/ralph_schedule.py" "$@" ;;
+  run)         exec "$SCRIPT_DIR/ralph-run.sh" "$@" ;;
+  add-feature)
+    echo "Run the /add-feature skill inside Claude Code, or describe the feature"
+    echo "to the agent. See skills/add-feature/SKILL.md."
+    ;;
+  ""|-h|--help|help)
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    echo "ralph: unknown command '$cmd' (try: audit, cost, schedule, run, add-feature)" >&2
+    exit 1
+    ;;
+esac
