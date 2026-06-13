@@ -1,0 +1,31 @@
+{
+  "storyId": "US-001",
+  "storyTitle": "Add priority field to database",
+  "roundNumber": 1,
+  "score": 0,
+  "proposedScope": "添加 priority 列到 tasks 表，生成 migration，更新类型定义",
+  "verificationSteps": [
+    "启动开发服务器",
+    "检查 migration 文件是否创建",
+    "运行 migration 确认无报错",
+    "检查生成的类型定义包含 priority 字段"
+  ],
+  "acceptanceCriteria": [
+    "tasks 表新增 priority 列，类型为枚举 'high'|'medium'|'low'，默认 'medium'",
+    "migration 可成功执行和回滚",
+    "TypeScript 类型定义同步更新",
+    "Typecheck 通过"
+  ],
+  "status": "proposed",
+  "history": [
+    {
+      "timestamp": "2026-05-09T10:00:00Z",
+      "actor": "generator",
+      "action": "proposed",
+      "message": "初始提案"
+    }
+  ],
+  "lockedAt": null,
+  "evaluatorSignature": null,
+  "generatorSignature": "generator-v1"
+}
