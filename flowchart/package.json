@@ -1,6 +1,7 @@
 {
   "name": "flowchart",
   "private": true,
+  "packageManager": "npm@11.19.0",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
